@@ -1,0 +1,234 @@
+{
+  "schema_version": "1.0",
+  "company": {
+    "name": "TechVenture Corp",
+    "incorporation_date": "2022-01-01",
+    "current_date": "2024-10-25",
+    "current_pps": 7.5
+  },
+  "holders": [
+    {
+      "holder_id": "b5c77236-6c7f-4811-a3be-119c6af50d45",
+      "name": "David Chen",
+      "type": "founder",
+      "email": "david@techventure.com"
+    },
+    {
+      "holder_id": "55361742-75ab-45da-86bc-55080b972d89",
+      "name": "Emma Wilson",
+      "type": "founder",
+      "email": "emma@techventure.com"
+    },
+    {
+      "holder_id": "4f73ed1c-49cf-4be7-b997-2d8cbdbeee8a",
+      "name": "Frank Thomas",
+      "type": "employee",
+      "email": "frank@techventure.com"
+    },
+    {
+      "holder_id": "b3d17114-aa56-49ca-a6b7-8d25f76aec96",
+      "name": "Grace Lee",
+      "type": "employee",
+      "email": "grace@techventure.com"
+    },
+    {
+      "holder_id": "91a2c80e-3210-46e0-bc32-d3b326fedec7",
+      "name": "Seed Ventures LLC",
+      "type": "investor"
+    },
+    {
+      "holder_id": "3c5a661f-ed9c-431d-b76b-9dee096bc423",
+      "name": "Alpha Capital Partners",
+      "type": "investor"
+    },
+    {
+      "holder_id": "8f0a4bb7-7f12-44ba-8b47-63500e2ae84e",
+      "name": "Beta Growth Fund",
+      "type": "investor"
+    },
+    {
+      "holder_id": "2b2d1491-5539-4771-9ea8-056ea41d5c50",
+      "name": "Unallocated Option Pool",
+      "type": "option_pool"
+    }
+  ],
+  "classes": [
+    {
+      "class_id": "221af0ec-6f6b-4535-8ace-9ee1c7945563",
+      "name": "Common Stock",
+      "type": "common",
+      "conversion_ratio": 1.0
+    },
+    {
+      "class_id": "1c3b53cc-975e-4b93-b9ca-40477cb2907a",
+      "name": "Stock Options",
+      "type": "option",
+      "conversion_ratio": 1.0
+    },
+    {
+      "class_id": "2140f8bb-239f-45ef-a882-8e3e1fec7863",
+      "name": "Seed Preferred",
+      "type": "preferred",
+      "terms_id": "00fc791c-3a3d-4af4-9ae9-453733ce83e2",
+      "conversion_ratio": 1.0
+    },
+    {
+      "class_id": "209eeedd-3e28-4bce-abd9-1985227cbdce",
+      "name": "Series A Preferred",
+      "type": "preferred",
+      "terms_id": "f3e3c41d-3a6c-45d1-b317-ba2cfa154c3c",
+      "conversion_ratio": 1.0
+    },
+    {
+      "class_id": "3ccd35f0-baa8-4a97-baf6-e592978d5115",
+      "name": "Series B Preferred",
+      "type": "preferred",
+      "terms_id": "e413afee-897d-4bcd-b23c-c9062ba55c44",
+      "conversion_ratio": 1.0
+    }
+  ],
+  "terms": [
+    {
+      "terms_id": "00fc791c-3a3d-4af4-9ae9-453733ce83e2",
+      "name": "Seed Preferred Terms",
+      "liquidation_multiple": 1.0,
+      "participation_type": "non_participating",
+      "seniority_rank": 3,
+      "anti_dilution": "weighted_average"
+    },
+    {
+      "terms_id": "f3e3c41d-3a6c-45d1-b317-ba2cfa154c3c",
+      "name": "Series A Preferred Terms",
+      "liquidation_multiple": 1.0,
+      "participation_type": "participating",
+      "seniority_rank": 2,
+      "anti_dilution": "weighted_average"
+    },
+    {
+      "terms_id": "e413afee-897d-4bcd-b23c-c9062ba55c44",
+      "name": "Series B Preferred Terms",
+      "liquidation_multiple": 1.5,
+      "participation_type": "participating",
+      "seniority_rank": 1,
+      "anti_dilution": "weighted_average"
+    }
+  ],
+  "instruments": [
+    {
+      "instrument_id": "3a1ee839-e71f-4cc2-a74c-65b330dc9586",
+      "holder_id": "b5c77236-6c7f-4811-a3be-119c6af50d45",
+      "class_id": "221af0ec-6f6b-4535-8ace-9ee1c7945563",
+      "initial_quantity": 5000000,
+      "acquisition_price": 0.001,
+      "acquisition_date": "2022-01-01"
+    },
+    {
+      "instrument_id": "c140777e-98be-46ef-948b-413370427ef3",
+      "holder_id": "55361742-75ab-45da-86bc-55080b972d89",
+      "class_id": "221af0ec-6f6b-4535-8ace-9ee1c7945563",
+      "initial_quantity": 5000000,
+      "acquisition_price": 0.001,
+      "acquisition_date": "2022-01-01"
+    },
+    {
+      "instrument_id": "913321ed-69ce-41de-92ce-da9e56f7aa9a",
+      "holder_id": "2b2d1491-5539-4771-9ea8-056ea41d5c50",
+      "class_id": "1c3b53cc-975e-4b93-b9ca-40477cb2907a",
+      "initial_quantity": 2000000,
+      "strike_price": 0.1,
+      "acquisition_date": "2022-01-01"
+    },
+    {
+      "instrument_id": "60601400-b350-43eb-935b-74b9d8252933",
+      "holder_id": "4f73ed1c-49cf-4be7-b997-2d8cbdbeee8a",
+      "class_id": "1c3b53cc-975e-4b93-b9ca-40477cb2907a",
+      "initial_quantity": 400000,
+      "strike_price": 0.5,
+      "acquisition_date": "2022-06-01",
+      "vesting_terms": {
+        "grant_date": "2022-06-01",
+        "cliff_days": 365,
+        "vesting_period_days": 1460
+      }
+    },
+    {
+      "instrument_id": "35335348-00e1-498f-857a-2588177770dd",
+      "holder_id": "b3d17114-aa56-49ca-a6b7-8d25f76aec96",
+      "class_id": "1c3b53cc-975e-4b93-b9ca-40477cb2907a",
+      "initial_quantity": 300000,
+      "strike_price": 1.0,
+      "acquisition_date": "2023-03-01",
+      "vesting_terms": {
+        "grant_date": "2023-03-01",
+        "cliff_days": 365,
+        "vesting_period_days": 1460
+      }
+    },
+    {
+      "instrument_id": "098d9685-df3d-4826-a177-61546aa50163",
+      "holder_id": "91a2c80e-3210-46e0-bc32-d3b326fedec7",
+      "class_id": "2140f8bb-239f-45ef-a882-8e3e1fec7863",
+      "round_id": "e99459e8-1027-4c73-8966-5fc11ed5f350",
+      "initial_quantity": 3000000,
+      "acquisition_price": 1.0,
+      "acquisition_date": "2022-12-01"
+    },
+    {
+      "instrument_id": "9c833799-52e1-438d-9796-19f2abb4041e",
+      "holder_id": "3c5a661f-ed9c-431d-b76b-9dee096bc423",
+      "class_id": "209eeedd-3e28-4bce-abd9-1985227cbdce",
+      "round_id": "157bae6a-8482-48e4-857e-05d7e01827d6",
+      "initial_quantity": 4000000,
+      "acquisition_price": 2.5,
+      "acquisition_date": "2023-09-01"
+    },
+    {
+      "instrument_id": "114f23d8-50d9-415b-b917-52bc5846a73f",
+      "holder_id": "8f0a4bb7-7f12-44ba-8b47-63500e2ae84e",
+      "class_id": "3ccd35f0-baa8-4a97-baf6-e592978d5115",
+      "round_id": "720ce81e-6d13-4e5f-9234-07ea2db876e2",
+      "initial_quantity": 3333333,
+      "acquisition_price": 6.0,
+      "acquisition_date": "2024-06-01"
+    }
+  ],
+  "rounds": [
+    {
+      "round_id": "e99459e8-1027-4c73-8966-5fc11ed5f350",
+      "name": "Seed Round",
+      "round_date": "2022-12-01",
+      "investment_amount": 3000000,
+      "pre_money_valuation": 12000000,
+      "post_money_valuation": 15000000,
+      "price_per_share": 1.0,
+      "shares_issued": 3000000
+    },
+    {
+      "round_id": "157bae6a-8482-48e4-857e-05d7e01827d6",
+      "name": "Series A",
+      "round_date": "2023-09-01",
+      "investment_amount": 10000000,
+      "pre_money_valuation": 40000000,
+      "post_money_valuation": 50000000,
+      "price_per_share": 2.5,
+      "shares_issued": 4000000
+    },
+    {
+      "round_id": "720ce81e-6d13-4e5f-9234-07ea2db876e2",
+      "name": "Series B",
+      "round_date": "2024-06-01",
+      "investment_amount": 20000000,
+      "pre_money_valuation": 100000000,
+      "post_money_valuation": 120000000,
+      "price_per_share": 6.0,
+      "shares_issued": 3333333
+    }
+  ],
+  "waterfall_scenarios": [
+    {
+      "scenario_id": "fdcf9901-2b51-4a1b-9abf-43bb5827a520",
+      "name": "Exit at $200M",
+      "exit_value": 200000000
+    }
+  ]
+}

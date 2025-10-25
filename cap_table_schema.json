@@ -1,0 +1,475 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://captable.schema/v1",
+  "title": "Cap Table Schema",
+  "description": "Dynamic capitalization table with formula-driven calculations",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "company",
+    "holders",
+    "classes",
+    "instruments"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "company": {
+      "$ref": "#/$defs/Company"
+    },
+    "holders": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Holder"
+      }
+    },
+    "classes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SecurityClass"
+      }
+    },
+    "terms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TermsPackage"
+      }
+    },
+    "instruments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Instrument"
+      }
+    },
+    "rounds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Round"
+      }
+    },
+    "waterfall_scenarios": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/WaterfallScenario"
+      }
+    }
+  },
+  "$defs": {
+    "UUID": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "UUID v4 format identifier"
+    },
+    "FormulaEncodingObject": {
+      "type": "object",
+      "required": [
+        "is_calculated",
+        "formula_string",
+        "dependency_refs",
+        "output_type"
+      ],
+      "properties": {
+        "is_calculated": {
+          "type": "boolean",
+          "const": true,
+          "description": "Flag indicating this field requires formula injection"
+        },
+        "formula_string": {
+          "type": "string",
+          "description": "Excel formula using symbolic placeholders (US English syntax)"
+        },
+        "dependency_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["placeholder", "path"],
+            "properties": {
+              "placeholder": {
+                "type": "string",
+                "description": "Symbolic name used in formula_string"
+              },
+              "path": {
+                "type": "string",
+                "description": "JSON Pointer to data or UUID reference"
+              },
+              "reference_type": {
+                "type": "string",
+                "enum": [
+                  "named_range",
+                  "structured_reference",
+                  "cell_reference",
+                  "uuid_lookup"
+                ],
+                "description": "Type of Excel reference to generate"
+              }
+            }
+          },
+          "description": "List of symbolic references to resolve"
+        },
+        "output_type": {
+          "type": "string",
+          "enum": ["named_range", "structured_reference", "cell_reference"],
+          "description": "Required Excel reference style for output"
+        }
+      }
+    },
+    "Company": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Company name"
+        },
+        "incorporation_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of incorporation (YYYY-MM-DD)"
+        },
+        "current_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Current date for calculations (YYYY-MM-DD)"
+        },
+        "current_pps": {
+          "type": "number",
+          "description": "Current price per share for TSM calculations"
+        }
+      }
+    },
+    "Holder": {
+      "type": "object",
+      "required": ["holder_id", "name", "type"],
+      "properties": {
+        "holder_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Holder name or institution name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["founder", "employee", "investor", "advisor", "option_pool"],
+          "description": "Type of shareholder"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Contact email (optional)"
+        }
+      }
+    },
+    "SecurityClass": {
+      "type": "object",
+      "required": ["class_id", "name", "type"],
+      "properties": {
+        "class_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Security class name (e.g., 'Common Stock', 'Series A Preferred')"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "common",
+            "preferred",
+            "option",
+            "warrant",
+            "safe",
+            "convertible_note"
+          ],
+          "description": "Type of security instrument"
+        },
+        "terms_id": {
+          "$ref": "#/$defs/UUID",
+          "description": "Reference to Terms Package (required for preferred shares)"
+        },
+        "conversion_ratio": {
+          "type": "number",
+          "default": 1.0,
+          "description": "Default conversion ratio to common"
+        }
+      }
+    },
+    "TermsPackage": {
+      "type": "object",
+      "required": ["terms_id", "name"],
+      "properties": {
+        "terms_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the terms package"
+        },
+        "liquidation_multiple": {
+          "type": "number",
+          "default": 1.0,
+          "description": "Liquidation preference multiple (e.g., 1.0 for 1x, 2.0 for 2x)"
+        },
+        "participation_type": {
+          "type": "string",
+          "enum": [
+            "non_participating",
+            "participating",
+            "capped_participating"
+          ],
+          "default": "non_participating",
+          "description": "Whether preferred shares participate in remaining proceeds"
+        },
+        "participation_cap": {
+          "type": "number",
+          "description": "Cap multiple for capped participating (e.g., 2.0 for 2x)"
+        },
+        "seniority_rank": {
+          "type": "integer",
+          "description": "Determines payout order in waterfall (lower number = more senior)"
+        },
+        "dividend_rate": {
+          "type": "number",
+          "description": "Annual dividend rate as decimal (e.g., 0.08 for 8%)"
+        },
+        "anti_dilution": {
+          "type": "string",
+          "enum": ["none", "weighted_average", "full_ratchet"],
+          "description": "Anti-dilution protection type"
+        }
+      }
+    },
+    "Instrument": {
+      "type": "object",
+      "required": [
+        "instrument_id",
+        "holder_id",
+        "class_id",
+        "initial_quantity"
+      ],
+      "properties": {
+        "instrument_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "holder_id": {
+          "$ref": "#/$defs/UUID",
+          "description": "Reference to holder"
+        },
+        "class_id": {
+          "$ref": "#/$defs/UUID",
+          "description": "Reference to security class"
+        },
+        "round_id": {
+          "$ref": "#/$defs/UUID",
+          "description": "Reference to financing round (optional, for new shares)"
+        },
+        "initial_quantity": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Initial number of shares or options granted"
+        },
+        "current_quantity": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/FormulaEncodingObject"
+            }
+          ],
+          "description": "Current shares (may be calculated for vesting)"
+        },
+        "strike_price": {
+          "type": "number",
+          "description": "Exercise price for options/warrants"
+        },
+        "acquisition_price": {
+          "type": "number",
+          "description": "Original issue price paid per share"
+        },
+        "acquisition_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of acquisition (YYYY-MM-DD)"
+        },
+        "vesting_terms": {
+          "$ref": "#/$defs/VestingTerms",
+          "description": "Vesting schedule (for options/grants)"
+        },
+        "convertible_terms": {
+          "$ref": "#/$defs/ConvertibleTerms",
+          "description": "Conversion terms (for SAFEs, convertible notes)"
+        }
+      }
+    },
+    "VestingTerms": {
+      "type": "object",
+      "required": ["grant_date", "cliff_days", "vesting_period_days"],
+      "properties": {
+        "grant_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date options were granted (YYYY-MM-DD)"
+        },
+        "cliff_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Cliff period in days (e.g., 365 for 1 year cliff)"
+        },
+        "vesting_period_days": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total vesting period in days (e.g., 1460 for 4 years)"
+        },
+        "vested_quantity": {
+          "$ref": "#/$defs/FormulaEncodingObject",
+          "description": "Calculated vested shares (will be auto-generated)"
+        }
+      }
+    },
+    "ConvertibleTerms": {
+      "type": "object",
+      "properties": {
+        "investment_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Investment amount in convertible security"
+        },
+        "discount_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Discount on conversion price (e.g., 0.20 for 20%)"
+        },
+        "price_cap": {
+          "type": "number",
+          "description": "Valuation cap for conversion"
+        },
+        "conversion_shares": {
+          "$ref": "#/$defs/FormulaEncodingObject",
+          "description": "Calculated shares on conversion (will be auto-generated)"
+        }
+      }
+    },
+    "Round": {
+      "type": "object",
+      "required": ["round_id", "name", "round_date"],
+      "properties": {
+        "round_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Round name (e.g., 'Seed Round', 'Series A')"
+        },
+        "round_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Round closing date (YYYY-MM-DD)"
+        },
+        "investment_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total investment amount in this round"
+        },
+        "pre_money_valuation": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/FormulaEncodingObject"
+            }
+          ],
+          "description": "Pre-money valuation"
+        },
+        "post_money_valuation": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/FormulaEncodingObject"
+            }
+          ],
+          "description": "Post-money valuation"
+        },
+        "price_per_share": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/FormulaEncodingObject"
+            }
+          ],
+          "description": "Price per share in this round"
+        },
+        "shares_issued": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/FormulaEncodingObject"
+            }
+          ],
+          "description": "Total shares issued in this round"
+        },
+        "option_pool_increase": {
+          "type": "object",
+          "properties": {
+            "target_pool_percent": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Target option pool percentage (e.g., 0.20 for 20%)"
+            },
+            "shares_added": {
+              "$ref": "#/$defs/FormulaEncodingObject",
+              "description": "Shares added to option pool (will be auto-generated)"
+            }
+          }
+        }
+      }
+    },
+    "WaterfallScenario": {
+      "type": "object",
+      "required": ["scenario_id", "name", "exit_value"],
+      "properties": {
+        "scenario_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Scenario name (e.g., 'Exit at $50M')"
+        },
+        "exit_value": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Exit valuation for this scenario"
+        },
+        "payouts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["class_id"],
+            "properties": {
+              "class_id": {
+                "$ref": "#/$defs/UUID",
+                "description": "Reference to security class"
+              },
+              "payout_amount": {
+                "$ref": "#/$defs/FormulaEncodingObject",
+                "description": "Calculated payout (will be auto-generated)"
+              }
+            }
+          },
+          "description": "Payout calculations by security class"
+        }
+      }
+    }
+  }
+}
