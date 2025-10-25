@@ -81,7 +81,7 @@ This creates:
 #### From JSON File
 
 ```python
-from cap_table_generator import generate_from_json
+from src.captable import generate_from_json
 
 excel_path = generate_from_json(
     json_path="my_captable.json",
@@ -92,7 +92,7 @@ excel_path = generate_from_json(
 #### From Data Dictionary
 
 ```python
-from cap_table_generator import generate_from_data
+from src.captable import generate_from_data
 
 data = {
     "schema_version": "1.0",
@@ -108,7 +108,7 @@ excel_path = generate_from_data(data, "output.xlsx")
 #### With Validation
 
 ```python
-from cap_table_generator import CapTableGenerator
+from src.captable import CapTableGenerator
 
 generator = CapTableGenerator(json_path="captable.json")
 
@@ -279,12 +279,14 @@ For calculated fields, use FEO structure:
 
 ### Component Overview
 
-1. **json_schema.py**: JSON Schema definition (Draft 2019-09)
-2. **cap_table_schema.py**: Validation engine with custom validators
-3. **deterministic_layout_map.py**: Maps JSON → Excel addresses
-4. **formula_resolver.py**: Translates FEO → Excel formulas
-5. **excel_generator.py**: Creates workbooks with xlsxwriter
-6. **cap_table_generator.py**: Main orchestrator
+The code is organized in the `src/captable/` package:
+
+1. **schema.py**: JSON Schema definition (Draft 2019-09)
+2. **validation.py**: Validation engine with custom validators
+3. **dlm.py**: Maps JSON → Excel addresses
+4. **formulas.py**: Translates FEO → Excel formulas
+5. **excel.py**: Creates workbooks with xlsxwriter
+6. **generator.py**: Main orchestrator
 
 ### Formula Resolution Pipeline
 
@@ -311,10 +313,10 @@ Run the comprehensive test suite:
 
 ```bash
 # Run all tests
-python test_cap_table.py
+python -m pytest tests/test_cap_table.py -v
 
-# Or use pytest
-pytest test_cap_table.py -v
+# Or from the tests directory
+cd tests && python test_cap_table.py
 ```
 
 Test coverage includes:

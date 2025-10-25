@@ -7,14 +7,14 @@ from jsonschema import Draft201909Validator, ValidationError
 from jsonschema.exceptions import SchemaError
 import re
 from typing import Dict, List, Any, Tuple
-from json_schema import get_schema
+from .schema import CAP_TABLE_SCHEMA
 
 
 class CapTableValidator:
     """Validates cap table JSON data against schema with custom validators."""
     
     def __init__(self):
-        self.schema = get_schema()
+        self.schema = CAP_TABLE_SCHEMA
         self.validator = Draft201909Validator(self.schema)
         
     def validate(self, data: Dict[str, Any]) -> Tuple[bool, List[str]]:

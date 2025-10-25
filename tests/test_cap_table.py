@@ -7,10 +7,12 @@ import pytest
 import json
 import os
 from pathlib import Path
-from cap_table_schema import validate_cap_table, CapTableValidator
-from deterministic_layout_map import DeterministicLayoutMap, ExcelReference
-from formula_resolver import FormulaResolver
-from cap_table_generator import CapTableGenerator, generate_from_data
+from src.captable import (
+    validate_cap_table, CapTableValidator,
+    DeterministicLayoutMap, ExcelReference,
+    FormulaResolver,
+    CapTableGenerator, generate_from_data
+)
 from sample_data_generator import generate_simple_captable, generate_complex_captable
 
 

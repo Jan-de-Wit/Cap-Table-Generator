@@ -6,7 +6,7 @@ into actual Excel formulas with proper references.
 
 import re
 from typing import Dict, List, Any, Optional
-from deterministic_layout_map import DeterministicLayoutMap
+from .dlm import DeterministicLayoutMap
 
 
 class FormulaResolver:

@@ -4,7 +4,7 @@ Demonstrates usage by generating sample cap tables.
 """
 
 from sample_data_generator import generate_simple_captable, generate_complex_captable, save_sample_data
-from cap_table_generator import generate_from_data
+from src.captable import generate_from_data
 
 
 def main():

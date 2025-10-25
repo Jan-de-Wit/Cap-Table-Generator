@@ -6,8 +6,8 @@ Coordinates JSON validation, DLM creation, and Excel generation.
 import json
 from typing import Dict, Any, Optional
 from pathlib import Path
-from cap_table_schema import validate_cap_table
-from excel_generator import ExcelGenerator
+from .validation import validate_cap_table
+from .excel import ExcelGenerator
 
 
 class CapTableGenerator:

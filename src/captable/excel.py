@@ -7,8 +7,8 @@ Implements standardized sheet structure with Named Ranges, Excel Tables, and for
 import xlsxwriter
 from typing import Dict, List, Any, Optional
 from datetime import datetime
-from deterministic_layout_map import DeterministicLayoutMap
-from formula_resolver import FormulaResolver
+from .dlm import DeterministicLayoutMap
+from .formulas import FormulaResolver
 
 
 class ExcelGenerator:
