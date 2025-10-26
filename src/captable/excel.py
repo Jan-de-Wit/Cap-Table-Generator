@@ -401,43 +401,16 @@ class ExcelGenerator:
             sheet.write(row, col, '', self.formats['header'])
             col += 1
         
-        row += 1
+        # Data starts here
+        data_start_row = row + 1
         
-        # Track cumulative shares for each holder across rounds
-        holder_shares = {}  # holder_id -> cumulative shares
-        round_totals = {}   # round_id -> total shares
+        # Track data row positions for each holder
+        holder_row_positions = {}  # holder_id -> data row index
         
-        # Initialize
-        for holder in self.data.get('holders', []):
-            holder_shares[holder['holder_id']] = 0
+        # Write data by category and track positions
+        row = data_start_row
+        data_rows_per_holder = []  # Track which rows contain holder data (not category headers or totals)
         
-        # Calculate totals per round
-        for round_data in rounds:
-            round_id = round_data['round_id']
-            total = sum(holder_shares.values())
-            
-            # Add shares from this round
-            for instrument in instruments:
-                if instrument.get('round_id') == round_id:
-                    holder_id = instrument.get('holder_id')
-                    shares = instrument.get('initial_quantity', 0)
-                    if holder_id in holder_shares:
-                        holder_shares[holder_id] += shares
-                        total += shares
-            
-            # Also include any shares not tied to a specific round (e.g., founder shares)
-            if round_data == rounds[0]:  # First round
-                for instrument in instruments:
-                    if not instrument.get('round_id'):
-                        holder_id = instrument.get('holder_id')
-                        shares = instrument.get('initial_quantity', 0)
-                        if holder_id in holder_shares:
-                            holder_shares[holder_id] += shares
-                            total += shares
-            
-            round_totals[round_id] = max(total, 1)  # Avoid division by zero
-        
-        # Write data by category
         for category_key in ['founder', 'investor', 'employee', 'advisor', 'option_pool', 'other']:
             if category_key not in categories:
                 continue
@@ -451,13 +424,11 @@ class ExcelGenerator:
             sheet.write(row, col, category_names.get(category_key, category_key.title()), self.formats['label'])
             row += 1
             
-            # Track category totals
-            category_start_row = row
-            
             # Each holder in category
             for holder in category_holders:
                 holder_id = holder['holder_id']
                 holder_name = holder['name']
+                holder_row_positions[holder_id] = row
                 
                 col = 0
                 sheet.write(row, col, holder_name)
@@ -465,119 +436,153 @@ class ExcelGenerator:
                 sheet.write(row, col, '')  # Empty column
                 col += 1
                 
-                # Track shares for this holder
-                holder_cumulative = 0
-                holder_start_shares = 0
+                # Get new shares per round for this holder
+                new_shares_per_round = {}
+                for instrument in instruments:
+                    if instrument.get('holder_id') == holder_id:
+                        round_id = instrument.get('round_id')
+                        shares = instrument.get('initial_quantity', 0)
+                        if round_id:
+                            if round_id not in new_shares_per_round:
+                                new_shares_per_round[round_id] = 0
+                            new_shares_per_round[round_id] += shares
                 
-                # First, get shares not tied to any round (founder shares, etc.)
+                # Track start shares (non-round-specific)
+                start_shares_value = 0
                 for instrument in instruments:
                     if instrument.get('holder_id') == holder_id and not instrument.get('round_id'):
-                        holder_start_shares += instrument.get('initial_quantity', 0)
+                        start_shares_value += instrument.get('initial_quantity', 0)
                 
-                holder_cumulative = holder_start_shares
-                
-                # For each round
+                # Write data for each round with formulas
                 for round_idx, round_data in enumerate(rounds):
                     round_id = round_data['round_id']
                     
-                    # Start shares (cumulative from previous rounds)
-                    start_shares = holder_cumulative
+                    new_shares = new_shares_per_round.get(round_id, 0)
                     
-                    # New shares in this round
-                    new_shares = 0
-                    for instrument in instruments:
-                        if instrument.get('holder_id') == holder_id and instrument.get('round_id') == round_id:
-                            new_shares += instrument.get('initial_quantity', 0)
+                    # Define column positions for this round
+                    start_col_idx = col
+                    new_col_idx = col + 1
+                    total_col_idx = col + 2
+                    percent_col_idx = col + 3
                     
-                    # Total shares after this round
-                    total_shares = start_shares + new_shares
-                    holder_cumulative = total_shares
-                    
-                    # Percentage
-                    total_round_shares = round_totals.get(round_id, 1)
-                    percentage = total_shares / total_round_shares if total_round_shares > 0 else 0
-                    
-                    # Write values
-                    if start_shares == 0:
-                        sheet.write(row, col, '-')
+                    # Calculate Start shares cell reference
+                    if round_idx == 0:
+                        # First round: Start = static value (founder shares)
+                        if start_shares_value > 0:
+                            sheet.write(row, start_col_idx, start_shares_value, self.formats['number'])
+                        else:
+                            sheet.write(row, start_col_idx, 0, self.formats['number'])
                     else:
-                        sheet.write(row, col, start_shares, self.formats['number'])
-                    col += 1
+                        # Subsequent rounds: Start = previous round's Total
+                        prev_total_col_idx = total_col_idx - 5  # 5 columns back (Start, New, Total, %, separator)
+                        prev_total_col_letter = self._col_letter(prev_total_col_idx)
+                        prev_total_cell_ref = f"{prev_total_col_letter}{row + 1}"
+                        sheet.write_formula(row, start_col_idx, f"={prev_total_cell_ref}", self.formats['number'])
                     
-                    if new_shares == 0:
-                        sheet.write(row, col, '-')
-                    else:
-                        sheet.write(row, col, new_shares, self.formats['number'])
-                    col += 1
+                    # New shares: SUMIFS from Ledger table
+                    # Formula: =SUMIFS(Ledger[initial_quantity], Ledger[holder_id], holder_id, Ledger[round_id], round_id)
+                    new_formula = f'=SUMIFS(Ledger[initial_quantity], Ledger[holder_id], "{holder_id}", Ledger[round_id], "{round_id}")'
+                    sheet.write_formula(row, new_col_idx, new_formula, self.formats['number'])
                     
-                    if total_shares == 0:
-                        sheet.write(row, col, '-')
-                    else:
-                        sheet.write(row, col, total_shares, self.formats['number'])
-                    col += 1
+                    # Total = Start + New (formula)
+                    start_cell_ref = self._col_letter(start_col_idx) + str(row + 1)
+                    new_cell_ref = self._col_letter(new_col_idx) + str(row + 1)
+                    total_formula = f"={start_cell_ref} + {new_cell_ref}"
+                    sheet.write_formula(row, total_col_idx, total_formula, self.formats['number'])
                     
-                    sheet.write(row, col, percentage, self.formats['percent'])
-                    col += 1
+                    # Percentage: Total / sum of all totals for this round
+                    # We'll calculate this after we know all the holder rows
+                    # Temporarily write a placeholder
+                    sheet.write(row, percent_col_idx, 0, self.formats['percent'])
                     
-                    sheet.write(row, col, '')  # Separator
-                    col += 1
+                    # Separator
+                    col += 5
                 
                 row += 1
+                data_rows_per_holder.append(row - 1)
             
             # Blank row after category
             sheet.write(row, 0, '')
             row += 1
         
-        # TOTAL row
-        col = 0
-        sheet.write(row, col, 'TOTAL', self.formats['label'])
-        col += 1
-        sheet.write(row, col, '')
-        col += 1
+        # Now update percentage formulas for all rounds
+        sheet_name = "'Cap Table Progression'"
+        for round_idx, round_data in enumerate(rounds):
+            # Round columns: Shareholder (col 0), Sep (col 1), Start (col 2), New (col 3), Total (col 4), % (col 5), Sep (col 6), ...
+            # For each subsequent round, add 5 columns: Start (col 2+5N), New (col 3+5N), Total (col 4+5N), % (col 5+5N)
+            total_col_base = 4 + (round_idx * 5)  # Total (#) is at column 4 for round 0, 9 for round 1, etc.
+            percent_col_base = 5 + (round_idx * 5)  # % is one column after Total
+            
+            if data_rows_per_holder:
+                total_col_letter = self._col_letter(total_col_base)
+                
+                # Build sum range: all holder rows for this round's Total column
+                range_start = f"{total_col_letter}{data_rows_per_holder[0] + 1}"
+                range_end = f"{total_col_letter}{data_rows_per_holder[-1] + 1}"
+                sum_range = f"{sheet_name}!{range_start}:{range_end}"
+                
+                for holder_row in data_rows_per_holder:
+                    # Individual total cell
+                    total_cell_ref = f"{total_col_letter}{holder_row + 1}"
+                    
+                    # Percentage formula: Total / Sum of all totals
+                    percent_formula = f"=IFERROR({total_cell_ref} / SUM({sum_range}), 0)"
+                    sheet.write_formula(holder_row, percent_col_base, percent_formula, self.formats['percent'])
         
-        # Calculate totals for each round
-        for round_data in rounds:
-            round_id = round_data['round_id']
+        # TOTAL row
+        sheet.write(row, 0, 'TOTAL', self.formats['label'])
+        sheet.write(row, 1, '')
+        col = 2
+        
+        total_row = row
+        
+        # Calculate totals for each round with formulas
+        for round_idx in range(len(rounds)):
+            # Column indices for this round
+            start_col_pos = col
+            new_col_pos = col + 1
+            total_col_pos = col + 2
+            percent_col_pos = col + 3
+            sep_col_pos = col + 4
             
-            # Start: sum of all shares before this round
-            start_total = 0
-            for holder_id in holder_shares.keys():
-                cumulative = 0
-                # Add founder shares
-                for instrument in instruments:
-                    if instrument.get('holder_id') == holder_id and not instrument.get('round_id'):
-                        cumulative += instrument.get('initial_quantity', 0)
+            if data_rows_per_holder:
+                # Start: sum of all Start values from holders above
+                start_col_letter = self._col_letter(start_col_pos)
+                start_range_start = f"{start_col_letter}{data_rows_per_holder[0] + 1}"
+                start_range_end = f"{start_col_letter}{data_rows_per_holder[-1] + 1}"
+                start_formula = f"=SUM({sheet_name}!{start_range_start}:{start_range_end})"
+                sheet.write_formula(row, start_col_pos, start_formula, self.formats['number'])
                 
-                # Add shares from previous rounds
-                for prev_round in rounds:
-                    if prev_round['round_id'] == round_id:
-                        break
-                    for instrument in instruments:
-                        if instrument.get('holder_id') == holder_id and instrument.get('round_id') == prev_round['round_id']:
-                            cumulative += instrument.get('initial_quantity', 0)
+                # New: sum of all shares issued in this round from Ledger table
+                round_id = rounds[round_idx]['round_id']
+                new_formula = f'=SUMIF(Ledger[round_id], "{round_id}", Ledger[initial_quantity])'
+                sheet.write_formula(row, new_col_pos, new_formula, self.formats['number'])
                 
-                start_total += cumulative
+                # Total: sum of all Total values from holders above
+                total_col_letter = self._col_letter(total_col_pos)
+                total_range_start = f"{total_col_letter}{data_rows_per_holder[0] + 1}"
+                total_range_end = f"{total_col_letter}{data_rows_per_holder[-1] + 1}"
+                total_formula = f"=SUM({sheet_name}!{total_range_start}:{total_range_end})"
+                sheet.write_formula(row, total_col_pos, total_formula, self.formats['number'])
+                
+                # Percentage: sum of all percentages from holders above
+                percent_col_letter = self._col_letter(percent_col_pos)
+                percent_range_start = f"{percent_col_letter}{data_rows_per_holder[0] + 1}"
+                percent_range_end = f"{percent_col_letter}{data_rows_per_holder[-1] + 1}"
+                percent_formula = f"=SUM({sheet_name}!{percent_range_start}:{percent_range_end})"
+                sheet.write_formula(row, percent_col_pos, percent_formula, self.formats['percent'])
+            else:
+                # No holders, write zeros
+                sheet.write(row, start_col_pos, 0, self.formats['number'])
+                sheet.write(row, new_col_pos, 0, self.formats['number'])
+                sheet.write(row, total_col_pos, 0, self.formats['number'])
+                sheet.write(row, percent_col_pos, 0, self.formats['percent'])
             
-            # New: shares issued in this round
-            new_total = 0
-            for instrument in instruments:
-                if instrument.get('round_id') == round_id:
-                    new_total += instrument.get('initial_quantity', 0)
+            # Write separator
+            sheet.write(row, sep_col_pos, '')
             
-            # Total: start + new
-            total_total = start_total + new_total
-            
-            # Write totals
-            sheet.write(row, col, start_total if start_total > 0 else 0, self.formats['number'])
-            col += 1
-            sheet.write(row, col, new_total if new_total > 0 else 0, self.formats['number'])
-            col += 1
-            sheet.write(row, col, total_total, self.formats['number'])
-            col += 1
-            sheet.write(row, col, 1.0, self.formats['percent'])  # Always 100%
-            col += 1
-            sheet.write(row, col, '')
-            col += 1
+            # Move to next round (5 columns ahead: Start, New, Total, %, Sep)
+            col = sep_col_pos + 1
         
         # Set column widths
         sheet.set_column(0, 0, 20)  # Shareholder names
