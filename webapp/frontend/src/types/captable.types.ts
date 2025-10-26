@@ -24,16 +24,38 @@ export interface SecurityClass {
   conversion_ratio?: number;
 }
 
+export interface ConvertibleTerms {
+  investment_amount: number;
+  discount_rate?: number;
+  price_cap?: number;
+  interest_rate?: number;
+  investment_start_date?: string;
+  interest_type?: 'simple' | 'compound';
+  accrued_interest?: number;
+  conversion_shares?: any;
+}
+
 export interface Instrument {
   instrument_id: string;
   holder_id: string;
   class_id: string;
   round_id?: string;
-  initial_quantity: number;
+  initial_quantity?: number;
   current_quantity?: number;
   strike_price?: number;
   acquisition_price?: number;
   acquisition_date?: string;
+  // Valuation-based calculation fields
+  investment_amount?: number;
+  valuation_basis?: 'pre_money' | 'post_money';
+  interest_rate?: number;
+  interest_start_date?: string;
+  interest_type?: 'simple' | 'compound';
+  accrued_interest?: number;
+  // Convertible securities
+  convertible_terms?: ConvertibleTerms;
+  // Vesting
+  vesting_terms?: any;
 }
 
 export interface Round {
@@ -45,6 +67,7 @@ export interface Round {
   post_money_valuation?: number;
   price_per_share?: number;
   shares_issued?: number;
+  pre_round_shares?: number;
 }
 
 export interface CapTable {

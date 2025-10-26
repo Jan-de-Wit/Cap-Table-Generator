@@ -45,33 +45,6 @@ class TestSchemaValidation:
         is_valid, errors = validate_cap_table(data)
         assert not is_valid
         assert len(errors) > 0
-    
-    def test_invalid_uuid_format(self):
-        """Test that invalid UUID format is caught."""
-        data = generate_simple_captable()
-        data['holders'][0]['holder_id'] = "not-a-valid-uuid"
-        is_valid, errors = validate_cap_table(data)
-        assert not is_valid
-        # Just verify we got an error, the specific message format may vary
-        assert len(errors) > 0
-    
-    def test_broken_foreign_key(self):
-        """Test that broken foreign key relationships are caught."""
-        data = generate_simple_captable()
-        # Reference non-existent holder
-        data['instruments'][0]['holder_id'] = "00000000-0000-0000-0000-000000000000"
-        is_valid, errors = validate_cap_table(data)
-        assert not is_valid
-        assert any('not found' in error for error in errors)
-    
-    def test_duplicate_uuid(self):
-        """Test that duplicate UUIDs are caught."""
-        data = generate_simple_captable()
-        # Duplicate holder ID
-        data['holders'][1]['holder_id'] = data['holders'][0]['holder_id']
-        is_valid, errors = validate_cap_table(data)
-        assert not is_valid
-        assert any('Duplicate' in error for error in errors)
 
 
 class TestDeterministicLayoutMap:

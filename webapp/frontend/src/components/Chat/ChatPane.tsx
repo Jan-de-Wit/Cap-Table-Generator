@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { ToolCallApproval } from '../ToolCallApproval';
@@ -50,6 +51,7 @@ export function ChatPane() {
     setThinkingStatus({ isThinking: true, startTime: Date.now() });
     
     let fullResponse = '';
+    let currentSegment = '';
     
     try {
       await chatStream(
@@ -57,16 +59,20 @@ export function ChatPane() {
         // onMessage
         (chunk) => {
           fullResponse += chunk;
-          streamingRef.current = fullResponse;
-          // Update state with accumulated response for streaming
-          setStreamingContent(fullResponse);
+          currentSegment += chunk;
+          streamingRef.current = currentSegment;
+          // Use flushSync to force immediate DOM update for streaming
+          flushSync(() => {
+            setStreamingContent(currentSegment);
+          });
         },
         // onComplete
         (data) => {
-          // Add assistant message
-          if (fullResponse.trim()) {
-            addMessage({ role: 'assistant', content: fullResponse, timestamp: Date.now() });
+          // Add final segment if there's any content left
+          if (currentSegment.trim()) {
+            addMessage({ role: 'assistant', content: currentSegment, timestamp: Date.now() });
           }
+          
           setStreamingContent('');
           streamingRef.current = '';
           setIsStreaming(false);
@@ -79,10 +85,9 @@ export function ChatPane() {
         },
         // onError
         (error) => {
-          
           // If we have partial response, save it
-          if (fullResponse.trim()) {
-            addMessage({ role: 'assistant', content: fullResponse, timestamp: Date.now() });
+          if (currentSegment.trim()) {
+            addMessage({ role: 'assistant', content: currentSegment, timestamp: Date.now() });
           }
           
           // Show error as a separate message
@@ -112,44 +117,84 @@ export function ChatPane() {
             arguments: proposal.arguments,
             status: 'pending'
           };
-          addPendingToolCall(toolCall as any);
+          flushSync(() => {
+            addPendingToolCall(toolCall as any);
+          });
         },
         // onToolResult
         (result) => {
           console.log('Tool result received:', result);
+          console.log('Result structure check:', {
+            status: result.status,
+            hasResult: !!result.result,
+            resultOk: result.result?.ok,
+            hasCapTable: !!result.result?.capTable,
+            hasMetrics: !!result.result?.metrics,
+            resultKeys: result.result ? Object.keys(result.result) : []
+          });
           
-          if (result.status === 'success' && result.result) {
-            if (result.result.ok && result.result.capTable && result.result.metrics) {
+          flushSync(() => {
+            // Always try to update cap table if we have the data
+            if (result.result && result.result.capTable && result.result.metrics) {
+              console.log('Updating cap table with result data');
               setCapTable(result.result.capTable);
               setMetrics(result.result.metrics);
-              setLastDiff(result.result.diff || []);
+              if (result.result.diff) {
+                setLastDiff(result.result.diff);
+              }
             }
-          }
-          
-          // Remove from pending after execution
-          if (result.tool_call_id) {
-            removePendingToolCall(result.tool_call_id);
-          }
+            
+            // Remove from pending after execution
+            if (result.tool_call_id) {
+              removePendingToolCall(result.tool_call_id);
+            }
+          });
         },
     // onStatusMessage
     (statusMessage) => {
       // Handle thinking status
       if (statusMessage.event === 'thinking_start') {
-        setThinkingStatus({ isThinking: true, startTime: Date.now() });
+        flushSync(() => {
+          setThinkingStatus({ isThinking: true, startTime: Date.now() });
+        });
       } else if (statusMessage.event === 'thinking_end') {
-        setThinkingStatus(null);
+        flushSync(() => {
+          setThinkingStatus(null);
+        });
+      }
+      
+      // When tool calls start, save current content segment as a message
+      if (statusMessage.event === 'tool_calls_start') {
+        flushSync(() => {
+          // Save the current streaming content as a complete message
+          if (currentSegment.trim()) {
+            addMessage({ role: 'assistant', content: currentSegment, timestamp: Date.now() });
+          }
+          // Clear current segment for post-tool content
+          currentSegment = '';
+          setStreamingContent('');
+        });
+      }
+      
+      // When tools complete, clear status messages so they don't show up in next segment
+      if (statusMessage.event === 'tools_complete') {
+        flushSync(() => {
+          setStatusMessages([]);
+        });
       }
       
       // Add status message to the list (filter out thinking_start as we show it separately)
       if (statusMessage.event !== 'thinking_start') {
-        setStatusMessages(prev => [...prev, statusMessage]);
+        flushSync(() => {
+          setStatusMessages(prev => [...prev, statusMessage]);
+        });
       }
     }
   );
     } catch (error) {
       // If we have partial response, save it
-      if (fullResponse.trim()) {
-        addMessage({ role: 'assistant', content: fullResponse, timestamp: Date.now() });
+      if (currentSegment.trim()) {
+        addMessage({ role: 'assistant', content: currentSegment, timestamp: Date.now() });
       }
       
       addMessage({

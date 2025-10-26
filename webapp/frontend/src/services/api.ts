@@ -20,8 +20,8 @@ export interface ConfigResponse {
 }
 
 export interface CapTableResponse {
-  capTable: CapTable;
-  metrics: Metrics;
+  capTable?: CapTable | null;
+  metrics?: Metrics | null;
 }
 
 /**
@@ -103,6 +103,8 @@ export async function chatStream(
     }
     
     let buffer = '';
+    let completionHandled = false;
+    let packetCount = 0;
     
     while (true) {
       const { done, value } = await reader.read();
@@ -112,20 +114,28 @@ export async function chatStream(
         if (buffer.trim()) {
           processEvent(buffer.trim());
         }
+        // Stream is complete - call onComplete if not already called
+        // This handles cases where the LLM response had no tool calls
+        if (!completionHandled) {
+          onComplete({ capTable: null, metrics: null });
+        }
         break;
       }
       
+      packetCount++;
       const chunk = decoder.decode(value, { stream: true });
+      
       buffer += chunk;
       
-      // Split by double newline to get complete events
-      const events = buffer.split('\n\n');
+      // Process complete events immediately, don't wait for stream to finish
+      // Split by double newline to get complete events (handle both \n\n and \r\n\r\n)
+      const parts = buffer.split(/\r\n\r\n|\n\n/);
       
       // Keep the last incomplete event in the buffer
-      buffer = events.pop() || '';
+      buffer = parts.pop() || '';
       
-      // Process each complete event
-      for (const event of events) {
+      // Process each complete event immediately
+      for (const event of parts) {
         if (!event.trim()) continue;
         processEvent(event);
       }
@@ -142,7 +152,9 @@ export async function chatStream(
         if (trimmedLine.startsWith('data:')) {
           // Handle both "data: " and "data:" formats
           const data = trimmedLine.substring(trimmedLine.indexOf(':') + 1).trim();
-          if (data === '[DONE]') continue;
+          if (data === '[DONE]') {
+            continue;
+          }
           
           try {
             const parsed = JSON.parse(data);
@@ -151,6 +163,7 @@ export async function chatStream(
             if (parsed.event) {
               switch (parsed.event) {
                 case 'content':
+                  // Trigger immediate UI update for content chunks
                   onMessage(parsed.data);
                   break;
                 case 'tool_proposal':
@@ -160,6 +173,7 @@ export async function chatStream(
                   onToolResult?.(parsed.data);
                   break;
                 case 'cap_table_update':
+                  completionHandled = true;
                   onComplete(parsed.data);
                   break;
                 case 'error':
@@ -171,6 +185,8 @@ export async function chatStream(
                 case 'tool_execution_start':
                 case 'tool_execution_complete':
                 case 'tools_complete':
+                case 'batch_start':
+                case 'batch_complete':
                   // Forward status messages to the callback
                   onStatusMessage?.({ event: parsed.event, data: parsed.data });
                   break;
@@ -180,6 +196,7 @@ export async function chatStream(
               if (parsed.content) {
                 onMessage(parsed.content);
               } else if (parsed.capTable && parsed.metrics) {
+                completionHandled = true;
                 onComplete(parsed);
               } else if (parsed.error) {
                 onError(parsed.error);

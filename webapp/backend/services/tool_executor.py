@@ -29,6 +29,15 @@ from webapp.backend.models import (
     DiffItem
 )
 
+# Import modular operations
+from webapp.backend.services.tools.operations import (
+    apply_replace,
+    apply_append,
+    apply_upsert,
+    apply_delete,
+    apply_bulk_patch
+)
+
 
 class ToolExecutor:
     """Executes cap_table_editor tool operations."""
@@ -158,135 +167,17 @@ class ToolExecutor:
         operation = request.operation
         
         if operation == "replace":
-            return self._apply_replace(cap_table, request.path, request.value)
+            return apply_replace(cap_table, request.path, request.value)
         elif operation == "append":
-            return self._apply_append(cap_table, request.path, request.value)
+            return apply_append(cap_table, request.path, request.value)
         elif operation == "upsert":
-            return self._apply_upsert(cap_table, request.path, request.value)
+            return apply_upsert(cap_table, request.path, request.value)
         elif operation == "delete":
-            return self._apply_delete(cap_table, request.path)
+            return apply_delete(cap_table, request.path, request.value)
         elif operation == "bulkPatch":
-            return self._apply_bulk_patch(cap_table, request.patch)
+            return apply_bulk_patch(cap_table, request.patch)
         else:
             raise ValueError(f"Unknown operation: {operation}")
-    
-    def _normalize_path(self, path: str) -> str:
-        """Normalize path to JSON Pointer format."""
-        if not path:
-            return ""
-        if not path.startswith("/"):
-            # Convert dot notation to JSON Pointer
-            path = "/" + path.replace(".", "/")
-        return path
-    
-    def _apply_replace(
-        self, 
-        cap_table: Dict[str, Any], 
-        path: str, 
-        value: Any
-    ) -> Dict[str, Any]:
-        """Replace value at path."""
-        path = self._normalize_path(path)
-        
-        # Use jsonpointer for safe access
-        pointer = jsonpointer.JsonPointer(path)
-        
-        # Check if path exists
-        try:
-            pointer.resolve(cap_table)
-        except jsonpointer.JsonPointerException:
-            raise ValueError(f"Path does not exist: {path}")
-        
-        # Set new value
-        pointer.set(cap_table, value)
-        return cap_table
-    
-    def _apply_append(
-        self, 
-        cap_table: Dict[str, Any], 
-        path: str, 
-        value: Any
-    ) -> Dict[str, Any]:
-        """Append value to array at path."""
-        path = self._normalize_path(path)
-        pointer = jsonpointer.JsonPointer(path)
-        
-        # Check for duplicate names in entity lists
-        if path in ["/holders", "/classes", "/terms", "/rounds"] and isinstance(value, dict):
-            name = value.get("name")
-            if name:
-                self._check_duplicate_name(cap_table, path, name, logger)
-        
-        try:
-            target = pointer.resolve(cap_table)
-        except jsonpointer.JsonPointerException:
-            # Path doesn't exist, create it as array
-            pointer.set(cap_table, [])
-            target = pointer.resolve(cap_table)
-        
-        if not isinstance(target, list):
-            raise ValueError(f"Path is not an array: {path}")
-        
-        target.append(value)
-        return cap_table
-    
-    def _check_duplicate_name(self, cap_table: Dict[str, Any], path: str, name: str, logger):
-        """
-        Check if an entity with the given name already exists.
-        
-        Args:
-            cap_table: Current cap table
-            path: Path being appended to
-            name: Name to check
-            logger: Logger instance
-            
-        Raises:
-            ValueError: If duplicate found
-        """
-        entity_type = path.replace("/", "")
-        if entity_type not in ["holders", "classes", "terms", "rounds"]:
-            return
-        
-        entities = cap_table.get(entity_type, [])
-        
-        for idx, entity in enumerate(entities):
-            if isinstance(entity, dict) and entity.get("name") == name:
-                # Duplicate found
-                raise ValueError(f"{entity_type}[{idx}]: Duplicate name '{name}'. Entity already exists at index {idx}. To modify existing entity, use the 'replace' or 'upsert' operation instead of 'append'.")
-    
-    def _apply_upsert(
-        self, 
-        cap_table: Dict[str, Any], 
-        path: str, 
-        value: Any
-    ) -> Dict[str, Any]:
-        """Update or insert value at path."""
-        path = self._normalize_path(path)
-        pointer = jsonpointer.JsonPointer(path)
-        
-        # Just set the value, creating path if needed
-        pointer.set(cap_table, value)
-        return cap_table
-    
-    def _apply_delete(self, cap_table: Dict[str, Any], path: str) -> Dict[str, Any]:
-        """Delete value at path."""
-        path = self._normalize_path(path)
-        
-        # Use jsonpatch for delete operation
-        patch = jsonpatch.JsonPatch([{"op": "remove", "path": path}])
-        return patch.apply(cap_table)
-    
-    def _apply_bulk_patch(
-        self, 
-        cap_table: Dict[str, Any], 
-        patch: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """Apply multiple JSON Patch operations."""
-        if not patch:
-            raise ValueError("Patch list is empty")
-        
-        json_patch = jsonpatch.JsonPatch(patch)
-        return json_patch.apply(cap_table)
     
     def _generate_diff(
         self, 

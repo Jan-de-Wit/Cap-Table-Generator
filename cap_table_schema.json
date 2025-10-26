@@ -1,59 +1,28 @@
 {
   "$schema": "https://json-schema.org/draft/2019-09/schema",
-  "$id": "https://captable.schema/v1",
+  "$id": "https://captable.schema/v2",
   "title": "Cap Table Schema",
-  "description": "Dynamic capitalization table with formula-driven calculations",
+  "description": "Dynamic capitalization table with formula-driven calculations and round-based architecture",
   "type": "object",
   "required": [
     "schema_version",
     "company",
-    "holders",
-    "classes",
-    "instruments"
+    "rounds"
   ],
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "1.0"
+      "const": "2.0"
     },
     "company": {
       "$ref": "#/$defs/Company"
-    },
-    "holders": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/Holder"
-      }
-    },
-    "classes": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/SecurityClass"
-      }
-    },
-    "terms": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/TermsPackage"
-      }
-    },
-    "instruments": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/Instrument"
-      }
     },
     "rounds": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/Round"
-      }
-    },
-    "waterfall_scenarios": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/WaterfallScenario"
-      }
+      },
+      "description": "Financing rounds containing nested instruments"
     }
   },
   "$defs": {
@@ -140,102 +109,11 @@
         }
       }
     },
-    "Holder": {
-      "type": "object",
-      "required": ["name", "type"],
-      "properties": {
-        "name": {
-          "$ref": "#/$defs/Name"
-        },
-        "type": {
-          "type": "string",
-          "enum": ["founder", "employee", "investor", "advisor", "option_pool"],
-          "description": "Type of shareholder"
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "Contact email (optional)"
-        }
-      }
-    },
-    "SecurityClass": {
-      "type": "object",
-      "required": ["name", "type"],
-      "properties": {
-        "name": {
-          "$ref": "#/$defs/Name"
-        },
-        "type": {
-          "type": "string",
-          "enum": [
-            "common",
-            "preferred",
-            "option",
-            "warrant",
-            "safe",
-            "convertible_note"
-          ],
-          "description": "Type of security instrument"
-        },
-        "terms_name": {
-          "type": "string",
-          "description": "Reference to Terms Package by name (for preferred shares)"
-        },
-        "conversion_ratio": {
-          "type": "number",
-          "default": 1.0,
-          "description": "Default conversion ratio to common"
-        }
-      }
-    },
-    "TermsPackage": {
-      "type": "object",
-      "required": ["name"],
-      "properties": {
-        "name": {
-          "$ref": "#/$defs/Name"
-        },
-        "liquidation_multiple": {
-          "type": "number",
-          "default": 1.0,
-          "description": "Liquidation preference multiple (e.g., 1.0 for 1x, 2.0 for 2x)"
-        },
-        "participation_type": {
-          "type": "string",
-          "enum": [
-            "non_participating",
-            "participating",
-            "capped_participating"
-          ],
-          "default": "non_participating",
-          "description": "Whether preferred shares participate in remaining proceeds"
-        },
-        "participation_cap": {
-          "type": "number",
-          "description": "Cap multiple for capped participating (e.g., 2.0 for 2x)"
-        },
-        "seniority_rank": {
-          "type": "integer",
-          "description": "Determines payout order in waterfall (lower number = more senior)"
-        },
-        "dividend_rate": {
-          "type": "number",
-          "description": "Annual dividend rate as decimal (e.g., 0.08 for 8%)"
-        },
-        "anti_dilution": {
-          "type": "string",
-          "enum": ["none", "weighted_average", "full_ratchet"],
-          "description": "Anti-dilution protection type"
-        }
-      }
-    },
     "Instrument": {
       "type": "object",
       "required": [
         "holder_name",
-        "class_name",
-        "initial_quantity"
+        "class_name"
       ],
       "properties": {
         "holder_name": {
@@ -246,14 +124,80 @@
           "type": "string",
           "description": "Reference to security class by name"
         },
-        "round_name": {
-          "type": "string",
-          "description": "Reference to financing round by name (optional, for new shares)"
-        },
         "initial_quantity": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "$ref": "#/$defs/FormulaEncodingObject"
+            }
+          ],
+          "description": "Number of shares (for fixed_shares type) or calculated from other fields"
+        },
+        "target_percentage": {
           "type": "number",
           "minimum": 0,
-          "description": "Initial number of shares or options granted"
+          "maximum": 1,
+          "description": "Target ownership percentage for target_percentage calculation type (as decimal, e.g., 0.20 for 20%)"
+        },
+        "investment_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Investment amount (for valuation_based and convertible types)"
+        },
+        "interest_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Annual interest rate on investment (as decimal, e.g., 0.08 for 8%)"
+        },
+        "interest_start_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date when interest starts accruing (YYYY-MM-DD)"
+        },
+        "interest_end_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date when interest ends accruing (YYYY-MM-DD)"
+        },
+        "days_passed": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "$ref": "#/$defs/FormulaEncodingObject"
+            }
+          ],
+          "description": "Days between interest_start_date and interest_end_date (can be calculated)"
+        },
+        "interest_type": {
+          "type": "string",
+          "enum": ["simple", "compound"],
+          "default": "simple",
+          "description": "Type of interest calculation (simple or compound annually)"
+        },
+        "accrued_interest": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "$ref": "#/$defs/FormulaEncodingObject"
+            }
+          ],
+          "description": "Accrued interest on investment (can be calculated if rate and dates provided)"
+        },
+        "discount_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Discount rate for convertible instruments (e.g., 0.20 for 20%)"
         },
         "current_quantity": {
           "oneOf": [
@@ -281,11 +225,7 @@
         },
         "vesting_terms": {
           "$ref": "#/$defs/VestingTerms",
-          "description": "Vesting schedule (for options/grants)"
-        },
-        "convertible_terms": {
-          "$ref": "#/$defs/ConvertibleTerms",
-          "description": "Conversion terms (for SAFEs, convertible notes)"
+          "description": "Vesting schedule for options"
         }
       }
     },
@@ -296,51 +236,27 @@
         "grant_date": {
           "type": "string",
           "format": "date",
-          "description": "Date options were granted (YYYY-MM-DD)"
+          "description": "Date when options were granted"
         },
         "cliff_days": {
           "type": "integer",
           "minimum": 0,
-          "description": "Cliff period in days (e.g., 365 for 1 year cliff)"
+          "description": "Cliff period in days"
         },
         "vesting_period_days": {
           "type": "integer",
-          "minimum": 1,
-          "description": "Total vesting period in days (e.g., 1460 for 4 years)"
+          "minimum": 0,
+          "description": "Total vesting period in days"
         },
         "vested_quantity": {
           "$ref": "#/$defs/FormulaEncodingObject",
-          "description": "Calculated vested shares (will be auto-generated)"
-        }
-      }
-    },
-    "ConvertibleTerms": {
-      "type": "object",
-      "properties": {
-        "investment_amount": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Investment amount in convertible security"
-        },
-        "discount_rate": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1,
-          "description": "Discount on conversion price (e.g., 0.20 for 20%)"
-        },
-        "price_cap": {
-          "type": "number",
-          "description": "Valuation cap for conversion"
-        },
-        "conversion_shares": {
-          "$ref": "#/$defs/FormulaEncodingObject",
-          "description": "Calculated shares on conversion (will be auto-generated)"
+          "description": "Calculated vested shares (auto-generated)"
         }
       }
     },
     "Round": {
       "type": "object",
-      "required": ["name", "round_date"],
+      "required": ["name", "round_date", "calculation_type"],
       "properties": {
         "name": {
           "$ref": "#/$defs/Name"
@@ -350,10 +266,39 @@
           "format": "date",
           "description": "Round closing date (YYYY-MM-DD)"
         },
+        "calculation_type": {
+          "type": "string",
+          "enum": ["fixed_shares", "target_percentage", "convertible", "valuation_based"],
+          "description": "Calculation method for all instruments in this round"
+        },
+        "valuation_cap_basis": {
+          "type": "string",
+          "enum": ["pre_money", "post_money"],
+          "description": "Valuation basis for convertible instruments (required for convertible type)"
+        },
+        "valuation_basis": {
+          "type": "string",
+          "enum": ["pre_money", "post_money"],
+          "description": "Valuation basis for valuation_based calculation type - determines how shares are calculated from investment amount"
+        },
+        "instruments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Instrument"
+          },
+          "description": "Instruments issued in this round"
+        },
         "investment_amount": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Total investment amount in this round"
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "$ref": "#/$defs/FormulaEncodingObject"
+            }
+          ],
+          "description": "Total investment amount in this round (can be calculated from instruments)"
         },
         "pre_money_valuation": {
           "oneOf": [
@@ -364,7 +309,7 @@
               "$ref": "#/$defs/FormulaEncodingObject"
             }
           ],
-          "description": "Pre-money valuation"
+          "description": "Pre-money valuation (used for valuation_based and convertible calculations)"
         },
         "post_money_valuation": {
           "oneOf": [
@@ -375,7 +320,7 @@
               "$ref": "#/$defs/FormulaEncodingObject"
             }
           ],
-          "description": "Post-money valuation"
+          "description": "Post-money valuation (can be calculated or used for calculations)"
         },
         "price_per_share": {
           "oneOf": [
@@ -386,7 +331,7 @@
               "$ref": "#/$defs/FormulaEncodingObject"
             }
           ],
-          "description": "Price per share in this round"
+          "description": "Price per share in this round (can be calculated from valuation)"
         },
         "shares_issued": {
           "oneOf": [
@@ -397,7 +342,18 @@
               "$ref": "#/$defs/FormulaEncodingObject"
             }
           ],
-          "description": "Total shares issued in this round"
+          "description": "Total shares issued in this round (can be calculated from instruments)"
+        },
+        "pre_round_shares": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/FormulaEncodingObject"
+            }
+          ],
+          "description": "Total shares outstanding before this round (auto-calculated from previous rounds)"
         },
         "option_pool_increase": {
           "type": "object",
@@ -413,38 +369,6 @@
               "description": "Shares added to option pool (will be auto-generated)"
             }
           }
-        }
-      }
-    },
-    "WaterfallScenario": {
-      "type": "object",
-      "required": ["name", "exit_value"],
-      "properties": {
-        "name": {
-          "$ref": "#/$defs/Name"
-        },
-        "exit_value": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Exit valuation for this scenario"
-        },
-        "payouts": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["class_name"],
-            "properties": {
-              "class_name": {
-                "type": "string",
-                "description": "Reference to security class by name"
-              },
-              "payout_amount": {
-                "$ref": "#/$defs/FormulaEncodingObject",
-                "description": "Calculated payout (will be auto-generated)"
-              }
-            }
-          },
-          "description": "Payout calculations by security class"
         }
       }
     }

@@ -1,0 +1,28 @@
+# Testing Requirements for Cap Table Generator
+# Install with: pip install -r tests/requirements-test.txt
+
+# Core testing framework
+pytest
+pytest-cov
+pytest-timeout
+
+# Excel file manipulation (for test assertions)
+openpyxl
+
+# Additional testing utilities
+pytest-mock
+pytest-xdist
+pytest-benchmark
+
+# Code quality
+pytest-flake8
+pytest-pylint
+
+# Test coverage reporting
+coverage
+coverage-badge
+
+# Fixtures and data generation
+faker
+factory-boy
+

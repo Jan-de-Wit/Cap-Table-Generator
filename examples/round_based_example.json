@@ -1,0 +1,119 @@
+{
+  "schema_version": "2.0",
+  "company": {
+    "name": "StartupCo Inc.",
+    "incorporation_date": "2023-01-01",
+    "current_date": "2024-12-31"
+  },
+  "rounds": [
+    {
+      "name": "Incorporation",
+      "round_date": "2023-01-01",
+      "calculation_type": "fixed_shares",
+      "instruments": [
+        {
+          "holder_name": "Alice",
+          "class_name": "Common Stock",
+          "initial_quantity": 4000000,
+          "acquisition_date": "2023-01-01"
+        },
+        {
+          "holder_name": "Bob",
+          "class_name": "Common Stock",
+          "initial_quantity": 4000000,
+          "acquisition_date": "2023-01-01"
+        }
+      ]
+    },
+    {
+      "name": "Seed Round",
+      "round_date": "2023-06-01",
+      "calculation_type": "valuation_based",
+      "valuation_basis": "post_money",
+      "pre_money_valuation": 8000000,
+      "post_money_valuation": 10000000,
+      "instruments": [
+        {
+          "holder_name": "Seed Investor",
+          "class_name": "Series Seed Preferred",
+          "investment_amount": 2000000,
+          "accrued_interest": 0
+        }
+      ]
+    },
+    {
+      "name": "Series A",
+      "round_date": "2024-03-15",
+      "calculation_type": "convertible",
+      "valuation_cap_basis": "pre_money",
+      "pre_money_valuation": 15000000,
+      "post_money_valuation": 20000000,
+      "price_per_share": 1.5,
+      "instruments": [
+        {
+          "holder_name": "VC Fund Simple",
+          "class_name": "Series A Preferred",
+          "investment_amount": 2000000,
+          "interest_rate": 0.08,
+          "interest_start_date": "2023-09-01",
+          "interest_end_date": "2024-03-15",
+          "interest_type": "simple",
+          "discount_rate": 0.20
+        },
+        {
+          "holder_name": "VC Fund Compound Yearly",
+          "class_name": "Series A Preferred",
+          "investment_amount": 1500000,
+          "interest_rate": 0.08,
+          "interest_start_date": "2023-09-01",
+          "interest_end_date": "2024-03-15",
+          "interest_type": "compound_yearly",
+          "discount_rate": 0.20
+        },
+        {
+          "holder_name": "VC Fund Compound Monthly",
+          "class_name": "Series A Preferred",
+          "investment_amount": 1000000,
+          "interest_rate": 0.08,
+          "interest_start_date": "2023-09-01",
+          "interest_end_date": "2024-03-15",
+          "interest_type": "compound_monthly",
+          "discount_rate": 0.20
+        },
+        {
+          "holder_name": "VC Fund Compound Daily",
+          "class_name": "Series A Preferred",
+          "investment_amount": 500000,
+          "interest_rate": 0.08,
+          "interest_start_date": "2023-09-01",
+          "interest_end_date": "2024-03-15",
+          "interest_type": "compound_daily",
+          "discount_rate": 0.20
+        },
+        {
+          "holder_name": "VC Fund No Interest",
+          "class_name": "Series A Preferred",
+          "investment_amount": 500000,
+          "interest_rate": 0,
+          "interest_start_date": "2023-09-01",
+          "interest_end_date": "2024-03-15",
+          "interest_type": "no_interest",
+          "discount_rate": 0.20
+        }
+      ]
+    },
+    {
+      "name": "Strategic Round",
+      "round_date": "2024-09-01",
+      "calculation_type": "target_percentage",
+      "instruments": [
+        {
+          "holder_name": "Strategic Partner",
+          "class_name": "Common Stock",
+          "target_percentage": 0.05
+        }
+      ]
+    }
+  ]
+}
+

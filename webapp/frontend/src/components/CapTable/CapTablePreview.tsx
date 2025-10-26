@@ -132,29 +132,63 @@ export function CapTablePreview() {
         {capTable.instruments.length === 0 ? (
           <p className="text-sm text-gray-500">No instruments defined</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 text-gray-600 font-medium">Holder</th>
-                  <th className="text-left py-2 text-gray-600 font-medium">Class</th>
-                  <th className="text-right py-2 text-gray-600 font-medium">Quantity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {capTable.instruments.map((inst: Instrument) => {
-                  const holder = capTable.holders.find(h => h.holder_id === inst.holder_id);
-                  const secClass = capTable.classes.find(c => c.class_id === inst.class_id);
-                  return (
-                    <tr key={inst.instrument_id} className="border-b last:border-b-0">
-                      <td className="py-2 text-gray-900">{holder?.name || 'Unknown'}</td>
-                      <td className="py-2 text-gray-600">{secClass?.name || 'Unknown'}</td>
-                      <td className="py-2 text-gray-900 text-right">{inst.initial_quantity.toLocaleString()}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {capTable.instruments.map((inst: Instrument) => {
+              const holder = capTable.holders.find(h => h.holder_id === inst.holder_id);
+              const secClass = capTable.classes.find(c => c.class_id === inst.class_id);
+              
+              // Determine instrument type and details
+              let typeBadge = '';
+              let details = '';
+              
+              if (inst.initial_quantity !== undefined) {
+                // Fixed shares
+                typeBadge = 'Fixed';
+                details = `${inst.initial_quantity.toLocaleString()} shares`;
+              } else if (inst.convertible_terms) {
+                // Convertible (SAFE/Note)
+                typeBadge = secClass?.type === 'safe' ? 'SAFE' : 'Note';
+                details = `$${inst.convertible_terms.investment_amount.toLocaleString()}`;
+                if (inst.convertible_terms.discount_rate) {
+                  details += ` @ ${(inst.convertible_terms.discount_rate * 100).toFixed(0)}% discount`;
+                }
+                if (inst.convertible_terms.price_cap) {
+                  details += ` ($${inst.convertible_terms.price_cap.toLocaleString()} cap)`;
+                }
+              } else if (inst.investment_amount && inst.valuation_basis) {
+                // Valuation-based
+                typeBadge = 'Valuation-Based';
+                details = `$${inst.investment_amount.toLocaleString()} @ ${inst.valuation_basis.replace('_', '-')}`;
+              }
+              
+              return (
+                <div key={inst.instrument_id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">{holder?.name || 'Unknown'}</div>
+                      <div className="text-sm text-gray-600">{secClass?.name || 'Unknown'}</div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      {typeBadge && (
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                          typeBadge === 'Fixed' ? 'bg-green-100 text-green-700' :
+                          typeBadge === 'SAFE' || typeBadge === 'Note' ? 'bg-purple-100 text-purple-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {typeBadge}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-700">{details}</div>
+                  {inst.vesting_terms && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      Vesting: {inst.vesting_terms.cliff_days} day cliff
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </Section>

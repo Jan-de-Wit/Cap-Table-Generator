@@ -1,11 +1,20 @@
 """
 Deterministic Layout Map (DLM)
+
 Maps JSON entities/UUIDs to Excel cell addresses, Named Ranges, and Structured References.
 Provides the bridge between abstract JSON data and physical Excel coordinates.
+
+The DLM ensures deterministic mapping between the JSON cap table data structure
+and Excel cell locations, enabling:
+1. Named ranges for global constants
+2. Structured references for table columns
+3. UUID-based lookups for specific entities
+4. JSON pointer resolution for nested data
 """
 
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
+import json
 
 
 @dataclass
@@ -138,6 +147,66 @@ class DeterministicLayoutMap:
                 )
                 self.pointer_map[f"{json_pointer}.{col_name}"] = ref
     
+    def register_round_section(self, round_name: str, sheet: str, 
+                              constants_row: int, instruments_start_row: int) -> None:
+        """
+        Register a round section with its constants row and instruments table location.
+        Used in round-based architecture where rounds are laid out vertically.
+        
+        Args:
+            round_name: Name of the round (unique identifier)
+            sheet: Sheet name where round appears
+            constants_row: Row where round constants start
+            instruments_start_row: Row where instruments table for this round starts
+        """
+        round_key = f"round_{round_name.replace(' ', '_')}"
+        self.uuid_map[f"{round_key}.constants_row"] = ExcelReference(
+            reference_type='cell_reference',
+            address=f"{sheet}!A{constants_row + 1}",
+            sheet_name=sheet,
+            row=constants_row,
+            col=0
+        )
+        self.uuid_map[f"{round_key}.instruments_start"] = ExcelReference(
+            reference_type='cell_reference',
+            address=f"{sheet}!A{instruments_start_row + 1}",
+            sheet_name=sheet,
+            row=instruments_start_row,
+            col=0
+        )
+    
+    def register_round_instrument(self, round_idx: int, instrument_idx: int, 
+                                 round_name: str, sheet: str, row: int, 
+                                 columns: Dict[str, int]) -> None:
+        """
+        Register an instrument within a round section.
+        Creates references in format: Round_<idx>_Instrument_<idx>_<field>
+        
+        Args:
+            round_idx: Index of the round (0-based)
+            instrument_idx: Index of the instrument within the round (0-based)
+            round_name: Name of the round
+            sheet: Sheet name
+            row: Row index where this instrument appears (0-based)
+            columns: Dictionary mapping column names to column indices
+        """
+        identifier_base = f"Round_{round_idx}_Instrument_{instrument_idx}"
+        
+        for col_name, col_idx in columns.items():
+            ref = ExcelReference(
+                reference_type='cell_reference',
+                address=f"{sheet}!{self._col_index_to_letter(col_idx)}{row + 1}",
+                sheet_name=sheet,
+                row=row,
+                col=col_idx
+            )
+            # Store with identifier and field name
+            self.uuid_map[f"{identifier_base}.{col_name}"] = ref
+            
+            # Also store with round_name for easier lookup
+            round_key = round_name.replace(' ', '_')
+            self.uuid_map[f"{round_key}_Instrument_{instrument_idx}.{col_name}"] = ref
+    
     def register_cell(self, identifier: str, sheet: str, row: int, col: int,
                      is_absolute: bool = True) -> str:
         """
@@ -187,8 +256,14 @@ class DeterministicLayoutMap:
             
         Returns:
             Excel reference string or None if not found
+            
+        Raises:
+            ValueError: If reference type cannot be determined
         """
-        # Check named ranges first
+        if not identifier:
+            return None
+            
+        # Check named ranges first (global constants)
         if identifier in self.named_ranges:
             return self.named_ranges[identifier].address
         
@@ -201,6 +276,41 @@ class DeterministicLayoutMap:
             return self.pointer_map[identifier].address
         
         return None
+    
+    def resolve_reference_or_raise(self, identifier: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Resolve a reference, raising ValueError if not found.
+        
+        Args:
+            identifier: UUID, JSON pointer, or symbolic name
+            context: Optional context for structured references
+            
+        Returns:
+            Excel reference string
+            
+        Raises:
+            ValueError: If reference cannot be resolved
+        """
+        ref = self.resolve_reference(identifier, context)
+        if ref is None:
+            raise ValueError(f"Reference not found: {identifier}")
+        return ref
+    
+    def validate_reference_exists(self, identifier: str) -> bool:
+        """
+        Check if a reference exists in the mapping.
+        
+        Args:
+            identifier: UUID, JSON pointer, or symbolic name
+            
+        Returns:
+            True if reference exists, False otherwise
+        """
+        return (
+            identifier in self.named_ranges or
+            identifier in self.uuid_map or
+            identifier in self.pointer_map
+        )
     
     def get_structured_reference(self, table_name: str, column_name: str, 
                                  current_row: bool = True) -> Optional[str]:
@@ -277,4 +387,66 @@ class DeterministicLayoutMap:
         if sheet:
             return f"{sheet}!{address}"
         return address
+    
+    def export_mappings(self) -> Dict[str, Any]:
+        """
+        Export all mappings to a dictionary for debugging and persistence.
+        
+        Returns:
+            Dictionary containing all mappings
+        """
+        return {
+            "named_ranges": {
+                name: {
+                    "address": ref.address,
+                    "sheet": ref.sheet_name,
+                    "row": ref.row,
+                    "col": ref.col
+                }
+                for name, ref in self.named_ranges.items()
+            },
+            "tables": {
+                name: {
+                    "sheet": table["sheet"],
+                    "start_row": table["start_row"],
+                    "start_col": table["start_col"],
+                    "columns": table["columns"]
+                }
+                for name, table in self.tables.items()
+            },
+            "registered_identifiers": list(self.uuid_map.keys()),
+            "registered_pointers": list(self.pointer_map.keys())
+        }
+    
+    def get_all_named_ranges(self) -> List[str]:
+        """
+        Get list of all registered named ranges.
+        
+        Returns:
+            List of named range identifiers
+        """
+        return list(self.named_ranges.keys())
+    
+    def get_all_tables(self) -> List[str]:
+        """
+        Get list of all registered table names.
+        
+        Returns:
+            List of table names
+        """
+        return list(self.tables.keys())
+    
+    def count_references(self) -> Dict[str, int]:
+        """
+        Count references by type for debugging and monitoring.
+        
+        Returns:
+            Dictionary with counts of each reference type
+        """
+        return {
+            "named_ranges": len(self.named_ranges),
+            "uuid_mappings": len(self.uuid_map),
+            "pointer_mappings": len(self.pointer_map),
+            "tables": len(self.tables)
+        }
 

@@ -2,6 +2,23 @@
 
 A comprehensive system for generating dynamic Excel-based capitalization tables from structured JSON data. Built with formula-driven calculations that remain live and updateable in Excel.
 
+## 🚀 Round-Based Architecture
+
+The cap table uses a round-centric architecture where instruments are nested within financing rounds. Each round has its own calculation logic, making the structure clearer and more flexible.
+
+**Key Features**:
+- ✅ Instruments nested within rounds
+- ✅ 4 calculation types: `fixed_shares`, `target_percentage`, `valuation_based`, `convertible`
+- ✅ Vertical Excel layout with rounds stacked
+- ✅ Comprehensive validation and error messages
+
+**Quick Links**:
+- 📖 [Schema Reference](docs/SCHEMA_REFERENCE.md) - Complete field documentation
+- 📋 [Example File](examples/round_based_example.json) - Working example
+- 📝 [Implementation Details](ROUND_BASED_ARCHITECTURE_IMPLEMENTATION.md) - Technical overview
+
+---
+
 ## Overview
 
 The Cap Table Generator transforms structured JSON cap table data into fully functional Excel workbooks with:
@@ -29,6 +46,8 @@ The Cap Table Generator transforms structured JSON cap table data into fully fun
 - **SAFE/Convertible Notes**: Conversion calculations with discount rates and caps
 - **Liquidation Waterfall**: Sequential payout logic with seniority and participation rights
 - **Option Pool Top-Ups**: Calculate shares needed to reach target pool percentage
+- **Valuation-Based Share Calculations**: Automatically calculate shares from investment amount and valuation
+- **Interest Accrual**: Simple interest calculations for convertible instruments
 
 ### Excel Workbook Structure
 
@@ -267,6 +286,8 @@ Participation types: `non_participating`, `participating`, `capped_participating
 
 #### Instruments (Holdings)
 
+**Standard Instrument** (explicit shares):
+
 ```json
 {
   "instruments": [
@@ -283,7 +304,37 @@ Participation types: `non_participating`, `participating`, `capped_participating
 }
 ```
 
-With vesting:
+**Valuation-Based Instrument** (calculated shares):
+
+```json
+{
+  "instrument_id": "uuid-v4",
+  "holder_id": "uuid-v4-of-holder",
+  "class_id": "uuid-v4-of-class",
+  "round_name": "Series A",
+  "investment_amount": 2000000,
+  "valuation_basis": "post_money",
+  "acquisition_date": "2024-06-01"
+}
+```
+
+**With Interest** (for convertible notes):
+
+```json
+{
+  "instrument_id": "uuid-v4",
+  "holder_id": "uuid-v4",
+  "class_id": "uuid-v4",
+  "round_name": "Bridge Round",
+  "investment_amount": 500000,
+  "valuation_basis": "pre_money",
+  "interest_rate": 0.08,
+  "interest_start_date": "2024-01-01",
+  "acquisition_date": "2024-01-01"
+}
+```
+
+**With vesting**:
 
 ```json
 {
@@ -302,6 +353,8 @@ With vesting:
 
 #### Rounds (Financing Events)
 
+**Standard Round** (with explicit values):
+
 ```json
 {
   "rounds": [
@@ -318,6 +371,20 @@ With vesting:
   ]
 }
 ```
+
+**Round for Valuation-Based Calculations**:
+
+```json
+{
+  "round_id": "uuid-v4",
+  "name": "Series B",
+  "round_date": "2024-06-01",
+  "post_money_valuation": 100000000,
+  "pre_round_shares": 50000000
+}
+```
+
+Note: When instruments reference this round with `investment_amount` and `valuation_basis`, their shares are calculated automatically. The round's `investment_amount`, `shares_issued`, and `price_per_share` can also be calculated from the instruments.
 
 ### Formula Encoding Objects (FEO)
 
@@ -532,9 +599,16 @@ The `docs/` directory contains comprehensive documentation:
   - Common patterns and examples
   - Validation rules and troubleshooting
   
+- **[Valuation-Based Calculations](docs/VALUATION_BASED_CALCULATIONS.md)**: Guide for calculating shares from investment and valuation
+  - Pre-money vs post-money calculations
+  - Interest accrual on investments
+  - Complete examples and formulas
+  - Migration guide from explicit shares
+  
 - **[Schema Reference](docs/SCHEMA_REFERENCE.md)**: Quick reference for the cap table schema
 - **[Knowledge Base](docs/Knowledge Base.md)**: Technical deep-dive on formula encoding and Excel generation
 - **[XLSX Output](docs/XLSX%20Output.md)**: Details on the generated Excel structure
+- **[System Prompt](docs/System%20Prompt.md)**: LLM system prompt for the web app assistant
 
 For generating input JSON programmatically or via LLM, start with the JSON Input Guide.
 
