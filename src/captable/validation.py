@@ -40,7 +40,7 @@ class CapTableValidator:
         if not errors:
             errors.extend(self._validate_relationships(data))
             errors.extend(self._validate_feo_objects(data))
-            errors.extend(self._validate_uuids(data))
+            errors.extend(self._validate_name_uniqueness(data))
             
         return (len(errors) == 0, errors)
     
@@ -53,40 +53,40 @@ class CapTableValidator:
         """Validate foreign key relationships between entities."""
         errors = []
         
-        # Collect all IDs
-        holder_ids = {h["holder_id"] for h in data.get("holders", [])}
-        class_ids = {c["class_id"] for c in data.get("classes", [])}
-        terms_ids = {t["terms_id"] for t in data.get("terms", [])}
-        round_ids = {r["round_id"] for r in data.get("rounds", [])}
+        # Collect all names
+        holder_names = {h["name"] for h in data.get("holders", [])}
+        class_names = {c["name"] for c in data.get("classes", [])}
+        terms_names = {t["name"] for t in data.get("terms", [])}
+        round_names = {r["name"] for r in data.get("rounds", [])}
         
         # Validate instrument references
         for idx, instrument in enumerate(data.get("instruments", [])):
-            holder_id = instrument.get("holder_id")
-            if holder_id and holder_id not in holder_ids:
-                errors.append(f"Instrument {idx}: holder_id '{holder_id}' not found in holders")
+            holder_name = instrument.get("holder_name")
+            if holder_name and holder_name not in holder_names:
+                errors.append(f"Instrument {idx}: holder_name '{holder_name}' not found in holders")
                 
-            class_id = instrument.get("class_id")
-            if class_id and class_id not in class_ids:
-                errors.append(f"Instrument {idx}: class_id '{class_id}' not found in classes")
+            class_name = instrument.get("class_name")
+            if class_name and class_name not in class_names:
+                errors.append(f"Instrument {idx}: class_name '{class_name}' not found in classes")
                 
-            round_id = instrument.get("round_id")
-            if round_id and round_id not in round_ids:
-                errors.append(f"Instrument {idx}: round_id '{round_id}' not found in rounds")
+            round_name = instrument.get("round_name")
+            if round_name and round_name not in round_names:
+                errors.append(f"Instrument {idx}: round_name '{round_name}' not found in rounds")
         
         # Validate class -> terms references
         for idx, sec_class in enumerate(data.get("classes", [])):
-            terms_id = sec_class.get("terms_id")
-            if terms_id and terms_id not in terms_ids:
-                errors.append(f"SecurityClass {idx}: terms_id '{terms_id}' not found in terms")
+            terms_name = sec_class.get("terms_name")
+            if terms_name and terms_name not in terms_names:
+                errors.append(f"SecurityClass {idx}: terms_name '{terms_name}' not found in terms")
         
         # Validate waterfall scenario references
         for idx, scenario in enumerate(data.get("waterfall_scenarios", [])):
             for payout_idx, payout in enumerate(scenario.get("payouts", [])):
-                class_id = payout.get("class_id")
-                if class_id and class_id not in class_ids:
+                class_name = payout.get("class_name")
+                if class_name and class_name not in class_names:
                     errors.append(
                         f"WaterfallScenario {idx}, payout {payout_idx}: "
-                        f"class_id '{class_id}' not found in classes"
+                        f"class_name '{class_name}' not found in classes"
                     )
         
         return errors
@@ -127,37 +127,35 @@ class CapTableValidator:
         check_feo(data, "root")
         return errors
     
-    def _validate_uuids(self, data: Dict[str, Any]) -> List[str]:
-        """Validate all UUIDs are properly formatted and unique within entity type."""
+    def _validate_name_uniqueness(self, data: Dict[str, Any]) -> List[str]:
+        """Validate all names are unique within entity type."""
         errors = []
-        uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
         
-        def check_uuid_format(uuid_str: str, entity_type: str, idx: int):
-            if not uuid_pattern.match(uuid_str):
-                errors.append(f"{entity_type}[{idx}]: Invalid UUID format '{uuid_str}'")
-        
-        # Check uniqueness within each entity type
+        # Define entity types and their name fields
         entity_types = [
-            ("holders", "holder_id"),
-            ("classes", "class_id"),
-            ("terms", "terms_id"),
-            ("instruments", "instrument_id"),
-            ("rounds", "round_id"),
-            ("waterfall_scenarios", "scenario_id")
+            ("holders", "name"),
+            ("classes", "name"),
+            ("terms", "name"),
+            ("rounds", "name"),
+            ("waterfall_scenarios", "name")
         ]
         
-        for entity_key, id_field in entity_types:
+        for entity_key, name_field in entity_types:
             entities = data.get(entity_key, [])
-            seen_ids = set()
+            seen_names = set()
             
             for idx, entity in enumerate(entities):
-                entity_id = entity.get(id_field)
-                if entity_id:
-                    check_uuid_format(entity_id, entity_key, idx)
-                    
-                    if entity_id in seen_ids:
-                        errors.append(f"{entity_key}[{idx}]: Duplicate {id_field} '{entity_id}'")
-                    seen_ids.add(entity_id)
+                name = entity.get(name_field)
+                if name:
+                    if not isinstance(name, str):
+                        errors.append(f"{entity_key}[{idx}]: {name_field} must be a string")
+                        continue
+                        
+                    if name in seen_names:
+                        errors.append(f"{entity_key}[{idx}]: Duplicate {name_field} '{name}'")
+                    seen_names.add(name)
+                else:
+                    errors.append(f"{entity_key}[{idx}]: Missing required field '{name_field}'")
         
         return errors
 

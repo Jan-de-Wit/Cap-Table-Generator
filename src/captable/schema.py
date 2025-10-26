@@ -45,10 +45,11 @@ CAP_TABLE_SCHEMA = {
         }
     },
     "$defs": {
-        "UUID": {
+        "Name": {
             "type": "string",
-            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-            "description": "UUID v4 format"
+            "minLength": 1,
+            "pattern": "^[^\\n\\r]+$",
+            "description": "Unique name identifier"
         },
         "FormulaEncodingObject": {
             "type": "object",
@@ -108,10 +109,9 @@ CAP_TABLE_SCHEMA = {
         },
         "Holder": {
             "type": "object",
-            "required": ["holder_id", "name", "type"],
+            "required": ["name", "type"],
             "properties": {
-                "holder_id": {"$ref": "#/$defs/UUID"},
-                "name": {"type": "string"},
+                "name": {"$ref": "#/$defs/Name"},
                 "type": {
                     "type": "string",
                     "enum": ["founder", "employee", "investor", "advisor", "option_pool"]
@@ -121,17 +121,16 @@ CAP_TABLE_SCHEMA = {
         },
         "SecurityClass": {
             "type": "object",
-            "required": ["class_id", "name", "type"],
+            "required": ["name", "type"],
             "properties": {
-                "class_id": {"$ref": "#/$defs/UUID"},
-                "name": {"type": "string"},
+                "name": {"$ref": "#/$defs/Name"},
                 "type": {
                     "type": "string",
                     "enum": ["common", "preferred", "option", "warrant", "safe", "convertible_note"]
                 },
-                "terms_id": {
-                    "$ref": "#/$defs/UUID",
-                    "description": "Reference to Terms Package"
+                "terms_name": {
+                    "type": "string",
+                    "description": "Reference to Terms Package by name"
                 },
                 "conversion_ratio": {
                     "type": "number",
@@ -142,10 +141,9 @@ CAP_TABLE_SCHEMA = {
         },
         "TermsPackage": {
             "type": "object",
-            "required": ["terms_id", "name"],
+            "required": ["name"],
             "properties": {
-                "terms_id": {"$ref": "#/$defs/UUID"},
-                "name": {"type": "string"},
+                "name": {"$ref": "#/$defs/Name"},
                 "liquidation_multiple": {
                     "type": "number",
                     "default": 1.0
@@ -175,12 +173,11 @@ CAP_TABLE_SCHEMA = {
         },
         "Instrument": {
             "type": "object",
-            "required": ["instrument_id", "holder_id", "class_id", "initial_quantity"],
+            "required": ["holder_name", "class_name", "initial_quantity"],
             "properties": {
-                "instrument_id": {"$ref": "#/$defs/UUID"},
-                "holder_id": {"$ref": "#/$defs/UUID"},
-                "class_id": {"$ref": "#/$defs/UUID"},
-                "round_id": {"$ref": "#/$defs/UUID"},
+                "holder_name": {"type": "string"},
+                "class_name": {"type": "string"},
+                "round_name": {"type": "string"},
                 "initial_quantity": {
                     "type": "number",
                     "minimum": 0
@@ -259,10 +256,9 @@ CAP_TABLE_SCHEMA = {
         },
         "Round": {
             "type": "object",
-            "required": ["round_id", "name", "round_date"],
+            "required": ["name", "round_date"],
             "properties": {
-                "round_id": {"$ref": "#/$defs/UUID"},
-                "name": {"type": "string"},
+                "name": {"$ref": "#/$defs/Name"},
                 "round_date": {
                     "type": "string",
                     "format": "date"
@@ -312,10 +308,9 @@ CAP_TABLE_SCHEMA = {
         },
         "WaterfallScenario": {
             "type": "object",
-            "required": ["scenario_id", "name", "exit_value"],
+            "required": ["name", "exit_value"],
             "properties": {
-                "scenario_id": {"$ref": "#/$defs/UUID"},
-                "name": {"type": "string"},
+                "name": {"$ref": "#/$defs/Name"},
                 "exit_value": {
                     "type": "number",
                     "minimum": 0
@@ -324,9 +319,9 @@ CAP_TABLE_SCHEMA = {
                     "type": "array",
                     "items": {
                         "type": "object",
-                        "required": ["class_id"],
+                        "required": ["class_name"],
                         "properties": {
-                            "class_id": {"$ref": "#/$defs/UUID"},
+                            "class_name": {"type": "string"},
                             "payout_amount": {
                                 "$ref": "#/$defs/FormulaEncodingObject"
                             }

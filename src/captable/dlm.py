@@ -88,15 +88,17 @@ class DeterministicLayoutMap:
     
     def register_table_row(self, table_name: str, row_idx: int, 
                           uuid: Optional[str] = None, 
-                          json_pointer: Optional[str] = None) -> None:
+                          json_pointer: Optional[str] = None,
+                          name: Optional[str] = None) -> None:
         """
-        Register a row in an Excel Table, mapping it to a UUID or JSON pointer.
+        Register a row in an Excel Table, mapping it to a UUID, JSON pointer, or name.
         
         Args:
             table_name: Name of the Excel Table
             row_idx: Row index within the table (data rows, 0-based)
             uuid: Optional UUID for this row's entity
             json_pointer: Optional JSON Pointer path
+            name: Optional name for this row (used as identifier if no UUID)
         """
         if table_name not in self.tables:
             raise ValueError(f"Table '{table_name}' not registered")
@@ -104,7 +106,10 @@ class DeterministicLayoutMap:
         table = self.tables[table_name]
         actual_row = table['start_row'] + 1 + row_idx  # +1 for header row
         
-        if uuid:
+        # Use name as identifier if provided, otherwise use uuid
+        identifier = name if name else uuid
+        
+        if identifier:
             # Register reference for each column in this row
             for col_name, col_idx in table['columns'].items():
                 ref = ExcelReference(
@@ -116,8 +121,8 @@ class DeterministicLayoutMap:
                     table_name=table_name,
                     column_name=col_name
                 )
-                # Store with UUID and column name as key
-                self.uuid_map[f"{uuid}.{col_name}"] = ref
+                # Store with identifier and column name as key
+                self.uuid_map[f"{identifier}.{col_name}"] = ref
         
         if json_pointer:
             # Similar registration for JSON pointer

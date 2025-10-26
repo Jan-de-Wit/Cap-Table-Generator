@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+sse-starlette
+openai
+jsonpointer
+jsonpatch
+pydantic
+pydantic-settings
+python-dotenv
+pytest
+pytest-asyncio
+

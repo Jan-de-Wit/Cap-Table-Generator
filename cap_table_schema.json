@@ -57,10 +57,11 @@
     }
   },
   "$defs": {
-    "UUID": {
+    "Name": {
       "type": "string",
-      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-      "description": "UUID v4 format identifier"
+      "minLength": 1,
+      "pattern": "^[^\\n\\r]+$",
+      "description": "Unique name identifier"
     },
     "FormulaEncodingObject": {
       "type": "object",
@@ -141,14 +142,10 @@
     },
     "Holder": {
       "type": "object",
-      "required": ["holder_id", "name", "type"],
+      "required": ["name", "type"],
       "properties": {
-        "holder_id": {
-          "$ref": "#/$defs/UUID"
-        },
         "name": {
-          "type": "string",
-          "description": "Holder name or institution name"
+          "$ref": "#/$defs/Name"
         },
         "type": {
           "type": "string",
@@ -164,14 +161,10 @@
     },
     "SecurityClass": {
       "type": "object",
-      "required": ["class_id", "name", "type"],
+      "required": ["name", "type"],
       "properties": {
-        "class_id": {
-          "$ref": "#/$defs/UUID"
-        },
         "name": {
-          "type": "string",
-          "description": "Security class name (e.g., 'Common Stock', 'Series A Preferred')"
+          "$ref": "#/$defs/Name"
         },
         "type": {
           "type": "string",
@@ -185,9 +178,9 @@
           ],
           "description": "Type of security instrument"
         },
-        "terms_id": {
-          "$ref": "#/$defs/UUID",
-          "description": "Reference to Terms Package (required for preferred shares)"
+        "terms_name": {
+          "type": "string",
+          "description": "Reference to Terms Package by name (for preferred shares)"
         },
         "conversion_ratio": {
           "type": "number",
@@ -198,14 +191,10 @@
     },
     "TermsPackage": {
       "type": "object",
-      "required": ["terms_id", "name"],
+      "required": ["name"],
       "properties": {
-        "terms_id": {
-          "$ref": "#/$defs/UUID"
-        },
         "name": {
-          "type": "string",
-          "description": "Name of the terms package"
+          "$ref": "#/$defs/Name"
         },
         "liquidation_multiple": {
           "type": "number",
@@ -244,26 +233,22 @@
     "Instrument": {
       "type": "object",
       "required": [
-        "instrument_id",
-        "holder_id",
-        "class_id",
+        "holder_name",
+        "class_name",
         "initial_quantity"
       ],
       "properties": {
-        "instrument_id": {
-          "$ref": "#/$defs/UUID"
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
         },
-        "holder_id": {
-          "$ref": "#/$defs/UUID",
-          "description": "Reference to holder"
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
         },
-        "class_id": {
-          "$ref": "#/$defs/UUID",
-          "description": "Reference to security class"
-        },
-        "round_id": {
-          "$ref": "#/$defs/UUID",
-          "description": "Reference to financing round (optional, for new shares)"
+        "round_name": {
+          "type": "string",
+          "description": "Reference to financing round by name (optional, for new shares)"
         },
         "initial_quantity": {
           "type": "number",
@@ -355,14 +340,10 @@
     },
     "Round": {
       "type": "object",
-      "required": ["round_id", "name", "round_date"],
+      "required": ["name", "round_date"],
       "properties": {
-        "round_id": {
-          "$ref": "#/$defs/UUID"
-        },
         "name": {
-          "type": "string",
-          "description": "Round name (e.g., 'Seed Round', 'Series A')"
+          "$ref": "#/$defs/Name"
         },
         "round_date": {
           "type": "string",
@@ -437,14 +418,10 @@
     },
     "WaterfallScenario": {
       "type": "object",
-      "required": ["scenario_id", "name", "exit_value"],
+      "required": ["name", "exit_value"],
       "properties": {
-        "scenario_id": {
-          "$ref": "#/$defs/UUID"
-        },
         "name": {
-          "type": "string",
-          "description": "Scenario name (e.g., 'Exit at $50M')"
+          "$ref": "#/$defs/Name"
         },
         "exit_value": {
           "type": "number",
@@ -455,11 +432,11 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["class_id"],
+            "required": ["class_name"],
             "properties": {
-              "class_id": {
-                "$ref": "#/$defs/UUID",
-                "description": "Reference to security class"
+              "class_name": {
+                "type": "string",
+                "description": "Reference to security class by name"
               },
               "payout_amount": {
                 "$ref": "#/$defs/FormulaEncodingObject",

@@ -180,11 +180,10 @@ class ExcelGenerator:
         
         # Define columns
         columns = [
-            'holder_id', 'holder_name', 'holder_type',
-            'class_id', 'class_name', 'class_type',
-            'instrument_id', 'round_id',
+            'holder_name', 'holder_type',
+            'class_name', 'class_type',
             'initial_quantity', 'current_quantity',
-            'strike_price', 'acquisition_price', 'acquisition_date',
+            'strike_price', 'acquisition_price', 'acquisition_date', 'round_name',
             'ownership_percent_fds',
             'gross_itm', 'proceeds', 'shares_repurchased', 'net_dilution'
         ]
@@ -196,33 +195,32 @@ class ExcelGenerator:
         
         # Build data rows
         instruments = self.data.get('instruments', [])
-        holders_map = {h['holder_id']: h for h in self.data.get('holders', [])}
-        classes_map = {c['class_id']: c for c in self.data.get('classes', [])}
+        holders_map = {h['name']: h for h in self.data.get('holders', [])}
+        classes_map = {c['name']: c for c in self.data.get('classes', [])}
         
         table_data = []
         for idx, instrument in enumerate(instruments):
-            holder = holders_map.get(instrument.get('holder_id'), {})
-            sec_class = classes_map.get(instrument.get('class_id'), {})
+            holder_name = instrument.get('holder_name', '')
+            class_name = instrument.get('class_name', '')
+            holder = holders_map.get(holder_name, {})
+            sec_class = classes_map.get(class_name, {})
             
             row_data = {
-                'holder_id': instrument.get('holder_id', ''),
-                'holder_name': holder.get('name', ''),
+                'holder_name': holder_name,
                 'holder_type': holder.get('type', ''),
-                'class_id': instrument.get('class_id', ''),
-                'class_name': sec_class.get('name', ''),
+                'class_name': class_name,
                 'class_type': sec_class.get('type', ''),
-                'instrument_id': instrument.get('instrument_id', ''),
-                'round_id': instrument.get('round_id', ''),
                 'initial_quantity': instrument.get('initial_quantity', 0),
                 'current_quantity': instrument.get('current_quantity', instrument.get('initial_quantity', 0)),
                 'strike_price': instrument.get('strike_price', 0),
                 'acquisition_price': instrument.get('acquisition_price', 0),
                 'acquisition_date': instrument.get('acquisition_date', ''),
+                'round_name': instrument.get('round_name', ''),  # Add round_name from instrument
             }
             table_data.append(row_data)
             
-            # Register this row in DLM
-            self.dlm.register_table_row('Ledger', idx, uuid=instrument.get('instrument_id'))
+            # Register this row in DLM using holder_name as unique identifier
+            self.dlm.register_table_row('Ledger', idx, name=holder_name)
         
         # Write table
         if table_data:
@@ -234,9 +232,11 @@ class ExcelGenerator:
                 sheet.write(start_row, start_col + col_idx, col_name, self.formats['header'])
         
         # Set column widths
-        sheet.set_column(0, 2, 12)  # IDs
-        sheet.set_column(1, 1, 20)  # Names
-        sheet.set_column(8, 17, 12)  # Numbers
+        sheet.set_column(0, 1, 20)  # Names
+        sheet.set_column(2, 2, 15)  # class_name
+        sheet.set_column(3, 9, 12)  # Numbers and dates (including round_name)
+        sheet.set_column(10, 10, 18)  # ownership_percent_fds
+        sheet.set_column(11, 14, 12)  # TSM calculations
     
     def _get_ledger_formulas(self) -> Dict[str, str]:
         """Get formula templates for Ledger calculated columns."""
@@ -272,7 +272,7 @@ class ExcelGenerator:
         self.sheets['Rounds'] = sheet
         
         columns = [
-            'round_id', 'round_name', 'round_date',
+            'round_name', 'round_date',
             'investment_amount', 'pre_money_valuation', 'post_money_valuation',
             'price_per_share', 'shares_issued'
         ]
@@ -284,43 +284,41 @@ class ExcelGenerator:
         # Write round data
         rounds = self.data.get('rounds', [])
         for row_idx, round_data in enumerate(rounds, start=1):
-            sheet.write(row_idx, 0, round_data.get('round_id', ''))
-            sheet.write(row_idx, 1, round_data.get('name', ''))
-            sheet.write(row_idx, 2, round_data.get('round_date', ''), self.formats['date'])
-            sheet.write(row_idx, 3, round_data.get('investment_amount', 0), self.formats['currency'])
+            sheet.write(row_idx, 0, round_data.get('name', ''))
+            sheet.write(row_idx, 1, round_data.get('round_date', ''), self.formats['date'])
+            sheet.write(row_idx, 2, round_data.get('investment_amount', 0), self.formats['currency'])
             
             # Handle calculated fields
             pre_money = round_data.get('pre_money_valuation')
             if isinstance(pre_money, dict) and pre_money.get('is_calculated'):
                 formula = self.formula_resolver.resolve_feo(pre_money)
-                sheet.write_formula(row_idx, 4, formula, self.formats['currency'])
+                sheet.write_formula(row_idx, 3, formula, self.formats['currency'])
             else:
-                sheet.write(row_idx, 4, pre_money or 0, self.formats['currency'])
+                sheet.write(row_idx, 3, pre_money or 0, self.formats['currency'])
             
             post_money = round_data.get('post_money_valuation')
             if isinstance(post_money, dict) and post_money.get('is_calculated'):
                 formula = self.formula_resolver.resolve_feo(post_money)
-                sheet.write_formula(row_idx, 5, formula, self.formats['currency'])
+                sheet.write_formula(row_idx, 4, formula, self.formats['currency'])
             else:
-                sheet.write(row_idx, 5, post_money or 0, self.formats['currency'])
+                sheet.write(row_idx, 4, post_money or 0, self.formats['currency'])
             
             pps = round_data.get('price_per_share')
             if isinstance(pps, dict) and pps.get('is_calculated'):
                 formula = self.formula_resolver.resolve_feo(pps)
-                sheet.write_formula(row_idx, 6, formula, self.formats['currency'])
+                sheet.write_formula(row_idx, 5, formula, self.formats['currency'])
             else:
-                sheet.write(row_idx, 6, pps or 0, self.formats['currency'])
+                sheet.write(row_idx, 5, pps or 0, self.formats['currency'])
             
             shares = round_data.get('shares_issued')
             if isinstance(shares, dict) and shares.get('is_calculated'):
                 formula = self.formula_resolver.resolve_feo(shares)
-                sheet.write_formula(row_idx, 7, formula, self.formats['number'])
+                sheet.write_formula(row_idx, 6, formula, self.formats['number'])
             else:
-                sheet.write(row_idx, 7, shares or 0, self.formats['number'])
+                sheet.write(row_idx, 6, shares or 0, self.formats['number'])
         
-        sheet.set_column(0, 0, 12)
-        sheet.set_column(1, 1, 20)
-        sheet.set_column(2, 7, 15)
+        sheet.set_column(0, 0, 20)
+        sheet.set_column(1, 6, 15)
     
     def _create_cap_table_progression_sheet(self):
         """Create Cap Table Progression sheet showing ownership evolution across rounds."""
@@ -335,8 +333,8 @@ class ExcelGenerator:
             sheet.write(0, 0, 'No financing rounds to display', self.formats['label'])
             return
         
-        # Build holder categories
-        holders_map = {h['holder_id']: h for h in self.data.get('holders', [])}
+        # Build holder categories using name as key
+        holders_map = {h['name']: h for h in self.data.get('holders', [])}
         instruments = self.data.get('instruments', [])
         
         # Group holders by type
@@ -371,7 +369,7 @@ class ExcelGenerator:
         round_start_cols = {}
         for round_data in rounds:
             round_name = round_data.get('name', 'Round')
-            round_start_cols[round_data['round_id']] = col
+            round_start_cols[round_name] = col
             
             # Merge cells for round name
             sheet.merge_range(row, col, row, col + 3, round_name, self.formats['header'])
@@ -426,9 +424,8 @@ class ExcelGenerator:
             
             # Each holder in category
             for holder in category_holders:
-                holder_id = holder['holder_id']
                 holder_name = holder['name']
-                holder_row_positions[holder_id] = row
+                holder_row_positions[holder_name] = row
                 
                 col = 0
                 sheet.write(row, col, holder_name)
@@ -439,25 +436,25 @@ class ExcelGenerator:
                 # Get new shares per round for this holder
                 new_shares_per_round = {}
                 for instrument in instruments:
-                    if instrument.get('holder_id') == holder_id:
-                        round_id = instrument.get('round_id')
+                    if instrument.get('holder_name') == holder_name:
+                        round_name = instrument.get('round_name')
                         shares = instrument.get('initial_quantity', 0)
-                        if round_id:
-                            if round_id not in new_shares_per_round:
-                                new_shares_per_round[round_id] = 0
-                            new_shares_per_round[round_id] += shares
+                        if round_name:
+                            if round_name not in new_shares_per_round:
+                                new_shares_per_round[round_name] = 0
+                            new_shares_per_round[round_name] += shares
                 
                 # Track start shares (non-round-specific)
                 start_shares_value = 0
                 for instrument in instruments:
-                    if instrument.get('holder_id') == holder_id and not instrument.get('round_id'):
+                    if instrument.get('holder_name') == holder_name and not instrument.get('round_name'):
                         start_shares_value += instrument.get('initial_quantity', 0)
                 
                 # Write data for each round with formulas
                 for round_idx, round_data in enumerate(rounds):
-                    round_id = round_data['round_id']
+                    round_name = round_data['name']
                     
-                    new_shares = new_shares_per_round.get(round_id, 0)
+                    new_shares = new_shares_per_round.get(round_name, 0)
                     
                     # Define column positions for this round
                     start_col_idx = col
@@ -479,9 +476,8 @@ class ExcelGenerator:
                         prev_total_cell_ref = f"{prev_total_col_letter}{row + 1}"
                         sheet.write_formula(row, start_col_idx, f"={prev_total_cell_ref}", self.formats['number'])
                     
-                    # New shares: SUMIFS from Ledger table
-                    # Formula: =SUMIFS(Ledger[initial_quantity], Ledger[holder_id], holder_id, Ledger[round_id], round_id)
-                    new_formula = f'=SUMIFS(Ledger[initial_quantity], Ledger[holder_id], "{holder_id}", Ledger[round_id], "{round_id}")'
+                    # New shares: SUMIFS from Ledger table using holder_name
+                    new_formula = f'=SUMIFS(Ledger[initial_quantity], Ledger[holder_name], "{holder_name}", Ledger[round_name], "{round_name}")'
                     sheet.write_formula(row, new_col_idx, new_formula, self.formats['number'])
                     
                     # Total = Start + New (formula)
@@ -554,8 +550,8 @@ class ExcelGenerator:
                 sheet.write_formula(row, start_col_pos, start_formula, self.formats['number'])
                 
                 # New: sum of all shares issued in this round from Ledger table
-                round_id = rounds[round_idx]['round_id']
-                new_formula = f'=SUMIF(Ledger[round_id], "{round_id}", Ledger[initial_quantity])'
+                round_name = rounds[round_idx]['name']
+                new_formula = f'=SUMIF(Ledger[round_name], "{round_name}", Ledger[initial_quantity])'
                 sheet.write_formula(row, new_col_pos, new_formula, self.formats['number'])
                 
                 # Total: sum of all Total values from holders above
@@ -614,21 +610,18 @@ class ExcelGenerator:
         
         # Find instruments with vesting terms
         instruments = self.data.get('instruments', [])
-        holders_map = {h['holder_id']: h for h in self.data.get('holders', [])}
-        classes_map = {c['class_id']: c for c in self.data.get('classes', [])}
-        
         row_idx = 1
         for instrument in instruments:
             vesting_terms = instrument.get('vesting_terms')
             if not vesting_terms:
                 continue
             
-            holder = holders_map.get(instrument.get('holder_id'), {})
-            sec_class = classes_map.get(instrument.get('class_id'), {})
+            holder_name = instrument.get('holder_name', '')
+            class_name = instrument.get('class_name', '')
             
-            sheet.write(row_idx, 0, instrument.get('instrument_id', ''))
-            sheet.write(row_idx, 1, holder.get('name', ''))
-            sheet.write(row_idx, 2, sec_class.get('name', ''))
+            sheet.write(row_idx, 0, holder_name + '/' + class_name)  # Use combined as identifier
+            sheet.write(row_idx, 1, holder_name)
+            sheet.write(row_idx, 2, class_name)
             sheet.write(row_idx, 3, instrument.get('initial_quantity', 0), self.formats['number'])
             sheet.write(row_idx, 4, vesting_terms.get('grant_date', ''), self.formats['date'])
             sheet.write(row_idx, 5, vesting_terms.get('cliff_days', 0))
@@ -680,14 +673,14 @@ class ExcelGenerator:
         
         # Get classes with terms
         classes = self.data.get('classes', [])
-        terms_map = {t['terms_id']: t for t in self.data.get('terms', [])}
+        terms_map = {t['name']: t for t in self.data.get('terms', [])}
         
         # Sort by seniority (lower rank = more senior, paid first)
         classes_with_terms = []
         for sec_class in classes:
-            terms_id = sec_class.get('terms_id')
-            if terms_id and terms_id in terms_map:
-                classes_with_terms.append((sec_class, terms_map[terms_id]))
+            terms_name = sec_class.get('terms_name')
+            if terms_name and terms_name in terms_map:
+                classes_with_terms.append((sec_class, terms_map[terms_name]))
         
         classes_with_terms.sort(key=lambda x: x[1].get('seniority_rank', 999))
         

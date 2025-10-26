@@ -217,10 +217,11 @@ print('Generated output.xlsx')
 
 ## Next Steps
 
-1. **Read README.md**: Comprehensive documentation of all features
-2. **Explore examples**: Check `example_usage.py` for more patterns
-3. **Run tests**: `python test_cap_table.py` to verify installation
-4. **Study samples**: Open `sample_simple_captable.json` and `sample_complex_captable.json`
+1. **Read JSON Input Guide**: `docs/JSON_INPUT_GUIDE.md` - Complete guide for generating valid cap table JSON
+2. **Read README.md**: Comprehensive documentation of all features
+3. **Explore examples**: Check `example_usage.py` for more patterns
+4. **Run tests**: `python test_cap_table.py` to verify installation
+5. **Study samples**: Open `sample_simple_captable.json` and `sample_complex_captable.json`
 
 ## Tips
 

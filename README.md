@@ -60,7 +60,9 @@ pip install xlsxwriter jsonschema python-dateutil
 
 ## Quick Start
 
-### Generate Sample Cap Tables
+### Option 1: Command Line (Traditional)
+
+#### Generate Sample Cap Tables
 
 ```bash
 # Create sample JSON files
@@ -75,6 +77,74 @@ This creates:
 - `sample_complex_captable.json` - Advanced example with multiple rounds, options, vesting
 - `demo_simple.xlsx` - Excel output for simple scenario
 - `demo_complex.xlsx` - Excel output for complex scenario
+
+### Option 2: Web App (LLM-Driven)
+
+Launch an interactive web application where you can chat with an LLM to create and modify cap tables in real-time:
+
+#### Backend Setup
+
+```bash
+cd webapp/backend
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env and add your API key for the active provider
+
+# Start the backend server
+uvicorn main:app --reload --port 8000
+```
+
+#### Frontend Setup
+
+```bash
+cd webapp/frontend
+
+# Install dependencies
+npm install
+
+# (Optional) Copy environment file
+cp .env.example .env
+
+# Start the development server
+npm run dev
+```
+
+Visit http://localhost:5173 to access the web app.
+
+#### Web App Features
+
+- **Chat Interface**: Natural language conversations with LLM to create and modify cap tables
+- **Real-time Preview**: See your cap table update live as you make changes
+- **Model Lock**: Server-configured LLM (users cannot switch models)
+- **Export Options**: Download as JSON or Excel at any time
+- **Diff Viewer**: See a human-readable summary of recent changes
+- **Validation**: All changes validated against the cap table schema
+
+#### Environment Variables (Backend)
+
+Edit `webapp/backend/.env`:
+
+```bash
+# Active LLM Configuration (server-side only)
+ACTIVE_PROVIDER=openai          # openai
+ACTIVE_MODEL=gpt-4              # Model name (e.g., gpt-4, gpt-4-turbo)
+
+# API Keys
+OPENAI_API_KEY=sk-...
+
+# Server Configuration
+CORS_ORIGINS=http://localhost:5173
+PORT=8000
+```
+
+#### Example Conversation
+
+```
+You: Create a cap table for TechCo with two founders
 
 ### Programmatic Usage
 
@@ -309,10 +379,12 @@ The system uses three types of Excel references for robustness:
 
 ## Testing
 
-Run the comprehensive test suite:
+### Core Library Tests
+
+Run the comprehensive test suite for the cap table generator:
 
 ```bash
-# Run all tests
+# Run all core tests
 python -m pytest tests/test_cap_table.py -v
 
 # Or from the tests directory
@@ -324,6 +396,31 @@ Test coverage includes:
 - DLM functionality (named ranges, tables, references)
 - Formula resolution (ownership, TSM, vesting, waterfall)
 - End-to-end generation (simple and complex scenarios)
+
+### Web App Tests
+
+Run tests for the web application:
+
+```bash
+# Backend unit tests
+cd webapp/backend
+pytest tests/ -v
+
+# Run specific test modules
+pytest tests/test_validation.py -v
+pytest tests/test_tool_executor.py -v
+pytest tests/test_metrics.py -v
+
+# End-to-end test
+cd ..
+pytest tests/test_e2e.py -v
+```
+
+Web app test coverage includes:
+- Validation: Schema validation, foreign key checks
+- Tool Executor: All operations (replace/append/upsert/delete/bulkPatch)
+- Metrics: Ownership calculations, FD shares, option pool
+- E2E: Full cap table creation flow with Excel export
 
 ## Examples
 
@@ -424,6 +521,22 @@ To extend the system:
 3. Create formula helpers in `formula_resolver.py`
 4. Update Excel generation in `excel_generator.py`
 5. Add tests to `test_cap_table.py`
+
+## Documentation
+
+The `docs/` directory contains comprehensive documentation:
+
+- **[JSON Input Guide](docs/JSON_INPUT_GUIDE.md)**: Complete reference for generating valid cap table JSON
+  - Detailed field specifications for all entities
+  - Data relationship mapping
+  - Common patterns and examples
+  - Validation rules and troubleshooting
+  
+- **[Schema Reference](docs/SCHEMA_REFERENCE.md)**: Quick reference for the cap table schema
+- **[Knowledge Base](docs/Knowledge Base.md)**: Technical deep-dive on formula encoding and Excel generation
+- **[XLSX Output](docs/XLSX%20Output.md)**: Details on the generated Excel structure
+
+For generating input JSON programmatically or via LLM, start with the JSON Input Guide.
 
 ## License
 
