@@ -11,19 +11,20 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 try:
     from captable import generate_from_json
-    
+
     # Paths
-    input_file = Path(__file__).parent / "examples" / "round_based_example.json"
+    input_file = Path(__file__).parent / "examples" / \
+        "round_based_example.json"
     output_file = Path(__file__).parent / "output_v2.xlsx"
-    
+
     print("🚀 Generating Excel from round-based example...")
     print(f"📄 Input: {input_file}")
     print(f"📊 Output: {output_file}")
     print()
-    
+
     # Generate
     result = generate_from_json(str(input_file), str(output_file))
-    
+
     print("✅ SUCCESS!")
     print(f"📊 Excel file created: {output_file}")
     print()
@@ -32,7 +33,7 @@ try:
     print("   - Cap Table Progression: Summary view (placeholder)")
     print()
     print("💡 Open the Excel file to see the results!")
-    
+
 except ImportError as e:
     print("❌ ERROR: Missing dependencies")
     print()
@@ -47,10 +48,9 @@ except ImportError as e:
     print()
     print(f"Missing module: {e}")
     sys.exit(1)
-    
+
 except Exception as e:
     print(f"❌ ERROR: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)
-

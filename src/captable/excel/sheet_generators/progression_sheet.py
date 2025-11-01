@@ -178,8 +178,8 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         # Use SUMIF with holder name from column A and round range from lookup table
         if round_idx in self.round_ranges:
             range_info = self.round_ranges[round_idx]
-            holder_range = f"Rounds!{range_info['holder_col']}{range_info['start_row']}:{range_info['holder_col']}{range_info['end_row']}"
-            shares_range = f"Rounds!{range_info['shares_col']}{range_info['start_row']}:{range_info['shares_col']}{range_info['end_row']}"
+            holder_range = f"Rounds!{range_info['holder_col']}{range_info['start_row'] + 1}:{range_info['holder_col']}{range_info['end_row'] + 1}"
+            shares_range = f"Rounds!{range_info['shares_col']}{range_info['start_row'] + 1}:{range_info['shares_col']}{range_info['end_row'] + 1}"
             
             # Get holder name from column A of this row (same sheet, use relative reference)
             new_formula = f'=SUMIF({holder_range}, A{row + 1}, {shares_range})'

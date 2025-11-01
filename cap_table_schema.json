@@ -226,6 +226,18 @@
         "vesting_terms": {
           "$ref": "#/$defs/VestingTerms",
           "description": "Vesting schedule for options"
+        },
+        "pro_rata_type": {
+          "type": "string",
+          "enum": ["none", "standard", "super"],
+          "default": "none",
+          "description": "Pro rata rights type: none (no rights), standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro rata rights (required when pro_rata_type is 'super')"
         }
       }
     },

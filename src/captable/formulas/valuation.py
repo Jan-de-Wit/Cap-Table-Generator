@@ -41,10 +41,10 @@ def create_shares_from_investment_premoney_formula(investment_ref: str,
     - Post-money = Pre-money + Investment + Interest
     
     Mathematical Formula:
-        Shares = (Investment + Interest) * Pre-Round-Shares / (Pre-Money + Investment + Interest)
+        Shares = (Investment + Interest) * Pre-Round-Shares / PreMoney
     
     Excel Formula:
-        =IFERROR((Investment + Interest) * PreRoundShares / (PreMoney + Investment + Interest), 0)
+        =IFERROR((Investment + Interest) * PreRoundShares / PreMoney, 0)
     
     Example:
         Pre-round shares: 10M
@@ -63,9 +63,8 @@ def create_shares_from_investment_premoney_formula(investment_ref: str,
         Excel formula string
     """
     total_investment = f"({investment_ref} + {interest_ref})"
-    post_money = f"({pre_money_val_ref} + {total_investment})"
-    # Shares = TotalInvestment * PreRoundShares / PostMoney
-    return f"=IFERROR({total_investment} * {pre_round_shares_ref} / {post_money}, 0)"
+    # Shares = TotalInvestment * PreRoundShares / PreMoney
+    return f"=IFERROR({total_investment} * {pre_round_shares_ref} / {pre_money_val_ref}, 0)"
 
 
 def create_shares_from_investment_postmoney_formula(investment_ref: str,
@@ -85,7 +84,7 @@ def create_shares_from_investment_postmoney_formula(investment_ref: str,
         Shares = PreRoundShares * ownership% / (1 - ownership%)
     
     Excel Formula:
-        =IFERROR(PreRoundShares * ((Investment + Interest) / PostMoney) / (1 - ((Investment + Interest) / PostMoney)), 0)
+        =IFERROR(PreRoundShares * ((Investment + Interest) / PostMoney), 0)
     
     Example:
         Pre-round shares: 10M
@@ -107,8 +106,7 @@ def create_shares_from_investment_postmoney_formula(investment_ref: str,
     ownership_pct = f"({total_investment} / {post_money_val_ref})"
     # Shares = PreRoundShares * ownership% / (1 - ownership%)
     numerator = f"{pre_round_shares_ref} * {ownership_pct}"
-    denominator = f"(1 - {ownership_pct})"
-    return f"=IFERROR({numerator} / {denominator}, 0)"
+    return f"=IFERROR({numerator}, 0)"
 
 
 def create_price_per_share_from_valuation_formula(valuation_ref: str,

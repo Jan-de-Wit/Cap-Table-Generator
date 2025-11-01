@@ -14,13 +14,13 @@
         {
           "holder_name": "Alice",
           "class_name": "Common Stock",
-          "initial_quantity": 4000000,
+          "initial_quantity": 5000000,
           "acquisition_date": "2023-01-01"
         },
         {
           "holder_name": "Bob",
           "class_name": "Common Stock",
-          "initial_quantity": 4000000,
+          "initial_quantity": 5000000,
           "acquisition_date": "2023-01-01"
         }
       ]
@@ -29,7 +29,7 @@
       "name": "Seed Round",
       "round_date": "2023-06-01",
       "calculation_type": "valuation_based",
-      "valuation_basis": "post_money",
+      "valuation_basis": "pre_money",
       "pre_money_valuation": 8000000,
       "post_money_valuation": 10000000,
       "instruments": [

@@ -36,7 +36,7 @@ def create_accrued_interest_formula(principal_ref: str, interest_rate_ref: str,
         Excel formula string for accrued interest
     """
     # Calculate years elapsed (fractional)
-    days_elapsed = f"DAYS({end_date_ref}, {start_date_ref})"
+    days_elapsed = f"IFERROR({end_date_ref} - {start_date_ref}, 0)"
     years_elapsed = f"({days_elapsed} / 365)"
     
     if interest_type == "compound":
