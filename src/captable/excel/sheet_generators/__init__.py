@@ -6,9 +6,11 @@ Individual sheet generators for each type of Excel sheet in round-based architec
 
 from .rounds_sheet import RoundsSheetGenerator
 from .progression_sheet import ProgressionSheetGenerator
+from .pro_rata_sheet import ProRataSheetGenerator
 
 __all__ = [
     'RoundsSheetGenerator',
     'ProgressionSheetGenerator',
+    'ProRataSheetGenerator',
 ]
 

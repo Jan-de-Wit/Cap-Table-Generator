@@ -175,22 +175,31 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             sheet.write_formula(row, start_col, f"={prev_cell}", self.formats.get('number'))
         
         # NEW: Sum shares for this holder in this round
-        # Use SUMIF with holder name from column A and round range from lookup table
+        # Includes base shares from Rounds sheet + pro rata shares from Pro Rata Allocations sheet
         if round_idx in self.round_ranges:
             range_info = self.round_ranges[round_idx]
-            holder_range = f"Rounds!{range_info['holder_col']}{range_info['start_row'] + 1}:{range_info['holder_col']}{range_info['end_row'] + 1}"
-            shares_range = f"Rounds!{range_info['shares_col']}{range_info['start_row'] + 1}:{range_info['shares_col']}{range_info['end_row'] + 1}"
+            holder_range = f"Rounds!{range_info['holder_col']}{range_info['start_row']}:{range_info['holder_col']}{range_info['end_row']}"
+            shares_range = f"Rounds!{range_info['shares_col']}{range_info['start_row']}:{range_info['shares_col']}{range_info['end_row']}"
             
             # Get holder name from column A of this row (same sheet, use relative reference)
-            new_formula = f'=SUMIF({holder_range}, A{row + 1}, {shares_range})'
+            rounds_shares = f'SUMIF({holder_range}, A{row + 1}, {shares_range})'
         else:
             # Fallback to old method with direct string matching
             calc_type = rounds[round_idx].get('calculation_type', 'fixed_shares')
             shares_col_letter = self._get_shares_column_letter(calc_type)
             # Use actual holder name directly instead of cell reference
             holder_name_escaped = f'"{holder_name}"'
-            new_formula = f'=SUMIF(Rounds!A:A, {holder_name_escaped}, Rounds!{shares_col_letter}:{shares_col_letter})'
+            rounds_shares = f'SUMIF(Rounds!A:A, {holder_name_escaped}, Rounds!{shares_col_letter}:{shares_col_letter})'
         
+        # Get pro rata shares from Pro Rata Allocations sheet
+        # Pro rata sheet has same row structure (holders in same order)
+        # Each round has columns: Pro Rata Type, Pro Rata %, Pro Rata Shares
+        # Pro Rata Shares is 2 columns after the start of each round section
+        pro_rata_start_col = self._get_pro_rata_shares_col(round_idx, rounds)
+        pro_rata_shares = f"'Pro Rata Allocations'!{pro_rata_start_col}{row + 1}"
+        
+        # Total new shares = rounds sheet shares + pro rata shares
+        new_formula = f'=ROUND({rounds_shares} + {pro_rata_shares}, 0)'
         sheet.write_formula(row, new_col, new_formula, self.formats.get('number'))
         
         # TOTAL: Start + New (rounded to integer)
@@ -229,6 +238,15 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             return 'K'  # calculated_shares is column K (11th column)
         else:
             return 'D'  # Default to column D
+    
+    def _get_pro_rata_shares_col(self, round_idx: int, rounds: List[Dict[str, Any]]) -> str:
+        """Get the column letter for pro rata shares in Pro Rata Allocations sheet."""
+        # Pro Rata Allocations sheet structure:
+        # Column 0: Shareholders
+        # Each round: Pro Rata Type, Pro Rata %, Pro Rata Shares, Separator
+        # Pro Rata Shares is 2 columns after the start of each round (col 1 + round_idx * 4 + 2)
+        col_idx = 1 + (round_idx * 4) + 2
+        return self._col_letter(col_idx)
     
     def _write_total_row(
         self,

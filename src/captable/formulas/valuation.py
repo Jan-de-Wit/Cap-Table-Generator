@@ -187,25 +187,45 @@ def create_shares_from_percentage_formula(percentage_ownership_ref: str,
 
 def create_convertible_shares_formula(investment_ref: str, interest_ref: str,
                                       discount_rate_ref: str, round_pps_ref: str,
-                                      valuation_cap_ref: str, pre_round_shares_ref: str) -> str:
+                                      valuation_cap_ref: str = None, pre_round_shares_ref: str = None) -> str:
     """
     Calculate shares from convertible instrument (SAFE or convertible note).
     
     CONVERTIBLE CALCULATION:
-    - Uses the lower of: discounted price or valuation cap price
-    - Conversion price = MIN(round_pps * (1 - discount), valuation_cap / pre_round_shares)
+    - Uses the lower of: discounted price or full price per share
+    - Conversion price = MIN(round_pps * (1 - discount), round_pps)
     - Shares = (investment + interest) / conversion_price
+    
+    Note: When valuation_cap_basis is used, price_per_share is calculated separately
+    based on the basis (pre_money, post_money, or fixed). This formula uses that
+    price_per_share directly.
     
     Args:
         investment_ref: Reference to investment amount
         interest_ref: Reference to accrued interest
         discount_rate_ref: Reference to discount rate (as decimal)
-        round_pps_ref: Reference to round price per share
-        valuation_cap_ref: Reference to valuation cap (round pre or post money)
-        pre_round_shares_ref: Reference to pre-round shares
+        round_pps_ref: Reference to round price per share (already calculated based on basis)
+        valuation_cap_ref: DEPRECATED - not used anymore, price_per_share handles this
+        pre_round_shares_ref: DEPRECATED - not used anymore, price_per_share handles this
         
     Returns:
         Excel formula string
+    """
+    total_investment = f"({investment_ref} + {interest_ref})"
+    discounted_price = f"({round_pps_ref} * (1 - {discount_rate_ref}))"
+    # Conversion price is the lower of discounted price or full price
+    # Since discount is typically positive, this is usually just the discounted price
+    conversion_price = f"MIN({discounted_price}, {round_pps_ref})"
+    
+    return f"=IFERROR({total_investment} / {conversion_price}, 0)"
+
+
+def create_convertible_shares_formula_legacy(investment_ref: str, interest_ref: str,
+                                      discount_rate_ref: str, round_pps_ref: str,
+                                      valuation_cap_ref: str, pre_round_shares_ref: str) -> str:
+    """
+    DEPRECATED: Legacy formula that calculates cap price within the shares formula.
+    Use create_convertible_shares_formula instead, which uses price_per_share directly.
     """
     total_investment = f"({investment_ref} + {interest_ref})"
     discounted_price = f"({round_pps_ref} * (1 - {discount_rate_ref}))"

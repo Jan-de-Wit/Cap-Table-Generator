@@ -29,8 +29,9 @@ try:
     print(f"📊 Excel file created: {output_file}")
     print()
     print("📋 What's in the file:")
-    print("   - Rounds Sheet: All rounds with instruments laid out vertically")
-    print("   - Cap Table Progression: Summary view (placeholder)")
+    print("   - Rounds Sheet: All rounds with instruments laid out vertically (base shares only)")
+    print("   - Pro Rata Allocations: Pro rata share allocations per stakeholder per round")
+    print("   - Cap Table Progression: Summary view showing ownership evolution")
     print()
     print("💡 Open the Excel file to see the results!")
 

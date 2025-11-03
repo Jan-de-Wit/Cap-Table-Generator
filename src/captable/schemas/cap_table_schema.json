@@ -285,8 +285,8 @@
         },
         "valuation_cap_basis": {
           "type": "string",
-          "enum": ["pre_money", "post_money"],
-          "description": "Valuation basis for convertible instruments (required for convertible type)"
+          "enum": ["pre_money", "post_money", "fixed"],
+          "description": "Valuation basis for convertible instruments (required for convertible type). Use 'fixed' to specify a fixed price per share instead of calculating from valuation."
         },
         "valuation_basis": {
           "type": "string",

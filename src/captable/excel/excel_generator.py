@@ -35,7 +35,8 @@ from ..formulas import FormulaResolver
 from .formatters import ExcelFormatters
 from .sheet_generators import (
     RoundsSheetGenerator,
-    ProgressionSheetGenerator
+    ProgressionSheetGenerator,
+    ProRataSheetGenerator
 )
 
 
@@ -84,13 +85,31 @@ class ExcelGenerator:
         # STEP 1: Create Rounds sheet (SOURCE OF TRUTH)
         # Each round contains constants and nested instruments
         # Instruments displayed with columns based on round's calculation_type
+        # Contains base shares only (no pro rata)
         rounds_gen = RoundsSheetGenerator(
             self.workbook, self.data, self.formats, self.dlm, self.formula_resolver
         )
         self.sheets['Rounds'] = rounds_gen.generate()
         
-        # STEP 2: Create Cap Table Progression sheet (SUMMARY VIEW)
-        # References instrument shares from Rounds sheet
+        # STEP 2: Create Pro Rata Allocations sheet
+        # Lists all stakeholders per round and calculates pro rata share allocations
+        # Pro rata calculations happen AFTER regular round shares are calculated
+        pro_rata_gen = ProRataSheetGenerator(
+            self.workbook, self.data, self.formats, self.dlm, self.formula_resolver
+        )
+        pro_rata_gen.set_round_ranges(rounds_gen.get_round_ranges())
+        # Pass shares_issued references for each round
+        rounds = self.data.get('rounds', [])
+        shares_issued_refs = {}
+        for round_idx in range(len(rounds)):
+            shares_issued_ref = rounds_gen.get_shares_issued_ref(round_idx)
+            if shares_issued_ref:
+                shares_issued_refs[round_idx] = shares_issued_ref
+        pro_rata_gen.set_shares_issued_refs(shares_issued_refs)
+        self.sheets['Pro Rata Allocations'] = pro_rata_gen.generate()
+        
+        # STEP 3: Create Cap Table Progression sheet (SUMMARY VIEW)
+        # References instrument shares from Rounds sheet + Pro Rata Allocations sheet
         # Shows ownership evolution across rounds
         progression_gen = ProgressionSheetGenerator(
             self.workbook, self.data, self.formats, self.dlm, self.formula_resolver
