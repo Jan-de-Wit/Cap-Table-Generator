@@ -139,11 +139,15 @@ class RoundsSheetGenerator(BaseSheetGenerator):
 
         # Store round range info for progression sheet
         instruments_end_row = current_row - 1 if instruments else instruments_start_row
+        # Include table metadata if a table was created
+        table_name = self._get_round_table_name(round_idx, round_data)
         self.round_ranges[round_idx] = {
             'start_row': instruments_start_row + 2,  # +1 for header
             'end_row': instruments_end_row + 1,
-            'holder_col': 'A',  # Assuming holder_name is column A
-            'shares_col': self._get_shares_column_letter(calc_type)
+            'holder_col': 'A',  # Column letters retained for fallback
+            'shares_col': self._get_shares_column_letter(calc_type),
+            'table_name': table_name,
+            'calc_type': calc_type
         }
 
         return current_row
@@ -327,6 +331,17 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                     else:
                         sheet.write(current_row, col_value, pps or 0,
                                     self.formats.get('currency'))
+                
+                # Register named range for price_per_share
+                round_name_key = round_data.get('name', '').replace(' ', '_')
+                price_per_share_cell = f"$B${current_row + 1}"
+                named_range_name = f"{round_name_key}_PricePerShare"
+                self.dlm.register_named_range(
+                    named_range_name, 'Rounds', current_row, col_value)
+                # Define with absolute reference: 'SheetName'!$B$5
+                self.workbook.define_name(
+                    named_range_name, f"'Rounds'!{price_per_share_cell}")
+                
                 current_row += 1
 
         # Shares Issued (calculated from instruments)
@@ -607,6 +622,31 @@ class RoundsSheetGenerator(BaseSheetGenerator):
             sheet.write_formula(
                 shares_issued_row, 1, shares_issued_formula, self.formats.get('number'))
 
+        # Create Excel Table for this round's instruments to enable structured references
+        # Table range includes header row and all instrument rows
+        if last_instrument_row >= first_instrument_row:
+            header_row = first_instrument_row - 1
+            end_col = len(headers) - 1
+            columns_def = [{'header': h} for h in headers]
+            table_name = self._get_round_table_name(round_idx, round_data)
+            sheet.add_table(
+                header_row,
+                0,
+                last_instrument_row,
+                end_col,
+                {
+                    'name': table_name,
+                    'columns': columns_def,
+                    'style': 'Table Style Medium 2'
+                }
+            )
+            # Update Shares Issued to sum the table's shares column using structured references
+            if shares_issued_row is not None:
+                shares_header = 'Shares' if calc_type == 'fixed_shares' else 'Calculated Shares'
+                structured_sum = f"=SUM({table_name}[[#All],[{shares_header}]])"
+                sheet.write_formula(
+                    shares_issued_row, 1, structured_sum, self.formats.get('number'))
+
         return current_row
 
 
@@ -660,6 +700,15 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         elif calc_type == 'convertible':
             return 'K'  # 11th column (0-indexed: 10)
         return 'D'  # Default
+
+    def _get_round_table_name(self, round_idx: int, round_data: Dict[str, Any]) -> str:
+        """Generate a stable Excel table name for a round's instruments table."""
+        round_name = round_data.get('name', f'Round {round_idx + 1}')
+        calc_type = round_data.get('calculation_type', 'fixed_shares')
+        # Excel table name rules: letters, numbers, underscores, cannot look like a cell reference
+        safe_round = ''.join(ch if ch.isalnum() else '_' for ch in round_name)
+        safe_calc = ''.join(ch if ch.isalnum() else '_' for ch in calc_type)
+        return f"{safe_round}_{safe_calc}_Instruments"
 
     def get_round_ranges(self) -> Dict[int, Dict[str, Any]]:
         """Get round ranges for progression sheet reference."""

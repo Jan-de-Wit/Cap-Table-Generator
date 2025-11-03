@@ -178,11 +178,17 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         # Includes base shares from Rounds sheet + pro rata shares from Pro Rata Allocations sheet
         if round_idx in self.round_ranges:
             range_info = self.round_ranges[round_idx]
-            holder_range = f"Rounds!{range_info['holder_col']}{range_info['start_row']}:{range_info['holder_col']}{range_info['end_row']}"
-            shares_range = f"Rounds!{range_info['shares_col']}{range_info['start_row']}:{range_info['shares_col']}{range_info['end_row']}"
-            
-            # Get holder name from column A of this row (same sheet, use relative reference)
-            rounds_shares = f'SUMIF({holder_range}, A{row + 1}, {shares_range})'
+            table_name = range_info.get('table_name')
+            if table_name:
+                # Use structured references over the round's instruments table
+                shares_header = self._get_shares_header(range_info.get('calc_type'))
+                holder_col_ref = f"{table_name}[[#All],[Holder Name]]"
+                shares_col_ref = f"{table_name}[[#All],[{shares_header}]]"
+                rounds_shares = f"SUMIF({holder_col_ref}, A{row + 1}, {shares_col_ref})"
+            else:
+                holder_range = f"Rounds!{range_info['holder_col']}{range_info['start_row']}:{range_info['holder_col']}{range_info['end_row']}"
+                shares_range = f"Rounds!{range_info['shares_col']}{range_info['start_row']}:{range_info['shares_col']}{range_info['end_row']}"
+                rounds_shares = f'SUMIF({holder_range}, A{row + 1}, {shares_range})'
         else:
             # Fallback to old method with direct string matching
             calc_type = rounds[round_idx].get('calculation_type', 'fixed_shares')
@@ -193,7 +199,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         
         # Get pro rata shares from Pro Rata Allocations sheet
         # Pro rata sheet has same row structure (holders in same order)
-        # Each round has columns: Pro Rata Type, Pro Rata %, Pro Rata Shares
+        # Each round has columns: Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount, Separator
         # Pro Rata Shares is 2 columns after the start of each round section
         pro_rata_start_col = self._get_pro_rata_shares_col(round_idx, rounds)
         pro_rata_shares = f"'Pro Rata Allocations'!{pro_rata_start_col}{row + 1}"
@@ -243,10 +249,17 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         """Get the column letter for pro rata shares in Pro Rata Allocations sheet."""
         # Pro Rata Allocations sheet structure:
         # Column 0: Shareholders
-        # Each round: Pro Rata Type, Pro Rata %, Pro Rata Shares, Separator
-        # Pro Rata Shares is 2 columns after the start of each round (col 1 + round_idx * 4 + 2)
-        col_idx = 1 + (round_idx * 4) + 2
+        # Each round: Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount, Separator
+        # Pro Rata Shares is 2 columns after the start of each round (col 1 + round_idx * 6 + 2)
+        col_idx = 1 + (round_idx * 6) + 2
         return self._col_letter(col_idx)
+    
+    def _get_shares_header(self, calc_type: str) -> str:
+        """Return the header text for the shares column for a given calc_type."""
+        if calc_type == 'fixed_shares':
+            return 'Shares'
+        # For target_percentage, valuation_based, and convertible the header used is 'Calculated Shares'
+        return 'Calculated Shares'
     
     def _write_total_row(
         self,
