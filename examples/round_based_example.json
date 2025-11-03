@@ -5,6 +5,45 @@
     "incorporation_date": "2023-01-01",
     "current_date": "2024-12-31"
   },
+  "holders": [
+    {
+      "name": "Alice",
+      "group": "Founders",
+      "description": "Founders of the company"
+    },
+    {
+      "name": "Bob",
+      "group": "Founders"
+    },
+    {
+      "name": "Seed Investor",
+      "group": "Investors"
+    },
+    {
+      "name": "VC Fund Simple",
+      "group": "Investors"
+    },
+    {
+      "name": "VC Fund Compound Yearly",
+      "group": "Investors"
+    },
+    {
+      "name": "VC Fund Compound Monthly",
+      "group": "Investors"
+    },
+    {
+      "name": "VC Fund Compound Daily",
+      "group": "Investors"
+    },
+    {
+      "name": "VC Fund No Interest",
+      "group": "Investors"
+    },
+    {
+      "name": "Strategic Partner",
+      "group": "Strategic Partners"
+    }
+  ],
   "rounds": [
     {
       "name": "Incorporation",
@@ -58,7 +97,12 @@
           "interest_start_date": "2023-09-01",
           "interest_end_date": "2024-03-15",
           "interest_type": "simple",
-          "discount_rate": 0.20
+          "discount_rate": 0.2
+        },
+        {
+          "holder_name": "Alice",
+          "class_name": "Common Stock",
+          "pro_rata_type": "standard"
         },
         {
           "holder_name": "VC Fund Compound Yearly",
@@ -68,7 +112,7 @@
           "interest_start_date": "2023-09-01",
           "interest_end_date": "2024-03-15",
           "interest_type": "compound_yearly",
-          "discount_rate": 0.20
+          "discount_rate": 0.2
         },
         {
           "holder_name": "VC Fund Compound Monthly",
@@ -78,7 +122,7 @@
           "interest_start_date": "2023-09-01",
           "interest_end_date": "2024-03-15",
           "interest_type": "compound_monthly",
-          "discount_rate": 0.20
+          "discount_rate": 0.2
         },
         {
           "holder_name": "VC Fund Compound Daily",
@@ -88,7 +132,7 @@
           "interest_start_date": "2023-09-01",
           "interest_end_date": "2024-03-15",
           "interest_type": "compound_daily",
-          "discount_rate": 0.20
+          "discount_rate": 0.2
         },
         {
           "holder_name": "VC Fund No Interest",
@@ -98,7 +142,7 @@
           "interest_start_date": "2023-09-01",
           "interest_end_date": "2024-03-15",
           "interest_type": "no_interest",
-          "discount_rate": 0.20
+          "discount_rate": 0.2
         }
       ]
     },
@@ -116,4 +160,3 @@
     }
   ]
 }
-

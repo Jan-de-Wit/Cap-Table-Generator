@@ -79,7 +79,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         calc_type = round_data.get('calculation_type', 'fixed_shares')
 
         # Write round heading
-        sheet.write(current_row, 0, round_name, self.formats.get('label'))
+        sheet.write(current_row, 0, round_name, self.formats.get('round_header_plain'))
         current_row += 1
 
         # Write constants section
@@ -121,10 +121,16 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         # Write instruments table
         instruments_start_row = current_row
         instruments = round_data.get('instruments', [])
+        
+        # Filter out pro rata allocations (they go in Pro Rata Allocations sheet, not Rounds sheet)
+        regular_instruments = [
+            inst for inst in instruments 
+            if not self._is_pro_rata_allocation(inst)
+        ]
 
-        if instruments:
+        if regular_instruments:
             current_row = self._write_instruments_table(
-                sheet, round_idx, round_data, instruments, all_rounds, current_row
+                sheet, round_idx, round_data, regular_instruments, all_rounds, current_row
             )
         else:
             # No instruments - just write placeholder
@@ -138,7 +144,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         )
 
         # Store round range info for progression sheet
-        instruments_end_row = current_row - 1 if instruments else instruments_start_row
+        instruments_end_row = current_row - 1 if regular_instruments else instruments_start_row
         # Include table metadata if a table was created
         table_name = self._get_round_table_name(round_idx, round_data)
         self.round_ranges[round_idx] = {
@@ -151,6 +157,33 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         }
 
         return current_row
+    
+    def _is_pro_rata_allocation(self, instrument: Dict[str, Any]) -> bool:
+        """
+        Check if an instrument is a pro rata allocation.
+        
+        A pro rata allocation has only holder_name, class_name, and pro_rata_type.
+        It may optionally have pro_rata_percentage.
+        
+        Args:
+            instrument: Instrument dictionary
+            
+        Returns:
+            True if this is a pro rata allocation, False otherwise
+        """
+        # Pro rata allocations have pro_rata_type and only basic fields
+        if "pro_rata_type" not in instrument:
+            return False
+        
+        # Check that it only has the allowed fields for pro rata allocations
+        allowed_fields = {"holder_name", "class_name", "pro_rata_type", "pro_rata_percentage"}
+        instrument_fields = set(instrument.keys())
+        
+        # If the instrument has any fields beyond the allowed ones, it's not just a pro rata allocation
+        if instrument_fields - allowed_fields:
+            return False
+        
+        return True
 
     def _write_round_constants(
         self,

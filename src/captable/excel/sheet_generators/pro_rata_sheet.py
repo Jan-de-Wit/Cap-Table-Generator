@@ -30,6 +30,8 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         self.shares_issued_refs = {}  # Shares issued cell references per round
         # Row range for holder data (for summing pro rata %)
         self.holder_data_range = {}
+        # Padding offset for table positioning
+        self.padding_offset = 1
 
     def _get_sheet_name(self) -> str:
         """Returns 'Pro Rata Allocations'."""
@@ -42,38 +44,83 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
         rounds = self.data.get('rounds', [])
         if not rounds:
-            sheet.write(0, 0, 'No rounds found', self.formats.get('text'))
+            sheet.write(self.padding_offset, self.padding_offset, 'No rounds found', self.formats.get('text'))
             return sheet
 
-        # Extract unique holders from all rounds
-        all_holders = self._extract_unique_holders(rounds)
+        # Extract holders with grouping
+        holders_by_group, all_holders = self._get_holders_with_groups(rounds)
 
         if not all_holders:
-            sheet.write(0, 0, 'No instruments found', self.formats.get('text'))
+            sheet.write(self.padding_offset + 1, self.padding_offset + 1, 'No instruments found', self.formats.get('text'))
             return sheet
 
-        # Write headers
+        # Calculate table bounds for border (border includes 1 cell padding on all sides)
+        # Border starts at padding_offset (1), content starts at padding_offset + 1 (2)
+        border_start_row = self.padding_offset
+        border_start_col = self.padding_offset
+        # Calculate last column: padding + 1 (padding) + 2 (Shareholders + Description) + (rounds * 6) - 1
+        # Each round has 6 columns (5 data + 1 separator), last round's separator is the last column
+        num_rounds = len(rounds)
+        border_end_col = self.padding_offset + 1 + 2 + (num_rounds * 6) - 1
+        # Last row includes padding, so we need to calculate after writing data
+        
+        # Write headers (shifted by padding offset + 1 for content within border)
         self._write_headers(sheet, rounds)
 
-        # Write holder data
-        data_start_row = 2  # After headers
-        first_holder_row = data_start_row
-        last_holder_row = data_start_row + len(all_holders) - 1
-
-        self._write_holder_data(
-            sheet, rounds, all_holders, data_start_row, first_holder_row, last_holder_row
+        # Write holder data with grouping (shifted by padding offset + 1 for content within border)
+        data_start_row = self.padding_offset + 1 + 2  # After padding + headers
+        data_rows_per_holder, first_holder_row, last_holder_row = self._write_holder_data_with_groups(
+            sheet, rounds, all_holders, holders_by_group, data_start_row
         )
 
         # Write total row
         self._write_total_row(sheet, rounds, all_holders,
                               first_holder_row, last_holder_row)
 
-        # Set column widths
-        self.set_column_widths([
-            (0, 0, 25),  # Holder name
-            # Round columns (5 data columns + 1 separator per round)
-            (1, len(rounds) * 6 + 1, 15),
+        # Calculate border end row (includes padding)
+        border_end_row = last_holder_row + 2 + 1  # Total row + spacing + padding
+
+        # Add padding cells with white background inside the border
+        self._add_padding_cells(sheet, border_start_row, border_start_col, border_end_row, border_end_col)
+
+        # Apply white background to all cells in the table
+        self._apply_white_background(sheet, border_start_row, border_start_col, border_end_row, border_end_col)
+
+        # Apply borders to entire table (including padding area)
+        self._apply_table_borders(sheet, border_start_row, border_start_col, border_end_row, border_end_col)
+
+        # Set row heights for header rows (make them taller) and padding rows
+        self.set_row_heights([
+            (0, 16.0),  # Outer padding row
+            (border_start_row, 16.0),  # Inner padding row (top border row)
+            (self.padding_offset + 1, 25),  # Round names row
+            (self.padding_offset + 2, 25),  # Column headers row
         ])
+
+        # Set column widths (include padding columns)
+        column_widths = [
+            (0, 0, 4.0),  # Outer padding column
+            (border_start_col, border_start_col, 4.0),  # Inner padding column (left border column)
+            (self.padding_offset + 1, self.padding_offset + 1, 35),  # Shareholders column
+            (self.padding_offset + 2, self.padding_offset + 2, 35),  # Description column
+        ]
+
+        # For each round, set widths for Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount (15) and separator (5)
+        for round_idx in range(num_rounds):
+            # Start column: padding + 1 (inner padding) + 2 (Shareholders + Description) + (round_idx * 6)
+            start_col = self.padding_offset + 1 + 2 + (round_idx * 6)
+            # Set Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount columns to width 15
+            column_widths.append((start_col, start_col + 4, 15))
+            # Set separator column to width 5
+            separator_col = start_col + 5
+            column_widths.append((separator_col, separator_col, 5))
+
+        self.set_column_widths(column_widths)
+
+        # Freeze columns and header rows
+        freeze_row = self.padding_offset + 2 + 1
+        freeze_col = self.padding_offset + 2
+        sheet.freeze_panes(freeze_row, freeze_col)
 
         return sheet
 
@@ -88,24 +135,155 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                     holders_set.add(holder_name)
         return sorted(list(holders_set))
 
+    def _get_holders_with_groups(self, rounds: List[Dict[str, Any]]) -> tuple:
+        """
+        Get holders list with grouping information.
+
+        Returns:
+            Tuple of (holders_by_group: Dict[str, List[str]], all_holders: List[str])
+            where holders_by_group maps group name to list of holder names,
+            and all_holders is a flat list of all holders in group order.
+        """
+        # First, get all unique holders from instruments
+        holders_set = set()
+        for round_data in rounds:
+            instruments = round_data.get('instruments', [])
+            for instrument in instruments:
+                holder_name = instrument.get('holder_name')
+                if holder_name:
+                    holders_set.add(holder_name)
+
+        # Build holder-to-group mapping from holders array
+        holder_to_group = {}
+        if 'holders' in self.data:
+            for holder_data in self.data['holders']:
+                holder_name = holder_data.get('name')
+                group = holder_data.get('group', '')
+                if holder_name and holder_name in holders_set:
+                    holder_to_group[holder_name] = group
+
+        # Group holders by their group
+        holders_by_group: Dict[str, List[str]] = {}
+        ungrouped = []
+
+        for holder_name in sorted(holders_set):
+            group = holder_to_group.get(holder_name, '')
+            if group:
+                if group not in holders_by_group:
+                    holders_by_group[group] = []
+                holders_by_group[group].append(holder_name)
+            else:
+                ungrouped.append(holder_name)
+
+        # Build flat list: groups first (sorted by group name), then ungrouped
+        all_holders = []
+        for group in sorted(holders_by_group.keys()):
+            all_holders.extend(holders_by_group[group])
+        all_holders.extend(ungrouped)
+
+        return holders_by_group, all_holders
+
+    def _add_padding_cells(self, sheet: xlsxwriter.worksheet.Worksheet, 
+                          border_start_row: int, border_start_col: int,
+                          border_end_row: int, border_end_col: int):
+        """Add padding cells with white background inside the border."""
+        white_bg_format = self.formats.get('white_bg')
+        
+        # Fill top padding row (inside border, below top border)
+        for col in range(border_start_col, border_end_col + 1):
+            sheet.write(border_start_row, col, '', white_bg_format)
+        
+        # Fill bottom padding row (inside border, above bottom border)
+        for col in range(border_start_col, border_end_col + 1):
+            sheet.write(border_end_row, col, '', white_bg_format)
+        
+        # Fill left padding column (inside border, to the right of left border)
+        for row in range(border_start_row + 1, border_end_row):
+            sheet.write(row, border_start_col, '', white_bg_format)
+        
+        # Fill right padding column (inside border, to the left of right border)
+        for row in range(border_start_row + 1, border_end_row):
+            sheet.write(row, border_end_col, '', white_bg_format)
+
+    def _apply_white_background(self, sheet: xlsxwriter.worksheet.Worksheet,
+                               start_row: int, start_col: int,
+                               end_row: int, end_col: int):
+        """Apply white background to all cells in the table range."""
+        white_bg_format = self.formats.get('white_bg')
+        # Apply white background to entire table range using conditional formatting
+        sheet.conditional_format(
+            start_row, start_col, end_row, end_col,
+            {'type': 'formula', 'criteria': 'TRUE', 'format': white_bg_format}
+        )
+    
+    def _apply_table_borders(self, sheet: xlsxwriter.worksheet.Worksheet, 
+                             start_row: int, start_col: int, 
+                             end_row: int, end_col: int):
+        """Apply borders to the entire table range using conditional formatting."""
+        # Apply borders to all edge cells, ensuring corners get both borders
+        
+        # Top row: all cells get top border, corners also get left/right
+        for col in range(start_col, end_col + 1):
+            border_props = {'top': 1}
+            if col == start_col:
+                border_props['left'] = 1
+            if col == end_col:
+                border_props['right'] = 1
+            top_border_format = self.workbook.add_format(border_props)
+            sheet.conditional_format(
+                start_row, col, start_row, col,
+                {'type': 'formula', 'criteria': 'TRUE', 'format': top_border_format}
+            )
+        
+        # Bottom row: all cells get bottom border, corners also get left/right
+        for col in range(start_col, end_col + 1):
+            border_props = {'bottom': 1}
+            if col == start_col:
+                border_props['left'] = 1
+            if col == end_col:
+                border_props['right'] = 1
+            bottom_border_format = self.workbook.add_format(border_props)
+            sheet.conditional_format(
+                end_row, col, end_row, col,
+                {'type': 'formula', 'criteria': 'TRUE', 'format': bottom_border_format}
+            )
+        
+        # Left column: all cells get left border (corners already handled above)
+        for row in range(start_row + 1, end_row):
+            left_border_format = self.workbook.add_format({'left': 1})
+            sheet.conditional_format(
+                row, start_col, row, start_col,
+                {'type': 'formula', 'criteria': 'TRUE', 'format': left_border_format}
+            )
+        
+        # Right column: all cells get right border (corners already handled above)
+        for row in range(start_row + 1, end_row):
+            right_border_format = self.workbook.add_format({'right': 1})
+            sheet.conditional_format(
+                row, end_col, row, end_col,
+                {'type': 'formula', 'criteria': 'TRUE', 'format': right_border_format}
+            )
+
     def _write_headers(self, sheet: xlsxwriter.worksheet.Worksheet, rounds: List[Dict[str, Any]]):
-        """Write the header rows (row 0 and 1)."""
-        # Row 0: Round names (merged headers)
-        row = 0
-        col = 1  # Start after "Shareholders"
+        """Write the header rows (shifted by padding offset + 1 for content within border)."""
+        # Row (shifted by padding + 1): Round names (merged headers)
+        row = self.padding_offset + 1
+        col = self.padding_offset + 1 + 2  # Start after padding + "Shareholders" and "Description"
 
         for round_data in rounds:
             round_name = round_data.get('name', 'Round')
             # Merge 5 cells for each round (Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount)
             sheet.merge_range(row, col, row, col + 4,
-                              round_name, self.formats.get('header'))
+                              round_name, self.formats.get('round_header'))
             col += 6  # 5 data columns + 1 separator
 
-        # Row 1: Column subheaders
-        row = 1
-        col = 0
+        # Row (shifted by padding + 1): Column subheaders
+        row = self.padding_offset + 2
+        col = self.padding_offset + 1
 
         sheet.write(row, col, 'Shareholders', self.formats.get('header'))
+        col += 1
+        sheet.write(row, col, '', self.formats.get('header'))
         col += 1
 
         for _ in rounds:
@@ -116,14 +294,133 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             sheet.write(row, col, 'Pro Rata Shares',
                         self.formats.get('header'))
             col += 1
-            sheet.write(row, col, 'Price Per Share',
+            sheet.write(row, col, 'Price per Share',
                         self.formats.get('header'))
             col += 1
-            sheet.write(row, col, 'Investment Amount',
+            sheet.write(row, col, 'Investment',
                         self.formats.get('header'))
             col += 1
             sheet.write(row, col, '', self.formats.get('header'))  # Separator
             col += 1
+
+    def _write_holder_data_with_groups(
+        self,
+        sheet: xlsxwriter.worksheet.Worksheet,
+        rounds: List[Dict[str, Any]],
+        all_holders: List[str],
+        holders_by_group: Dict[str, List[str]],
+        data_start_row: int
+    ) -> tuple:
+        """
+        Write holder data with grouping and spacing rows.
+
+        Returns:
+            Tuple of (data_rows: List[int], first_holder_row: int, last_holder_row: int)
+        """
+        # First pass: calculate row positions
+        holder_row_map = {}  # holder_name -> row
+        row = data_start_row
+        first_holder_row = None
+
+        # Build reverse mapping: holder -> group
+        holder_to_group = {}
+        for group, holders in holders_by_group.items():
+            for holder in holders:
+                holder_to_group[holder] = group
+
+        # Calculate which row each holder will be on
+        current_group = None
+        for holder_name in all_holders:
+            group = holder_to_group.get(holder_name, '')
+
+            # Add group header and spacing row before new group
+            if group and group != current_group:
+                if current_group is not None:
+                    # Add spacing row after previous group
+                    row += 1
+                # Add group header row
+                row += 1
+                current_group = group
+            elif not group and current_group is not None:
+                # Add spacing row before ungrouped holders
+                row += 1
+                current_group = None
+
+            # Track first and last holder rows (excluding spacing rows and group headers)
+            if first_holder_row is None:
+                first_holder_row = row
+
+            holder_row_map[holder_name] = row
+            row += 1
+
+        last_holder_row = row - 1
+
+        # Build holder -> description mapping
+        holder_to_description: Dict[str, str] = {}
+        for holder in self.data.get('holders', []) or []:
+            name = holder.get('name')
+            desc = holder.get('description', '')
+            if name:
+                holder_to_description[name] = desc
+
+        # Second pass: write data with correct row references
+        data_rows = []
+        row = data_start_row
+        current_group = None
+        pro_rata_type_rows_by_round = {}  # Track rows for dropdown validation per round
+
+        for holder_name in all_holders:
+            group = holder_to_group.get(holder_name, '')
+
+            # Add group header and spacing row before new group
+            if group and group != current_group:
+                if current_group is not None:
+                    # Add spacing row after previous group
+                    row += 1
+                # Write group header row (bold) - shifted by padding offset + 1 for content within border
+                sheet.write(row, self.padding_offset + 1, group, self.formats.get('label'))
+                # Leave other columns empty for group header
+                row += 1
+                current_group = group
+            elif not group and current_group is not None:
+                # Add spacing row before ungrouped holders
+                row += 1
+                current_group = None
+
+            # Write holder name - shifted by padding offset + 1 for content within border
+            sheet.write(row, self.padding_offset + 1, holder_name, self.formats.get('text'))
+            # Description column - shifted by padding offset + 1 for content within border
+            sheet.write(row, self.padding_offset + 2, holder_to_description.get(
+                holder_name, ''), self.formats.get('italic_text'))
+            col = self.padding_offset + 1 + 2
+
+            # For each round, write pro rata data
+            for round_idx, round_data in enumerate(rounds):
+                type_col = col  # Pro Rata Type column for this round
+                col = self._write_round_pro_rata_data(
+                    sheet, row, col, round_idx, holder_name, rounds,
+                    first_holder_row, last_holder_row
+                )
+
+                # Track rows that have pro rata type cells for dropdown validation
+                if round_idx not in pro_rata_type_rows_by_round:
+                    pro_rata_type_rows_by_round[round_idx] = []
+                pro_rata_type_rows_by_round[round_idx].append(row)
+
+            data_rows.append(row)
+            row += 1
+
+        # Store row ranges for calculating sum of pro rata percentages
+        self.holder_data_range = {
+            'first_row': first_holder_row,
+            'last_row': last_holder_row
+        }
+
+        # Add dropdown validation for pro rata type columns
+        self._add_pro_rata_dropdowns(
+            sheet, rounds, pro_rata_type_rows_by_round)
+
+        return data_rows, first_holder_row, last_holder_row
 
     def _write_holder_data(
         self,
@@ -134,7 +431,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         first_holder_row: int,
         last_holder_row: int
     ):
-        """Write holder data with pro rata calculations."""
+        """Write holder data with pro rata calculations (legacy method, kept for compatibility)."""
         row = data_start_row
         pro_rata_type_rows_by_round = {}  # Track rows for dropdown validation per round
 
@@ -177,7 +474,8 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         holder_name: str,
         rounds: List[Dict[str, Any]],
         first_holder_row: int,
-        last_holder_row: int
+        last_holder_row: int,
+        is_last_round: bool = False
     ) -> int:
         """Write pro rata data for one round and return updated column position."""
         type_col = col
@@ -271,10 +569,12 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         sheet.write_formula(row, investment_col,
                             investment_formula, self.formats.get('currency'))
 
-        # Separator
-        sheet.write(row, separator_col, '', self.formats.get('text'))
-
-        return separator_col + 1
+        # Separator (skip for last round)
+        if not is_last_round:
+            sheet.write(row, separator_col, '', self.formats.get('text'))
+            return separator_col + 1
+        else:
+            return investment_col + 1
 
     def _create_pro_rata_formula(
         self,
@@ -355,8 +655,9 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         last_row = last_holder_row
 
         # Pro Rata % column for this round
-        # Column position: 1 (type) + 1 (pct) + round_idx * 6 (5 data columns + 1 separator)
-        pct_col = 2 + (round_idx * 6)
+        # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 6 (5 data columns + 1 separator)
+        type_col = self.padding_offset + 1 + 2 + (round_idx * 6)
+        pct_col = type_col + 1
         pct_col_letter = self._col_letter(pct_col)
 
         # Create Excel SUM formula for the Pro Rata % column in this round
@@ -377,7 +678,8 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         Uses SUM over the Pro Rata Type column == "standard".
         """
         # Determine the type and pct column letters for this round
-        type_col = 1 + (round_idx * 6)
+        # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 6 (5 data columns + 1 separator)
+        type_col = self.padding_offset + 1 + 2 + (round_idx * 6)
         pct_col = type_col + 1
         pct_col_letter = self._col_letter(pct_col)
 
@@ -401,19 +703,24 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         """
         # Build ranges
         sheet_name = self._get_sheet_name()
-        type_col = 1 + (round_idx * 6)
+        # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 6 (5 data columns + 1 separator)
+        type_col = self.padding_offset + 1 + 2 + (round_idx * 6)
         type_col_letter = self._col_letter(type_col)
         type_range = f"'{sheet_name}'!{type_col_letter}{first_holder_row + 1}:{type_col_letter}{last_holder_row + 1}"
 
-        rounds_holder_range, rounds_shares_range = self._get_rounds_holder_and_shares_ranges(round_idx)
-        holder_name_range = f"'{sheet_name}'!A{first_holder_row + 1}:A{last_holder_row + 1}"
+        rounds_holder_range, rounds_shares_range = self._get_rounds_holder_and_shares_ranges(
+            round_idx)
+        # Shareholders column is at padding_offset + 1 (within border)
+        holder_name_col_letter = self._col_letter(self.padding_offset + 1)
+        holder_name_range = f"'{sheet_name}'!{holder_name_col_letter}{first_holder_row + 1}:{holder_name_col_letter}{last_holder_row + 1}"
         base_sum_array = f"SUMIF({rounds_holder_range}, {holder_name_range}, {rounds_shares_range})"
 
         # Progression range is 0 in the first round
         if round_idx == 0:
             progression_range = "0"
         else:
-            prev_round_total_col = self._get_progression_total_col(round_idx - 1, rounds)
+            prev_round_total_col = self._get_progression_total_col(
+                round_idx - 1, rounds)
             progression_range = f"'Cap Table Progression'!{prev_round_total_col}{first_holder_row + 1}:{prev_round_total_col}{last_holder_row + 1}"
 
         type_filter = f"(({type_range}=\"standard\")+({type_range}=\"super\")>0)"
@@ -424,7 +731,9 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         rounds_holder_range, rounds_shares_range = self._get_rounds_holder_and_shares_ranges(
             round_idx)
         sheet_name = self._get_sheet_name()
-        holder_name_cell = f"'{sheet_name}'!A{holder_row_1_based}"
+        # Shareholders column is at padding_offset + 1 (within border)
+        holder_name_col_letter = self._col_letter(self.padding_offset + 1)
+        holder_name_cell = f"'{sheet_name}'!{holder_name_col_letter}{holder_row_1_based}"
         return f"IFERROR(SUMIF({rounds_holder_range}, {holder_name_cell}, {rounds_shares_range}), 0)"
 
     def _get_rounds_holder_and_shares_ranges(self, round_idx: int) -> tuple:
@@ -460,7 +769,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         # Each round has 4 columns: Start, New, Total, %
         # Total is 2 columns after Start
         # Formula: col = 2 + (round_idx * 5) + 2 (for Total column)
-        col_idx = 2 + (round_idx * 5) + 2
+        col_idx = 2 + (round_idx * 5) + 4
         return self._col_letter(col_idx)
 
     def _write_total_row(
@@ -471,15 +780,19 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         first_holder_row: int,
         last_holder_row: int
     ):
-        """Write the total row at the bottom."""
+        """Write the total row at the bottom with spacing row before it."""
         if not holders:
             return
 
-        row = last_holder_row + 1
-        sheet.write(row, 0, 'TOTAL', self.formats.get('label'))
-        col = 1
+        # Add spacing row before total
+        row = last_holder_row + 2
+        sheet.write(row, self.padding_offset + 1, 'TOTAL', self.formats.get('total_label'))
+        sheet.write(row, self.padding_offset + 2, '', self.formats.get(
+            'total_text'))  # Description column
+        col = self.padding_offset + 1 + 2
 
         for round_idx, round_data in enumerate(rounds):
+            is_last_round = (round_idx == len(rounds) - 1)
             type_col = col
             pct_col = col + 1
             shares_col = col + 2
@@ -487,13 +800,13 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             investment_col = col + 4
             separator_col = col + 5
 
-            sheet.write(row, type_col, '', self.formats.get('text'))
+            sheet.write(row, type_col, '', self.formats.get('total_text'))
             # Sum all pro rata percentages for this round
             pct_col_letter = self._col_letter(pct_col)
             sheet.write_formula(
                 row, pct_col,
                 f"=SUM({pct_col_letter}{first_holder_row + 1}:{pct_col_letter}{last_holder_row + 1})",
-                self.formats.get('percent')
+                self.formats.get('total_percent')
             )
             # Highlight when total pro rata % exceeds 100%
             sheet.conditional_format(
@@ -502,7 +815,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                     'type': 'cell',
                     'criteria': 'greater than',
                     'value': 1,
-                    'format': self.formats.get('error') if 'error' in self.formats else self.formats.get('percent')
+                    'format': self.formats.get('error') if 'error' in self.formats else self.formats.get('total_percent')
                 }
             )
 
@@ -511,7 +824,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             sheet.write_formula(
                 row, shares_col,
                 f"=SUM({shares_col_letter}{first_holder_row + 1}:{shares_col_letter}{last_holder_row + 1})",
-                self.formats.get('number')
+                self.formats.get('total_number')
             )
 
             # Define a Named Range for this round's total pro rata shares so other sheets can reference it
@@ -521,18 +834,23 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             self.workbook.define_name(pr_total_named, cell_ref_abs)
 
             # Price Per Share column: leave empty in total row
-            sheet.write(row, pps_col, '', self.formats.get('text'))
+            sheet.write(row, pps_col, '', self.formats.get('total_text'))
 
             # Sum all investment amounts for this round
             investment_col_letter = self._col_letter(investment_col)
             sheet.write_formula(
                 row, investment_col,
                 f"=SUM({investment_col_letter}{first_holder_row + 1}:{investment_col_letter}{last_holder_row + 1})",
-                self.formats.get('currency')
+                self.formats.get('total_currency')
             )
 
-            sheet.write(row, separator_col, '', self.formats.get('text'))
-            col = separator_col + 1
+            # Separator (skip for last round)
+            if not is_last_round:
+                sheet.write(row, separator_col, '',
+                            self.formats.get('total_text'))
+                col = separator_col + 1
+            else:
+                col = investment_col + 1
 
     def set_round_ranges(self, round_ranges: Dict[int, Dict[str, Any]]):
         """Set round ranges from rounds sheet generator."""
@@ -554,8 +872,8 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                 continue
 
             # Pro Rata Type column is the first column of each round section
-            # Column position: 1 + (round_idx * 6)
-            type_col = 1 + (round_idx * 6)
+            # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 6 (5 data columns + 1 separator)
+            type_col = self.padding_offset + 1 + 2 + (round_idx * 6)
 
             first_row = min(rows)
             last_row = max(rows)

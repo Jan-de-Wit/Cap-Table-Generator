@@ -107,6 +107,33 @@ class BusinessRulesValidator:
         
         return errors
     
+    def _is_pro_rata_allocation(self, instrument: Dict[str, Any]) -> bool:
+        """
+        Check if an instrument is a pro rata allocation.
+        
+        A pro rata allocation has only holder_name, class_name, and pro_rata_type.
+        It may optionally have pro_rata_percentage.
+        
+        Args:
+            instrument: Instrument dictionary
+            
+        Returns:
+            True if this is a pro rata allocation, False otherwise
+        """
+        # Pro rata allocations have pro_rata_type and only basic fields
+        if "pro_rata_type" not in instrument:
+            return False
+        
+        # Check that it only has the allowed fields for pro rata allocations
+        allowed_fields = {"holder_name", "class_name", "pro_rata_type", "pro_rata_percentage"}
+        instrument_fields = set(instrument.keys())
+        
+        # If the instrument has any fields beyond the allowed ones, it's not just a pro rata allocation
+        if instrument_fields - allowed_fields:
+            return False
+        
+        return True
+    
     def _validate_instrument_completeness(self, data: Dict[str, Any]) -> List[str]:
         """
         Validate that instruments have necessary data based on their round's calculation type.
@@ -116,6 +143,9 @@ class BusinessRulesValidator:
         2. target_percentage: Requires target_percentage
         3. valuation_based: Requires investment_amount
         4. convertible: Requires investment_amount, interest_rate, interest_start_date, interest_end_date
+        
+        Note: Pro rata allocations (holder_name, class_name, pro_rata_type) are valid
+        for any round type and skip the above validation.
         
         Args:
             data: Cap table JSON data
@@ -137,6 +167,10 @@ class BusinessRulesValidator:
             for inst_idx, instrument in enumerate(instruments):
                 holder_name = instrument.get("holder_name", "Unknown")
                 class_name = instrument.get("class_name", "Unknown")
+                
+                # Skip validation for pro rata allocations
+                if self._is_pro_rata_allocation(instrument):
+                    continue
                 
                 # Validate based on calculation type
                 if calc_type == "fixed_shares":

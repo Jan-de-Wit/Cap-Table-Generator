@@ -79,6 +79,10 @@ class ExcelGenerator:
         self.workbook = xlsxwriter.Workbook(self.output_path)
         self.workbook.set_calc_mode('auto')  # Force recalculation on open
         
+        # Set default format for all cells: font size 10 and background color #869A78
+        self.workbook.formats[0].set_font_size(10)
+        self.workbook.formats[0].set_bg_color('#869A78')
+        
         # Create formats
         self.formats = ExcelFormatters.create_formats(self.workbook)
         

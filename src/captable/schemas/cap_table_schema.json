@@ -17,6 +17,13 @@
     "company": {
       "$ref": "#/$defs/Company"
     },
+    "holders": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Holder"
+      },
+      "description": "List of all holders with optional grouping for display"
+    },
     "rounds": {
       "type": "array",
       "items": {
@@ -238,6 +245,24 @@
         "vesting_terms": {
           "$ref": "#/$defs/VestingTerms",
           "description": "Vesting schedule for options"
+        }
+      }
+    },
+    "Holder": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Name",
+          "description": "Unique holder name (used as reference in instruments)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description shown next to the holder name in Cap Table Progression"
+        },
+        "group": {
+          "type": "string",
+          "description": "Optional group name for organizing holders in Excel output (e.g., 'Founders', 'Investors', 'Employees')"
         }
       }
     },
