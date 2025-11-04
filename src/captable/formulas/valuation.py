@@ -30,7 +30,6 @@ def create_safe_conversion_shares_formula(investment_ref: str, conversion_price_
 
 
 def create_shares_from_investment_premoney_formula(investment_ref: str,
-                                                   interest_ref: str,
                                                    pre_money_val_ref: str,
                                                    pre_round_shares_ref: str) -> str:
     """
@@ -55,20 +54,17 @@ def create_shares_from_investment_premoney_formula(investment_ref: str,
 
     Args:
         investment_ref: Reference to investment amount
-        interest_ref: Reference to accrued interest (use 0 if none)
         pre_money_val_ref: Reference to pre-money valuation (from Rounds sheet column E)
         pre_round_shares_ref: Reference to shares outstanding before round
 
     Returns:
         Excel formula string
     """
-    total_investment = f"({investment_ref} + {interest_ref})"
-    # Shares = TotalInvestment * PreRoundShares / PreMoney
-    return f"=IFERROR({total_investment} * {pre_round_shares_ref} / {pre_money_val_ref}, 0)"
+    # Shares = Investment * PreRoundShares / PreMoney
+    return f"=IFERROR({investment_ref} * {pre_round_shares_ref} / {pre_money_val_ref}, 0)"
 
 
 def create_shares_from_investment_postmoney_formula(investment_ref: str,
-                                                    interest_ref: str,
                                                     post_money_val_ref: str,
                                                     pre_round_shares_ref: str) -> str:
     """
@@ -95,15 +91,13 @@ def create_shares_from_investment_postmoney_formula(investment_ref: str,
 
     Args:
         investment_ref: Reference to investment amount
-        interest_ref: Reference to accrued interest (use 0 if none)
-        post_money_val_ref: Reference to post-money valuation (from Rounds sheet column F)
+        post_money_val_ref: Reference to post-money valuation (from Rounds sheet column E)
         pre_round_shares_ref: Reference to shares outstanding before round
 
     Returns:
         Excel formula string
     """
-    total_investment = f"({investment_ref} + {interest_ref})"
-    ownership_pct = f"({total_investment} / {post_money_val_ref})"
+    ownership_pct = f"({investment_ref} / {post_money_val_ref})"
     # Shares = PreRoundShares * ownership% / (1 - ownership%)
     numerator = f"{pre_round_shares_ref} * {ownership_pct}"
     return f"=IFERROR({numerator}, 0)"
@@ -126,36 +120,33 @@ def create_price_per_share_from_valuation_formula(valuation_ref: str,
 
 def create_post_money_from_pre_money_formula(pre_money_ref: str,
                                              investment_ref: str,
-                                             interest_ref: str = "0") -> str:
+                                             ) -> str:
     """
     Calculate post-money valuation from pre-money valuation and investment.
 
     Args:
         pre_money_ref: Reference to pre-money valuation
         investment_ref: Reference to investment amount
-        interest_ref: Reference to accrued interest (default: 0)
 
     Returns:
         Excel formula string
     """
-    return f"={pre_money_ref} + {investment_ref} + {interest_ref}"
+    return f"={pre_money_ref} + {investment_ref}"
 
 
 def create_pre_money_from_post_money_formula(post_money_ref: str,
-                                             investment_ref: str,
-                                             interest_ref: str = "0") -> str:
+                                             investment_ref: str) -> str:
     """
     Calculate pre-money valuation from post-money valuation and investment.
 
     Args:
         post_money_ref: Reference to post-money valuation
         investment_ref: Reference to investment amount
-        interest_ref: Reference to accrued interest (default: 0)
 
     Returns:
         Excel formula string
     """
-    return f"={post_money_ref} - {investment_ref} - {interest_ref}"
+    return f"={post_money_ref} - {investment_ref}"
 
 
 def create_shares_from_percentage_formula(percentage_ownership_ref: str,
@@ -186,8 +177,7 @@ def create_shares_from_percentage_formula(percentage_ownership_ref: str,
 
 
 def create_convertible_shares_formula(investment_ref: str, interest_ref: str,
-                                      discount_rate_ref: str, round_pps_ref: str,
-                                      valuation_cap_ref: str = None, pre_round_shares_ref: str = None) -> str:
+                                      discount_rate_ref: str, round_pps_ref: str) -> str:
     """
     Calculate shares from convertible instrument (SAFE or convertible note).
 
@@ -205,31 +195,13 @@ def create_convertible_shares_formula(investment_ref: str, interest_ref: str,
         interest_ref: Reference to accrued interest
         discount_rate_ref: Reference to discount rate (as decimal)
         round_pps_ref: Reference to round price per share (already calculated based on basis)
-        valuation_cap_ref: DEPRECATED - not used anymore, price_per_share handles this
-        pre_round_shares_ref: DEPRECATED - not used anymore, price_per_share handles this
 
     Returns:
         Excel formula string
     """
-    total_investment = f"({investment_ref} + {interest_ref})"
     discounted_price = f"({round_pps_ref} * (1 - {discount_rate_ref}))"
     # Conversion price is the lower of discounted price or full price
     # Since discount is typically positive, this is usually just the discounted price
     conversion_price = f"MIN({discounted_price}, {round_pps_ref})"
 
-    return f"=IFERROR({total_investment} / {conversion_price}, 0)"
-
-
-# def create_convertible_shares_formula_legacy(investment_ref: str, interest_ref: str,
-#                                       discount_rate_ref: str, round_pps_ref: str,
-#                                       valuation_cap_ref: str, pre_round_shares_ref: str) -> str:
-#     """
-#     DEPRECATED: Legacy formula that calculates cap price within the shares formula.
-#     Use create_convertible_shares_formula instead, which uses price_per_share directly.
-#     """
-#     total_investment = f"({investment_ref} + {interest_ref})"
-#     discounted_price = f"({round_pps_ref} * (1 - {discount_rate_ref}))"
-#     cap_price = f"({valuation_cap_ref} / {pre_round_shares_ref})"
-#     conversion_price = f"MIN({discounted_price}, {cap_price})"
-
-#     return f"=IFERROR({total_investment} / {conversion_price}, 0)"
+    return f"=IFERROR(({investment_ref} + {interest_ref}) / {conversion_price}, 0)"

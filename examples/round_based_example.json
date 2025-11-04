@@ -53,14 +53,12 @@
         {
           "holder_name": "Alice",
           "class_name": "Common Stock",
-          "initial_quantity": 5000000,
-          "acquisition_date": "2023-01-01"
+          "initial_quantity": 5000000
         },
         {
           "holder_name": "Bob",
           "class_name": "Common Stock",
-          "initial_quantity": 5000000,
-          "acquisition_date": "2023-01-01"
+          "initial_quantity": 5000000
         }
       ]
     },
@@ -75,8 +73,7 @@
         {
           "holder_name": "Seed Investor",
           "class_name": "Series Seed Preferred",
-          "investment_amount": 2000000,
-          "accrued_interest": 0
+          "investment_amount": 2000000
         }
       ]
     },

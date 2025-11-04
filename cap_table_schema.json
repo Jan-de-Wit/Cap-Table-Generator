@@ -225,11 +225,6 @@
           "type": "number",
           "description": "Original issue price paid per share"
         },
-        "acquisition_date": {
-          "type": "string",
-          "format": "date",
-          "description": "Date of acquisition (YYYY-MM-DD)"
-        },
         "vesting_terms": {
           "$ref": "#/$defs/VestingTerms",
           "description": "Vesting schedule for options"

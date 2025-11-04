@@ -433,14 +433,14 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         """Get the column letter for shares based on calculation type."""
         # Determine which column has shares based on calc_type
         if calc_type == 'fixed_shares':
-            # Columns: holder_name, class_name, acquisition_date, shares
-            return 'D'  # shares is column D (4th column)
+            # Columns: holder_name, class_name, shares
+            return 'C'  # shares is column C (3rd column)
         elif calc_type == 'target_percentage':
             # Columns: holder_name, class_name, target_percentage, calculated_shares
             return 'D'  # calculated_shares is column D
         elif calc_type == 'valuation_based':
-            # Columns: holder_name, class_name, investment_amount, accrued_interest, calculated_shares
-            return 'E'  # calculated_shares is column E (5th column)
+            # Columns: holder_name, class_name, investment_amount, calculated_shares
+            return 'D'  # calculated_shares is column D (4th column)
         elif calc_type == 'convertible':
             # Columns: holder_name, class_name, investment_amount, ..., calculated_shares
             return 'K'  # calculated_shares is column K (11th column)
