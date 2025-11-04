@@ -33,6 +33,7 @@ class ExcelFormatters:
             - italic_text: 11pt PT Sans Italic for italic text (e.g., descriptions)
             - header: 11pt PT Sans Bold, white text on blue background with border (table headers)
             - label: 11pt PT Sans Bold for labels (group names)
+            - round_name: 11pt PT Sans Bold for round names
             - round_header: Century Gothic 14pt Bold with blue background for merged round headers
             - round_header_plain: Century Gothic 14pt Bold for plain round names (no background)
             - currency: Currency format with $ and commas, shows "-" when empty
@@ -46,11 +47,18 @@ class ExcelFormatters:
             - total_percent: Percent format with top and bottom borders for total row
             - total_currency: Currency format with top and bottom borders for total row
             - total_text: Text format with top and bottom borders for total row
+            - param_text: Right-aligned text format for parameter values
+            - table_currency: Left-aligned currency format for table cells
+            - table_number: Left-aligned number format for table cells
+            - table_date: Left-aligned date format for table cells
+            - table_percent: Left-aligned percent format for table cells
         """
         return {
             'text': workbook.add_format({
                 'font_name': 'PT Sans',
-                'font_size': 11
+                'font_size': 11,
+                'font_color': '#000000',
+                'bg_color': '#FFFFFF'
             }),
             'italic_text': workbook.add_format({
                 'font_name': 'PT Sans',
@@ -61,9 +69,16 @@ class ExcelFormatters:
                 'font_name': 'PT Sans',
                 'font_size': 11,
                 'bold': True,
-                'bottom': 1
+                'font_color': '#000000',
+                'bottom': 1,
+                'bg_color': '#FFFFFF'
             }),
             'label': workbook.add_format({
+                'font_name': 'PT Sans',
+                'font_size': 11,
+                'bold': True
+            }),
+            'round_name': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
                 'bold': True
@@ -81,66 +96,136 @@ class ExcelFormatters:
             'currency': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
-                'num_format': '$#,##0.00;[Red]-$#,##0.00;"-"'
+                'font_color': '#000000',
+                'num_format': '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)',
+                'bg_color': '#FFFFFF',
+                'align': 'right'
             }),
             'percent': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
-                'num_format': '0.00%;-0.00%;"-"'
+                'font_color': '#000000',
+                'num_format': '0.00%;-0.00%;"-"',
+                'bg_color': '#FFFFFF',
+                'align': 'right'
             }),
             'number': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
-                'num_format': '#,##0;-###,##0;"-"'
+                'font_color': '#000000',
+                'num_format': '#,##0;-###,##0;"-"',
+                'bg_color': '#FFFFFF',
+                'align': 'right'
             }),
             'decimal': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
-                'num_format': '#,##0.00'
+                'font_color': '#000000',
+                'num_format': '#,##0.00',
+                'bg_color': '#FFFFFF',
+                'align': 'right'
             }),
             'date': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
-                'num_format': 'yyyy-mm-dd'
+                'font_color': '#000000',
+                'num_format': 'yyyy-mm-dd',
+                'bg_color': '#FFFFFF',
+                'align': 'right'
             }),
             'empty': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
+                'font_color': '#000000',
                 'num_format': '"-"'
             }),
             'total_label': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
                 'bold': True,
+                'font_color': '#000000',
                 'top': 1,
-                'bottom': 1
+                'bottom': 1,
+                'bg_color': '#FFFFFF',
+                'align': 'left'
             }),
             'total_number': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
+                'font_color': '#000000',
                 'num_format': '#,##0;-###,##0;"-"',
                 'top': 1,
-                'bottom': 1
+                'bottom': 1,
+                'bg_color': '#FFFFFF',
+                'align': 'left'
             }),
             'total_percent': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
+                'font_color': '#000000',
                 'num_format': '0.00%;-0.00%;"-"',
                 'top': 1,
-                'bottom': 1
+                'bottom': 1,
+                'bg_color': '#FFFFFF',
+                'align': 'left'
             }),
             'total_currency': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
-                'num_format': '$#,##0.00;[Red]-$#,##0.00;"-"',
+                'font_color': '#000000',
+                'num_format': '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)',
                 'top': 1,
-                'bottom': 1
+                'bottom': 1,
+                'bg_color': '#FFFFFF',
+                'align': 'left'
             }),
             'total_text': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
+                'font_color': '#000000',
                 'top': 1,
-                'bottom': 1
+                'bottom': 1,
+                'bg_color': '#FFFFFF',
+                'align': 'left'
+            }),
+            'param_text': workbook.add_format({
+                'font_name': 'PT Sans',
+                'font_size': 11,
+                'font_color': '#000000',
+                'bg_color': '#FFFFFF',
+                'align': 'right'
+            }),
+            'table_currency': workbook.add_format({
+                'font_name': 'PT Sans',
+                'font_size': 11,
+                'font_color': '#000000',
+                'num_format': '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)',
+                'bg_color': '#FFFFFF',
+                'align': 'left'
+            }),
+            'table_number': workbook.add_format({
+                'font_name': 'PT Sans',
+                'font_size': 11,
+                'font_color': '#000000',
+                'num_format': '#,##0;-###,##0;"-"',
+                'bg_color': '#FFFFFF',
+                'align': 'left'
+            }),
+            'table_date': workbook.add_format({
+                'font_name': 'PT Sans',
+                'font_size': 11,
+                'font_color': '#000000',
+                'num_format': 'yyyy-mm-dd',
+                'bg_color': '#FFFFFF',
+                'align': 'left'
+            }),
+            'table_percent': workbook.add_format({
+                'font_name': 'PT Sans',
+                'font_size': 11,
+                'font_color': '#000000',
+                'num_format': '0.00%;-0.00%;"-"',
+                'bg_color': '#FFFFFF',
+                'align': 'left'
             }),
             'white_bg': workbook.add_format({
                 'bg_color': '#FFFFFF'

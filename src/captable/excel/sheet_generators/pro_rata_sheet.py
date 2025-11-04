@@ -80,24 +80,14 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         # Calculate border end row (includes padding)
         border_end_row = last_holder_row + 2 + 1  # Total row + spacing + padding
 
-        # Add padding cells with white background inside the border
-        self._add_padding_cells(sheet, border_start_row, border_start_col, border_end_row, border_end_col)
-
-        # Apply white background to all cells in the table
-        self._apply_white_background(sheet, border_start_row, border_start_col, border_end_row, border_end_col)
-
-        # Apply borders to entire table (including padding area)
-        self._apply_table_borders(sheet, border_start_row, border_start_col, border_end_row, border_end_col)
-
-        # Set row heights for header rows (make them taller) and padding rows
-        self.set_row_heights([
+        # Set up table formatting using utility function
+        row_heights = [
             (0, 16.0),  # Outer padding row
             (border_start_row, 16.0),  # Inner padding row (top border row)
             (self.padding_offset + 1, 25),  # Round names row
             (self.padding_offset + 2, 25),  # Column headers row
-        ])
+        ]
 
-        # Set column widths (include padding columns)
         column_widths = [
             (0, 0, 4.0),  # Outer padding column
             (border_start_col, border_start_col, 4.0),  # Inner padding column (left border column)
@@ -115,7 +105,16 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             separator_col = start_col + 5
             column_widths.append((separator_col, separator_col, 5))
 
-        self.set_column_widths(column_widths)
+        self.setup_table_formatting(
+            sheet,
+            border_start_row,
+            border_start_col,
+            border_end_row,
+            border_end_col,
+            padding_offset=self.padding_offset,
+            row_heights=row_heights,
+            column_widths=column_widths
+        )
 
         # Freeze columns and header rows
         freeze_row = self.padding_offset + 2 + 1
@@ -183,125 +182,29 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
         return holders_by_group, all_holders
 
-    def _add_padding_cells(self, sheet: xlsxwriter.worksheet.Worksheet, 
-                          border_start_row: int, border_start_col: int,
-                          border_end_row: int, border_end_col: int):
-        """Add padding cells with white background inside the border."""
-        white_bg_format = self.formats.get('white_bg')
-        
-        # Fill top padding row (inside border, below top border)
-        for col in range(border_start_col, border_end_col + 1):
-            sheet.write(border_start_row, col, '', white_bg_format)
-        
-        # Fill bottom padding row (inside border, above bottom border)
-        for col in range(border_start_col, border_end_col + 1):
-            sheet.write(border_end_row, col, '', white_bg_format)
-        
-        # Fill left padding column (inside border, to the right of left border)
-        for row in range(border_start_row + 1, border_end_row):
-            sheet.write(row, border_start_col, '', white_bg_format)
-        
-        # Fill right padding column (inside border, to the left of right border)
-        for row in range(border_start_row + 1, border_end_row):
-            sheet.write(row, border_end_col, '', white_bg_format)
-
-    def _apply_white_background(self, sheet: xlsxwriter.worksheet.Worksheet,
-                               start_row: int, start_col: int,
-                               end_row: int, end_col: int):
-        """Apply white background to all cells in the table range."""
-        white_bg_format = self.formats.get('white_bg')
-        # Apply white background to entire table range using conditional formatting
-        sheet.conditional_format(
-            start_row, start_col, end_row, end_col,
-            {'type': 'formula', 'criteria': 'TRUE', 'format': white_bg_format}
-        )
-    
-    def _apply_table_borders(self, sheet: xlsxwriter.worksheet.Worksheet, 
-                             start_row: int, start_col: int, 
-                             end_row: int, end_col: int):
-        """Apply borders to the entire table range using conditional formatting."""
-        # Apply borders to all edge cells, ensuring corners get both borders
-        
-        # Top row: all cells get top border, corners also get left/right
-        for col in range(start_col, end_col + 1):
-            border_props = {'top': 1}
-            if col == start_col:
-                border_props['left'] = 1
-            if col == end_col:
-                border_props['right'] = 1
-            top_border_format = self.workbook.add_format(border_props)
-            sheet.conditional_format(
-                start_row, col, start_row, col,
-                {'type': 'formula', 'criteria': 'TRUE', 'format': top_border_format}
-            )
-        
-        # Bottom row: all cells get bottom border, corners also get left/right
-        for col in range(start_col, end_col + 1):
-            border_props = {'bottom': 1}
-            if col == start_col:
-                border_props['left'] = 1
-            if col == end_col:
-                border_props['right'] = 1
-            bottom_border_format = self.workbook.add_format(border_props)
-            sheet.conditional_format(
-                end_row, col, end_row, col,
-                {'type': 'formula', 'criteria': 'TRUE', 'format': bottom_border_format}
-            )
-        
-        # Left column: all cells get left border (corners already handled above)
-        for row in range(start_row + 1, end_row):
-            left_border_format = self.workbook.add_format({'left': 1})
-            sheet.conditional_format(
-                row, start_col, row, start_col,
-                {'type': 'formula', 'criteria': 'TRUE', 'format': left_border_format}
-            )
-        
-        # Right column: all cells get right border (corners already handled above)
-        for row in range(start_row + 1, end_row):
-            right_border_format = self.workbook.add_format({'right': 1})
-            sheet.conditional_format(
-                row, end_col, row, end_col,
-                {'type': 'formula', 'criteria': 'TRUE', 'format': right_border_format}
-            )
 
     def _write_headers(self, sheet: xlsxwriter.worksheet.Worksheet, rounds: List[Dict[str, Any]]):
         """Write the header rows (shifted by padding offset + 1 for content within border)."""
-        # Row (shifted by padding + 1): Round names (merged headers)
-        row = self.padding_offset + 1
-        col = self.padding_offset + 1 + 2  # Start after padding + "Shareholders" and "Description"
+        header_row = self.padding_offset + 1
+        subheader_row = self.padding_offset + 2
+        start_col = self.padding_offset + 1 + 2  # Start after padding + "Shareholders" and "Description"
 
-        for round_data in rounds:
-            round_name = round_data.get('name', 'Round')
-            # Merge 5 cells for each round (Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount)
-            sheet.merge_range(row, col, row, col + 4,
-                              round_name, self.formats.get('round_header'))
-            col += 6  # 5 data columns + 1 separator
+        # Write Shareholders and Description headers first
+        sheet.write(subheader_row, self.padding_offset + 1, 'Shareholders', self.formats.get('header'))
+        sheet.write(subheader_row, self.padding_offset + 2, '', self.formats.get('header'))
 
-        # Row (shifted by padding + 1): Column subheaders
-        row = self.padding_offset + 2
-        col = self.padding_offset + 1
-
-        sheet.write(row, col, 'Shareholders', self.formats.get('header'))
-        col += 1
-        sheet.write(row, col, '', self.formats.get('header'))
-        col += 1
-
-        for _ in rounds:
-            sheet.write(row, col, 'Pro Rata Type', self.formats.get('header'))
-            col += 1
-            sheet.write(row, col, 'Pro Rata %', self.formats.get('header'))
-            col += 1
-            sheet.write(row, col, 'Pro Rata Shares',
-                        self.formats.get('header'))
-            col += 1
-            sheet.write(row, col, 'Price per Share',
-                        self.formats.get('header'))
-            col += 1
-            sheet.write(row, col, 'Investment',
-                        self.formats.get('header'))
-            col += 1
-            sheet.write(row, col, '', self.formats.get('header'))  # Separator
-            col += 1
+        # Use utility function to write round headers
+        subheaders = ['Pro Rata Type', 'Pro Rata %', 'Pro Rata Shares', 'Price per Share', 'Investment']
+        self.write_round_headers(
+            sheet,
+            rounds,
+            header_row,
+            start_col,
+            columns_per_round=5,
+            separator_width=1,
+            subheader_row=subheader_row,
+            subheaders=subheaders
+        )
 
     def _write_holder_data_with_groups(
         self,
@@ -537,7 +440,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             f"=IF(OR({type_cell_ref}=\"standard\", {type_cell_ref}=\"super\"), {ownership_pct_formula}, \"\")"
         )
         sheet.write_formula(row, pct_col, pct_formula,
-                            self.formats.get('percent'))
+                            self.formats.get('table_percent'))
 
         # Create formulas for each pro rata type
         pro_rata_formula = self._create_pro_rata_formula(
@@ -551,14 +454,14 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             f"=IFERROR(IF(OR({type_cell_ref}=\"\", {type_cell_ref}=\"none\"), 0, {pro_rata_formula}), 0)"
         )
         sheet.write_formula(row, shares_col, shares_formula,
-                            self.formats.get('number'))
+                            self.formats.get('table_number'))
 
         # Price Per Share column: reference from rounds sheet
         round_name_key = round_data.get('name', '').replace(' ', '_')
         price_per_share_ref = f"{round_name_key}_PricePerShare"
         pps_formula = f"=IFERROR({price_per_share_ref}, 0)"
         sheet.write_formula(row, pps_col, pps_formula,
-                            self.formats.get('currency'))
+                            self.formats.get('table_currency'))
 
         # Investment Amount column: Price Per Share * Pro Rata Shares
         shares_col_letter = self._col_letter(shares_col)
@@ -567,7 +470,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         pps_cell_ref = f"{pps_col_letter}{row + 1}"
         investment_formula = f"=IFERROR({pps_cell_ref} * {shares_cell_ref}, 0)"
         sheet.write_formula(row, investment_col,
-                            investment_formula, self.formats.get('currency'))
+                            investment_formula, self.formats.get('table_currency'))
 
         # Separator (skip for last round)
         if not is_last_round:

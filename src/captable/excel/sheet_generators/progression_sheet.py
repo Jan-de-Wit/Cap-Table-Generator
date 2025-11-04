@@ -78,24 +78,14 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         # Calculate border end row (includes padding)
         border_end_row = data_rows_per_holder[-1] + 2 + 1  # Total row + spacing + padding
         
-        # Add padding cells with white background inside the border
-        self._add_padding_cells(sheet, border_start_row, border_start_col, border_end_row, border_end_col)
-        
-        # Apply white background to all cells in the table
-        self._apply_white_background(sheet, border_start_row, border_start_col, border_end_row, border_end_col)
-        
-        # Apply borders to entire table (including padding area)
-        self._apply_table_borders(sheet, border_start_row, border_start_col, border_end_row, border_end_col)
-        
-        # Set row heights for header rows (make them taller) and padding rows
-        self.set_row_heights([
+        # Set up table formatting using utility function
+        row_heights = [
             (0, 16.0),  # Outer padding row
             (border_start_row, 16.0),  # Inner padding row (top border row)
             (self.padding_offset + 1, 25),  # Round names row
             (self.padding_offset + 2, 25),  # Column headers row
-        ])
+        ]
         
-        # Set column widths (include padding columns)
         column_widths = [
             (0, 0, 4.0),  # Outer padding column
             (border_start_col, border_start_col, 4.0),  # Inner padding column (left border column)
@@ -113,7 +103,16 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             separator_col = start_col + 4
             column_widths.append((separator_col, separator_col, 5))
         
-        self.set_column_widths(column_widths)
+        self.setup_table_formatting(
+            sheet,
+            border_start_row,
+            border_start_col,
+            border_end_row,
+            border_end_col,
+            padding_offset=self.padding_offset,
+            row_heights=row_heights,
+            column_widths=column_widths
+        )
         
         freeze_row = self.padding_offset + 2 + 1
         freeze_col = self.padding_offset + 2
@@ -180,119 +179,30 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         
         return holders_by_group, all_holders
     
-    def _add_padding_cells(self, sheet: xlsxwriter.worksheet.Worksheet,
-                          border_start_row: int, border_start_col: int,
-                          border_end_row: int, border_end_col: int):
-        """Add padding cells with white background inside the border."""
-        white_bg_format = self.formats.get('white_bg')
-        
-        # Fill top padding row (inside border, below top border)
-        for col in range(border_start_col, border_end_col + 1):
-            sheet.write(border_start_row, col, '', white_bg_format)
-        
-        # Fill bottom padding row (inside border, above bottom border)
-        for col in range(border_start_col, border_end_col + 1):
-            sheet.write(border_end_row, col, '', white_bg_format)
-        
-        # Fill left padding column (inside border, to the right of left border)
-        for row in range(border_start_row + 1, border_end_row):
-            sheet.write(row, border_start_col, '', white_bg_format)
-        
-        # Fill right padding column (inside border, to the left of right border)
-        for row in range(border_start_row + 1, border_end_row):
-            sheet.write(row, border_end_col, '', white_bg_format)
-    
-    def _apply_white_background(self, sheet: xlsxwriter.worksheet.Worksheet,
-                               start_row: int, start_col: int,
-                               end_row: int, end_col: int):
-        """Apply white background to all cells in the table range."""
-        white_bg_format = self.formats.get('white_bg')
-        # Apply white background to entire table range using conditional formatting
-        sheet.conditional_format(
-            start_row, start_col, end_row, end_col,
-            {'type': 'formula', 'criteria': 'TRUE', 'format': white_bg_format}
-        )
-    
-    def _apply_table_borders(self, sheet: xlsxwriter.worksheet.Worksheet, 
-                             start_row: int, start_col: int, 
-                             end_row: int, end_col: int):
-        """Apply borders to the entire table range using conditional formatting."""
-        # Apply borders to all edge cells, ensuring corners get both borders
-        
-        # Top row: all cells get top border, corners also get left/right
-        for col in range(start_col, end_col + 1):
-            border_props = {'top': 1}
-            if col == start_col:
-                border_props['left'] = 1
-            if col == end_col:
-                border_props['right'] = 1
-            top_border_format = self.workbook.add_format(border_props)
-            sheet.conditional_format(
-                start_row, col, start_row, col,
-                {'type': 'formula', 'criteria': 'TRUE', 'format': top_border_format}
-            )
-        
-        # Bottom row: all cells get bottom border, corners also get left/right
-        for col in range(start_col, end_col + 1):
-            border_props = {'bottom': 1}
-            if col == start_col:
-                border_props['left'] = 1
-            if col == end_col:
-                border_props['right'] = 1
-            bottom_border_format = self.workbook.add_format(border_props)
-            sheet.conditional_format(
-                end_row, col, end_row, col,
-                {'type': 'formula', 'criteria': 'TRUE', 'format': bottom_border_format}
-            )
-        
-        # Left column: all cells get left border (corners already handled above)
-        for row in range(start_row + 1, end_row):
-            left_border_format = self.workbook.add_format({'left': 1})
-            sheet.conditional_format(
-                row, start_col, row, start_col,
-                {'type': 'formula', 'criteria': 'TRUE', 'format': left_border_format}
-            )
-        
-        # Right column: all cells get right border (corners already handled above)
-        for row in range(start_row + 1, end_row):
-            right_border_format = self.workbook.add_format({'right': 1})
-            sheet.conditional_format(
-                row, end_col, row, end_col,
-                {'type': 'formula', 'criteria': 'TRUE', 'format': right_border_format}
-            )
     
     def _write_headers(self, sheet: xlsxwriter.worksheet.Worksheet, rounds: List[Dict[str, Any]]):
         """Write the header rows (shifted by padding offset + 1 for content within border)."""
         # Row (shifted by padding + 1): Round names (merged headers)
-        row = self.padding_offset + 1
-        col = self.padding_offset + 1 + 2  # Start after padding + "Shareholders" and empty column
+        header_row = self.padding_offset + 1
+        subheader_row = self.padding_offset + 2
+        start_col = self.padding_offset + 1 + 2  # Start after padding + "Shareholders" and empty column
         
-        for round_data in rounds:
-            round_name = round_data.get('name', 'Round')
-            # Merge 4 cells for each round (Start, New, Total, %)
-            sheet.merge_range(row, col, row, col + 3, round_name, self.formats.get('round_header'))
-            col += 5  # 4 data columns + 1 separator
+        # Write Shareholders and Description headers first
+        sheet.write(subheader_row, self.padding_offset + 1, 'Shareholders', self.formats.get('header'))
+        sheet.write(subheader_row, self.padding_offset + 2, '', self.formats.get('header'))
         
-        # Row (shifted by padding + 1): Column subheaders
-        row = self.padding_offset + 2
-        col = self.padding_offset + 1
-        
-        sheet.write(row, col, 'Shareholders', self.formats.get('header'))
-        col += 1
-        sheet.write(row, col, '', self.formats.get('header'))
-        col += 1
-        
-        for _ in rounds:
-            sheet.write(row, col, 'Start (#)', self.formats.get('header'))
-            col += 1
-            sheet.write(row, col, 'New (#)', self.formats.get('header'))
-            col += 1
-            sheet.write(row, col, 'Total (#)', self.formats.get('header'))
-            col += 1
-            sheet.write(row, col, '(%)', self.formats.get('header'))
-            col += 1
-            sheet.write(row, col, '', self.formats.get('header'))  # Separator
-            col += 1
+        # Use utility function to write round headers
+        subheaders = ['Start (#)', 'New (#)', 'Total (#)', '(%)']
+        self.write_round_headers(
+            sheet,
+            rounds,
+            header_row,
+            start_col,
+            columns_per_round=4,
+            separator_width=1,
+            subheader_row=subheader_row,
+            subheaders=subheaders
+        )
     
     def _write_holder_data_with_groups(
         self,
@@ -449,7 +359,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         if round_idx == 0:
             # First round: 0 or founders' shares
             # For now, write 0 (would need to handle founders separately)
-            sheet.write_formula(row, start_col, "=0", self.formats.get('number'))
+            sheet.write_formula(row, start_col, "=0", self.formats.get('table_number'))
         else:
             # Reference previous round's Total
             # Previous total is 3 columns back (from the start column)
@@ -457,7 +367,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             prev_total_col = start_col - 3
             prev_col_letter = self._col_letter(prev_total_col)
             prev_cell = f"'{self._get_sheet_name()}'!{prev_col_letter}{row + 1}"
-            sheet.write_formula(row, start_col, f"={prev_cell}", self.formats.get('number'))
+            sheet.write_formula(row, start_col, f"={prev_cell}", self.formats.get('table_number'))
         
         # NEW: Sum shares for this holder in this round
         # Includes base shares from Rounds sheet + pro rata shares from Pro Rata Allocations sheet
@@ -495,13 +405,13 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         
         # Total new shares = rounds sheet shares + pro rata shares
         new_formula = f'=ROUND({rounds_shares} + {pro_rata_shares}, 0)'
-        sheet.write_formula(row, new_col, new_formula, self.formats.get('number'))
+        sheet.write_formula(row, new_col, new_formula, self.formats.get('table_number'))
         
         # TOTAL: Start + New (rounded to integer)
         start_cell = self._col_letter(start_col) + str(row + 1)
         new_cell = self._col_letter(new_col) + str(row + 1)
         total_formula = f"=ROUND(SUM({start_cell},{new_cell}), 0)"
-        sheet.write_formula(row, total_col, total_formula, self.formats.get('number'))
+        sheet.write_formula(row, total_col, total_formula, self.formats.get('table_number'))
         
         # PERCENTAGE: Total / Sum of all Totals for this round
         # Formula: =Total / SUM(All Totals in this round across all holders)
@@ -510,7 +420,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         # Sum range is from first holder to last holder in the same total column
         sum_range = f"{total_col_letter}{first_holder_row + 1}:{total_col_letter}{last_holder_row + 1}"
         percent_formula = f"=IFERROR({total_cell} / SUM({sum_range}), 0)"
-        sheet.write_formula(row, percent_col, percent_formula, self.formats.get('percent'))
+        sheet.write_formula(row, percent_col, percent_formula, self.formats.get('table_percent'))
         
         # Separator (skip for last round)
         if is_last_round:
