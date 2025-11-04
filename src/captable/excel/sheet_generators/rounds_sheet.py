@@ -495,18 +495,18 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                        'shares': 2}
         elif calc_type == 'target_percentage':
             headers = ['Holder Name', 'Class Name',
-                       'Target %', 'Calculated Shares']
+                       'Target %', 'Shares']
             col_map = {'holder_name': 0, 'class_name': 1,
                        'target_percentage': 2, 'shares': 3}
         elif calc_type == 'valuation_based':
             headers = ['Holder Name', 'Class Name', 'Investment Amount',
-                       'Calculated Shares']
+                       'Shares']
             col_map = {'holder_name': 0, 'class_name': 1, 'investment_amount': 2,
                        'shares': 3}
         elif calc_type == 'convertible':
             headers = ['Holder Name', 'Class Name', 'Investment Amount', 'Interest Start',
-                       'Interest End', 'Days Passed', 'Interest Rate', 'Interest Type',
-                       'Accrued Interest', 'Discount Rate', 'Calculated Shares']
+                       'Interest End', 'Days Passed', 'Interest (%)', 'Interest Type',
+                       'Accrued Interest', 'Discount (%)', 'Shares']
             col_map = {'holder_name': 0, 'class_name': 1, 'investment_amount': 2,
                        'interest_start_date': 3, 'interest_end_date': 4, 'days_passed': 5,
                        'interest_rate': 6, 'interest_type': 7, 'accrued_interest': 8,
@@ -768,7 +768,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 sum_formula = f"=SUM({col_letter}{first_instrument_row + 1}:{col_letter}{last_instrument_row + 1})"
                 sheet.write_formula(
                     total_row, col_pos, sum_formula, self.formats.get('total_currency'))
-            elif header_name in ['Shares', 'Calculated Shares']:
+            elif header_name in ['Shares']:
                 # Sum shares column
                 col_letter = self._col_letter(col_pos)
                 sum_formula = f"=SUM({col_letter}{first_instrument_row + 1}:{col_letter}{last_instrument_row + 1})"
@@ -786,7 +786,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 sum_formula = f"=SUM({col_letter}{first_instrument_row + 1}:{col_letter}{last_instrument_row + 1})"
                 sheet.write_formula(
                     total_row, col_pos, sum_formula, self.formats.get('total_number'))
-            elif header_name in ['Discount Rate', 'Interest Rate']:
+            elif header_name in ['Discount (%)', 'Interest (%)']:
                 # Average percentage columns (or empty - depends on requirement)
                 sheet.write(total_row, col_pos, '',
                             self.formats.get('total_text'))
@@ -840,17 +840,6 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         # For now, use named range directly
         return named_range
 
-    def _get_shares_issued_ref(self, round_idx: int, round_data: Dict[str, Any],
-                               all_rounds: List[Dict[str, Any]]) -> str:
-        """Get Excel reference for shares_issued."""
-        # Find the row where shares_issued constant is written
-        row = self._find_constant_row(round_idx, 'Shares Issued:')
-        if row is not None:
-            col_value_ref = self.padding_offset + 3  # Values column (column 4)
-            col_letter = self._col_letter(col_value_ref)
-            return f"{col_letter}{row + 1}"
-        return "0"
-
     def _get_pro_rata_total_ref(self, round_idx: int, round_data: Dict[str, Any],
                                 all_rounds: List[Dict[str, Any]]) -> str:
         """Get Named Range for total pro rata shares for a given round."""
@@ -898,12 +887,3 @@ class RoundsSheetGenerator(BaseSheetGenerator):
     def get_round_ranges(self) -> Dict[int, Dict[str, Any]]:
         """Get round ranges for progression sheet reference."""
         return self.round_ranges
-
-    def get_shares_issued_ref(self, round_idx: int) -> Optional[str]:
-        """Get Excel reference for shares_issued for a round."""
-        row = self._find_constant_row(round_idx, 'Shares Issued:')
-        if row is not None:
-            col_value_ref = self.padding_offset + 3  # Values column (column 4)
-            col_letter = self._col_letter(col_value_ref)
-            return f"Rounds!{col_letter}{row + 1}"
-        return None

@@ -47,6 +47,10 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             sheet.write(self.padding_offset, self.padding_offset, 'No rounds found', self.formats.get('text'))
             return sheet
 
+        # Title row inside border (top-left of table, respecting padding)
+        title_row = self.padding_offset + 1
+        sheet.write(title_row, self.padding_offset + 1, 'Pro Rata Allocation', self.formats.get('round_header_plain'))
+
         # Extract holders with grouping
         holders_by_group, all_holders = self._get_holders_with_groups(rounds)
 
@@ -64,11 +68,11 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         border_end_col = self.padding_offset + 1 + 2 + (num_rounds * 6) - 1
         # Last row includes padding, so we need to calculate after writing data
         
-        # Write headers (shifted by padding offset + 1 for content within border)
+        # Write headers aligned with title row for round names
         self._write_headers(sheet, rounds)
 
         # Write holder data with grouping (shifted by padding offset + 1 for content within border)
-        data_start_row = self.padding_offset + 1 + 2  # After padding + headers
+        data_start_row = self.padding_offset + 1 + 2  # After padding + title/round names + column headers
         data_rows_per_holder, first_holder_row, last_holder_row = self._write_holder_data_with_groups(
             sheet, rounds, all_holders, holders_by_group, data_start_row
         )
@@ -84,7 +88,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         row_heights = [
             (0, 16.0),  # Outer padding row
             (border_start_row, 16.0),  # Inner padding row (top border row)
-            (self.padding_offset + 1, 25),  # Round names row
+            (self.padding_offset + 1, 25),  # Title row (also round names row)
             (self.padding_offset + 2, 25),  # Column headers row
         ]
 
@@ -116,7 +120,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             column_widths=column_widths
         )
 
-        # Freeze columns and header rows
+        # Freeze columns and header rows (below column headers)
         freeze_row = self.padding_offset + 2 + 1
         freeze_col = self.padding_offset + 2
         sheet.freeze_panes(freeze_row, freeze_col)
@@ -185,6 +189,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
     def _write_headers(self, sheet: xlsxwriter.worksheet.Worksheet, rounds: List[Dict[str, Any]]):
         """Write the header rows (shifted by padding offset + 1 for content within border)."""
+        # Place round names header on the same row as the title
         header_row = self.padding_offset + 1
         subheader_row = self.padding_offset + 2
         start_col = self.padding_offset + 1 + 2  # Start after padding + "Shareholders" and "Description"
@@ -499,9 +504,15 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             shares_issued_ref = self.shares_issued_refs[round_idx]
         elif round_idx in self.round_ranges:
             range_info = self.round_ranges[round_idx]
-            shares_col = range_info.get('shares_col', 'D')
-            shares_range = f"Rounds!{shares_col}{range_info['start_row']}:{shares_col}{range_info['end_row']}"
-            shares_issued_ref = f"SUM({shares_range})"
+            table_name = range_info.get('table_name')
+            if table_name:
+                # Prefer structured references to the table's unified shares column header
+                shares_issued_ref = f"SUM({table_name}[[#All],[Shares]])"
+            else:
+                # Fallback to A1-style column range if table is unavailable
+                shares_col = range_info.get('shares_col', 'D')
+                shares_range = f"Rounds!{shares_col}{range_info['start_row']}:{shares_col}{range_info['end_row']}"
+                shares_issued_ref = f"SUM({shares_range})"
         else:
             shares_issued_ref = "0"
 
@@ -645,11 +656,9 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             range_info = self.round_ranges[round_idx]
             table_name = range_info.get('table_name')
             if table_name:
-                # Prefer structured references when table exists
-                calc_type = range_info.get('calc_type')
-                shares_header = 'Shares' if calc_type == 'fixed_shares' else 'Calculated Shares'
+                # Prefer structured references when table exists. The shares column header is unified as 'Shares'.
                 holder_range = f"{table_name}[[#All],[Holder Name]]"
-                shares_range = f"{table_name}[[#All],[{shares_header}]]"
+                shares_range = f"{table_name}[[#All],[Shares]]"
                 return holder_range, shares_range
             holder_col = range_info.get('holder_col', 'A')
             shares_col = range_info.get('shares_col', 'D')

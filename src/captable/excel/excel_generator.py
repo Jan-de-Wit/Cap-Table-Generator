@@ -43,15 +43,15 @@ from .sheet_generators import (
 class ExcelGenerator:
     """
     Generates Excel workbooks with dynamic formulas from cap table data.
-    
+
     This class orchestrates the creation of Excel workbooks by coordinating
     specialized sheet generators that handle individual sheet types.
     """
-    
+
     def __init__(self, data: Dict[str, Any], output_path: str):
         """
         Initialize Excel generator.
-        
+
         Args:
             data: Validated cap table JSON data
             output_path: Path for output Excel file
@@ -63,29 +63,29 @@ class ExcelGenerator:
         self.formats = {}
         self.dlm = DeterministicLayoutMap()
         self.formula_resolver = FormulaResolver(self.dlm)
-        
+
     def generate(self) -> str:
         """
         Generate the complete Excel workbook with round-based architecture.
-        
+
         Sheet creation order:
         1. Rounds (SOURCE OF TRUTH - contains all instruments nested within rounds)
         2. Cap Table Progression (SUMMARY VIEW - references Rounds sheet)
-        
+
         Returns:
             Path to generated Excel file
         """
         # Create workbook
         self.workbook = xlsxwriter.Workbook(self.output_path)
         self.workbook.set_calc_mode('auto')  # Force recalculation on open
-        
+
         # Set default format for all cells: font size 10 and background color #869A78
         self.workbook.formats[0].set_font_size(10)
         self.workbook.formats[0].set_bg_color('#869A78')
-        
+
         # Create formats
         self.formats = ExcelFormatters.create_formats(self.workbook)
-        
+
         # STEP 1: Create Rounds sheet (SOURCE OF TRUTH)
         # Each round contains constants and nested instruments
         # Instruments displayed with columns based on round's calculation_type
@@ -94,7 +94,7 @@ class ExcelGenerator:
             self.workbook, self.data, self.formats, self.dlm, self.formula_resolver
         )
         self.sheets['Rounds'] = rounds_gen.generate()
-        
+
         # STEP 2: Create Pro Rata Allocations sheet
         # Lists all stakeholders per round and calculates pro rata share allocations
         # Pro rata calculations happen AFTER regular round shares are calculated
@@ -103,15 +103,8 @@ class ExcelGenerator:
         )
         pro_rata_gen.set_round_ranges(rounds_gen.get_round_ranges())
         # Pass shares_issued references for each round
-        rounds = self.data.get('rounds', [])
-        shares_issued_refs = {}
-        for round_idx in range(len(rounds)):
-            shares_issued_ref = rounds_gen.get_shares_issued_ref(round_idx)
-            if shares_issued_ref:
-                shares_issued_refs[round_idx] = shares_issued_ref
-        pro_rata_gen.set_shares_issued_refs(shares_issued_refs)
         self.sheets['Pro Rata Allocations'] = pro_rata_gen.generate()
-        
+
         # STEP 3: Create Cap Table Progression sheet (SUMMARY VIEW)
         # References instrument shares from Rounds sheet + Pro Rata Allocations sheet
         # Shows ownership evolution across rounds
@@ -121,9 +114,8 @@ class ExcelGenerator:
         # Pass round ranges from rounds sheet
         progression_gen.round_ranges = rounds_gen.get_round_ranges()
         self.sheets['Cap Table Progression'] = progression_gen.generate()
-        
+
         # Close and save
         self.workbook.close()
-        
-        return self.output_path
 
+        return self.output_path

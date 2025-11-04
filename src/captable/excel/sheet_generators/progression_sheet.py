@@ -46,6 +46,10 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             sheet.write(self.padding_offset, self.padding_offset, 'No rounds found', self.formats.get('text'))
             return sheet
         
+        # Title row inside border (top-left of table, respecting padding)
+        title_row = self.padding_offset + 1
+        sheet.write(title_row, self.padding_offset + 1, 'Cap Table Progression', self.formats.get('round_header_plain'))
+
         # Extract holders with grouping
         holders_by_group, all_holders = self._get_holders_with_groups(rounds)
         
@@ -63,11 +67,11 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         border_end_col = self.padding_offset + 1 + 2 + (num_rounds * 5) - 1
         # Last row includes padding, so we need to calculate after writing data
         
-        # Write headers (shifted by padding offset + 1 for content within border)
+        # Write headers aligned with title row for round names
         self._write_headers(sheet, rounds)
         
         # Write holder data with grouping (shifted by padding offset + 1 for content within border)
-        data_start_row = self.padding_offset + 1 + 2  # After padding + headers
+        data_start_row = self.padding_offset + 1 + 2  # After padding + title/round names + column headers
         data_rows_per_holder, first_holder_row, last_holder_row = self._write_holder_data_with_groups(
             sheet, rounds, all_holders, holders_by_group, data_start_row
         )
@@ -82,7 +86,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         row_heights = [
             (0, 16.0),  # Outer padding row
             (border_start_row, 16.0),  # Inner padding row (top border row)
-            (self.padding_offset + 1, 25),  # Round names row
+            (self.padding_offset + 1, 25),  # Title row (also round names row)
             (self.padding_offset + 2, 25),  # Column headers row
         ]
         
@@ -114,6 +118,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             column_widths=column_widths
         )
         
+        # Freeze below column headers
         freeze_row = self.padding_offset + 2 + 1
         freeze_col = self.padding_offset + 2
         sheet.freeze_panes(freeze_row, freeze_col)
@@ -182,7 +187,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
     
     def _write_headers(self, sheet: xlsxwriter.worksheet.Worksheet, rounds: List[Dict[str, Any]]):
         """Write the header rows (shifted by padding offset + 1 for content within border)."""
-        # Row (shifted by padding + 1): Round names (merged headers)
+        # Row (shifted by padding + 1): Put round names header on the same row as title
         header_row = self.padding_offset + 1
         subheader_row = self.padding_offset + 2
         start_col = self.padding_offset + 1 + 2  # Start after padding + "Shareholders" and empty column
@@ -376,7 +381,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             table_name = range_info.get('table_name')
             if table_name:
                 # Use structured references over the round's instruments table
-                shares_header = self._get_shares_header(range_info.get('calc_type'))
+                shares_header = 'Shares'
                 holder_col_ref = f"{table_name}[[#All],[Holder Name]]"
                 shares_col_ref = f"{table_name}[[#All],[{shares_header}]]"
                 # Shareholders column is at padding_offset + 1 (within border)
@@ -463,11 +468,8 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         return self._col_letter(col_idx)
     
     def _get_shares_header(self, calc_type: str) -> str:
-        """Return the header text for the shares column for a given calc_type."""
-        if calc_type == 'fixed_shares':
-            return 'Shares'
-        # For target_percentage, valuation_based, and convertible the header used is 'Calculated Shares'
-        return 'Calculated Shares'
+        """Return the unified header text for the shares column."""
+        return 'Shares'
     
     def _write_total_row(
         self,
