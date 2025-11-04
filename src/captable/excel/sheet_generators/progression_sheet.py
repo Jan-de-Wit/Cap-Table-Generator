@@ -425,7 +425,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         # Sum range is from first holder to last holder in the same total column
         sum_range = f"{total_col_letter}{first_holder_row + 1}:{total_col_letter}{last_holder_row + 1}"
         percent_formula = f"=IFERROR({total_cell} / SUM({sum_range}), 0)"
-        sheet.write_formula(row, percent_col, percent_formula, self.formats.get('table_percent'))
+        sheet.write_formula(row, percent_col, percent_formula, self.formats.get('table_percent_small_italic'))
         
         # Separator (skip for last round)
         if is_last_round:
@@ -541,7 +541,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             sheet.write_formula(
                 row, percent_col,
                 f"=SUM({sheet_name}!{percent_col_letter}{first_row}:{percent_col_letter}{last_row})",
-                self.formats.get('total_percent')
+                self.formats.get('total_percent_small_italic')
             )
             
             # Separator (skip for last round)

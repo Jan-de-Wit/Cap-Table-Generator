@@ -169,6 +169,17 @@ class ExcelFormatters:
                 'bg_color': '#FFFFFF',
                 'align': 'left'
             }),
+            'total_percent_small_italic': workbook.add_format({
+                'font_name': 'PT Sans',
+                'font_size': 9,
+                'italic': True,
+                'font_color': '#000000',
+                'num_format': '0.00%;-0.00%;"-"',
+                'top': 1,
+                'bottom': 1,
+                'bg_color': '#FFFFFF',
+                'align': 'left'
+            }),
             'total_currency': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
@@ -222,6 +233,15 @@ class ExcelFormatters:
             'table_percent': workbook.add_format({
                 'font_name': 'PT Sans',
                 'font_size': 11,
+                'font_color': '#000000',
+                'num_format': '0.00%;-0.00%;"-"',
+                'bg_color': '#FFFFFF',
+                'align': 'left'
+            }),
+            'table_percent_small_italic': workbook.add_format({
+                'font_name': 'PT Sans',
+                'font_size': 9,
+                'italic': True,
                 'font_color': '#000000',
                 'num_format': '0.00%;-0.00%;"-"',
                 'bg_color': '#FFFFFF',
