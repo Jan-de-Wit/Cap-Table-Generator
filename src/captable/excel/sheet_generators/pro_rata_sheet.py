@@ -100,7 +100,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             # Start column: padding + 1 (inner padding) + 2 (Shareholders + Description) + (round_idx * 6)
             start_col = self.padding_offset + 1 + 2 + (round_idx * 6)
             # Set Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount columns to width 15
-            column_widths.append((start_col, start_col + 4, 15))
+            column_widths.append((start_col, start_col + 4, 20))
             # Set separator column to width 5
             separator_col = start_col + 5
             column_widths.append((separator_col, separator_col, 5))

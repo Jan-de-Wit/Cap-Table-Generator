@@ -316,9 +316,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         round_date = round_data.get('round_date', '')
         constants_to_write.append(('Round Date:', round_date, 'date', None))
         
-        # Pre-Round Shares
-        pre_round_shares_row = round_name_row + len(constants_to_write) + (1 if len(constants_to_write) > 0 else 0)
-        constants_to_write.append(('Pre-Round Shares:', None, 'number', 'Pre-Round Shares:'))
+        # Pre-Round Shares (removed from visible parameters; sourced from Progression sheet)
         
         # Valuation fields (for valuation_based and convertible)
         if calc_type in ['valuation_based', 'convertible']:
@@ -366,33 +364,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
             # Let me put value in column 4 for now, but we can adjust
             col_value = self.padding_offset + 3  # Values in column 4
             
-            if first_label == 'Pre-Round Shares:':
-                # Special handling for Pre-Round Shares
-                col_letter = self._col_letter(col_value)
-                pre_round_shares_cell = f"${col_letter}${round_name_row + 1}"
-                
-                if round_idx == 0:
-                    sheet.write(round_name_row, col_value, 0, self.formats.get('number'))
-                else:
-                    prev_round = all_rounds[round_idx - 1]
-                    prev_pre_round_ref = self._get_pre_round_shares_ref(
-                        round_idx - 1, prev_round, all_rounds)
-                    prev_shares_issued_ref = self._get_shares_issued_ref(
-                        round_idx - 1, prev_round, all_rounds)
-                    prev_prorata_total_ref = self._get_pro_rata_total_ref(
-                        round_idx - 1, prev_round, all_rounds)
-                    formula = f"=IFERROR({prev_pre_round_ref} + {prev_shares_issued_ref} + {prev_prorata_total_ref}, 0)"
-                    sheet.write_formula(round_name_row, col_value,
-                                        formula, self.formats.get('number'))
-                
-                # Register named range
-                round_name_key = round_data.get('name', '').replace(' ', '_')
-                named_range_name = f"{round_name_key}_PreRoundShares"
-                self.dlm.register_named_range(
-                    named_range_name, 'Rounds', round_name_row, col_value)
-                self.workbook.define_name(
-                    named_range_name, f"'Rounds'!{pre_round_shares_cell}")
-            elif first_label == 'Shares Issued:':
+            if first_label == 'Shares Issued:':
                 # Shares Issued will be updated after instruments are written
                 self.round_constants_rows[round_idx][first_track_key] = round_name_row
             else:
@@ -419,33 +391,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 self.round_constants_rows[round_idx][track_key] = current_row
             
             # Write the value
-            if label == 'Pre-Round Shares:':
-                # Special handling for Pre-Round Shares
-                col_letter = self._col_letter(col_value)
-                pre_round_shares_cell = f"${col_letter}${current_row + 1}"
-                
-                if round_idx == 0:
-                    sheet.write(current_row, col_value, 0, self.formats.get('number'))
-                else:
-                    prev_round = all_rounds[round_idx - 1]
-                    prev_pre_round_ref = self._get_pre_round_shares_ref(
-                        round_idx - 1, prev_round, all_rounds)
-                    prev_shares_issued_ref = self._get_shares_issued_ref(
-                        round_idx - 1, prev_round, all_rounds)
-                    prev_prorata_total_ref = self._get_pro_rata_total_ref(
-                        round_idx - 1, prev_round, all_rounds)
-                    formula = f"=IFERROR({prev_pre_round_ref} + {prev_shares_issued_ref} + {prev_prorata_total_ref}, 0)"
-                    sheet.write_formula(current_row, col_value,
-                                        formula, self.formats.get('number'))
-                
-                # Register named range
-                round_name_key = round_data.get('name', '').replace(' ', '_')
-                named_range_name = f"{round_name_key}_PreRoundShares"
-                self.dlm.register_named_range(
-                    named_range_name, 'Rounds', current_row, col_value)
-                self.workbook.define_name(
-                    named_range_name, f"'Rounds'!{pre_round_shares_cell}")
-            elif label == 'Price Per Share:':
+            if label == 'Price Per Share:':
                 # Special handling for Price Per Share
                 pps = round_data.get('price_per_share')
                 

@@ -504,6 +504,19 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
                 f"=SUM({sheet_name}!{start_col_letter}{first_row}:{start_col_letter}{last_row})",
                 self.formats.get('total_number')
             )
+            # Define named range for Pre-Round Shares for this round
+            round_name_key = rounds[round_idx].get('name', '').replace(' ', '_')
+            named_range_name = f"{round_name_key}_PreRoundShares"
+            # Register with DLM and workbook (absolute reference)
+            try:
+                self.dlm.register_named_range(
+                    named_range_name, self._get_sheet_name(), row, start_col
+                )
+            except Exception:
+                # DLM may not require registration; continue with workbook name definition
+                pass
+            abs_cell_ref = f"'{self._get_sheet_name()}'!${start_col_letter}${row + 1}"
+            self.workbook.define_name(named_range_name, abs_cell_ref)
             
             # NEW
             new_col_letter = self._col_letter(new_col)
