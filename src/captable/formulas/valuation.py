@@ -150,30 +150,49 @@ def create_pre_money_from_post_money_formula(post_money_ref: str,
 
 
 def create_shares_from_percentage_formula(percentage_ownership_ref: str,
-                                          pre_round_shares_ref: str) -> str:
+                                          pre_round_shares_ref: str,
+                                          holder_current_shares_ref: str = "0") -> str:
     """
-    Calculate shares issued from ownership percentage.
+    Calculate shares issued from ownership percentage, subtracting existing shares.
 
     PERCENTAGE-BASED CALCULATION:
     - Investor gets a fixed percentage of the company after the round
-    - Formula: Shares = Pre-Round Shares × Ownership % / (1 - Ownership %)
+    - Formula: New Shares = (p × PreRoundShares - CurrentShares) / (1 - p)
+    - Where: (CurrentShares + NewShares) / (PreRoundShares + NewShares) = p
+
+    Mathematical derivation:
+        (C + N) / (P + N) = p
+        C + N = p × (P + N)
+        C + N = p×P + p×N
+        C = p×P + p×N - N
+        C = p×P + N×(p - 1)
+        C - p×P = N×(p - 1)
+        N = (C - p×P) / (p - 1)
+        N = (p×P - C) / (1 - p)
 
     Excel Formula:
-        =IFERROR(PreRoundShares * Ownership% / (1 - Ownership%), 0)
+        =IFERROR(MAX(0, (Ownership% × PreRoundShares - HolderCurrentShares) / (1 - Ownership%)), 0)
 
     Example:
         Pre-round shares: 10M
+        Holder current shares: 0.5M
         Ownership target: 20%
-        Shares: 10M × 0.20 / (1 - 0.20) = 10M × 0.20 / 0.80 = 2.5M shares
+        New shares: (0.20 × 10M - 0.5M) / (1 - 0.20) = (2M - 0.5M) / 0.80 = 1.875M
+        After round: (0.5M + 1.875M) / (10M + 1.875M) = 2.375M / 11.875M = 20% ✓
 
     Args:
         percentage_ownership_ref: Reference to ownership percentage (as decimal, e.g., 0.20 for 20%)
         pre_round_shares_ref: Reference to shares outstanding before round
+        holder_current_shares_ref: Reference to holder's current shares before this round (default: "0")
 
     Returns:
         Excel formula string
     """
-    return f"=IFERROR({pre_round_shares_ref} * {percentage_ownership_ref} / (1 - {percentage_ownership_ref}), 0)"
+    # Formula: N = (p × P - C) / (1 - p)
+    numerator = f"({percentage_ownership_ref} * {pre_round_shares_ref} - {holder_current_shares_ref})"
+    denominator = f"(1 - {percentage_ownership_ref})"
+    new_shares = f"({numerator} / {denominator})"
+    return f"=IFERROR(MAX(0, {new_shares}), 0)"
 
 
 def create_convertible_shares_formula(investment_ref: str, interest_ref: str,

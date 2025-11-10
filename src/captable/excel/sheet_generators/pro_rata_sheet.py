@@ -413,6 +413,42 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         # Write pro rata type (will have dropdown validation added later)
         sheet.write(row, type_col, pro_rata_type, self.formats.get('text'))
 
+        # Add conditional formatting and validation for pro rata enabled without prev round shares
+        type_col_letter = self._col_letter(type_col)
+        type_cell_ref = f"{type_col_letter}{row + 1}"
+        
+        # Get holder's shares at start of round for validation
+        if round_idx == 0:
+            holder_shares_start_ref = "0"
+        else:
+            prev_round_total_col = self._get_progression_total_col(
+                round_idx - 1, rounds)
+            holder_row = row + 1
+            holder_shares_start_ref = f"'Cap Table Progression'!{prev_round_total_col}{holder_row}"
+        
+        # Conditional formatting: highlight red if pro rata enabled (standard/super) but no prev round shares
+        sheet.conditional_format(
+            row, type_col, row, type_col,
+            {
+                'type': 'formula',
+                'criteria': f'=AND(OR({type_cell_ref}="standard", {type_cell_ref}="super"), {holder_shares_start_ref}<=0)',
+                'format': self.formats.get('error_text')
+            }
+        )
+        
+        # Data validation: prevent enabling pro rata if no shares in prev round
+        # Valid if: type is "none"/empty OR (type is "standard"/"super" AND holder has shares > 0)
+        sheet.data_validation(
+            row, type_col, row, type_col,
+            {
+                'validate': 'custom',
+                'value': f'=OR({type_cell_ref}="none", {type_cell_ref}="", AND(OR({type_cell_ref}="standard", {type_cell_ref}="super"), {holder_shares_start_ref}>0))',
+                'error_type': 'stop',
+                'error_title': 'Invalid Pro Rata Rights',
+                'error_message': f'Pro rata rights cannot be enabled (standard or super) when the shareholder has no shares in the previous round. Current shares: {holder_shares_start_ref}'
+            }
+        )
+
         # Pro Rata % column: dynamic formula based on pro_rata_type
         # For "standard": calculate ownership % = holder_shares_start / pre_round_shares
         # For "super": use the value from data (allow manual entry)
@@ -422,17 +458,8 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
         # Get references needed for ownership % calculation
         round_data = rounds[round_idx]
-        round_name_key = round_data.get('name', '').replace(' ', '_')
+        round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
         pre_round_shares_ref = f"{round_name_key}_PreRoundShares"
-
-        # Get holder's shares at start of round (for standard pro rata ownership % calculation)
-        if round_idx == 0:
-            holder_shares_start_ref = "0"
-        else:
-            prev_round_total_col = self._get_progression_total_col(
-                round_idx - 1, rounds)
-            holder_row = row + 1
-            holder_shares_start_ref = f"'Cap Table Progression'!{prev_round_total_col}{holder_row}"
 
         # Dynamic formula for Pro Rata % column
         # If "standard": calculate ownership % = holder_shares_start / pre_round_shares
@@ -462,7 +489,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                             self.formats.get('table_number'))
 
         # Price Per Share column: reference from rounds sheet
-        round_name_key = round_data.get('name', '').replace(' ', '_')
+        round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
         price_per_share_ref = f"{round_name_key}_PricePerShare"
         pps_formula = f"=IFERROR({price_per_share_ref}, 0)"
         sheet.write_formula(row, pps_col, pps_formula,
@@ -496,7 +523,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
     ) -> str:
         """Create formula for pro rata shares (standard uses Pro Rata % cell as target)."""
         round_data = rounds[round_idx]
-        round_name_key = round_data.get('name', '').replace(' ', '_')
+        round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
         pre_round_shares_ref = f"{round_name_key}_PreRoundShares"
 
         # Base round shares (before pro rata)
@@ -720,14 +747,28 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                 f"=SUM({pct_col_letter}{first_holder_row + 1}:{pct_col_letter}{last_holder_row + 1})",
                 self.formats.get('total_percent')
             )
-            # Highlight when total pro rata % exceeds 100%
+            # Highlight when total pro rata % >= 100% (red background)
             sheet.conditional_format(
                 row, pct_col, row, pct_col,
                 {
                     'type': 'cell',
-                    'criteria': 'greater than',
+                    'criteria': '>=',
                     'value': 1,
-                    'format': self.formats.get('error') if 'error' in self.formats else self.formats.get('total_percent')
+                    'format': self.formats.get('error')
+                }
+            )
+            
+            # Add data validation with error message for sum >= 100%
+            pct_cell_ref = f"{pct_col_letter}{row + 1}"
+            sum_range = f"{pct_col_letter}{first_holder_row + 1}:{pct_col_letter}{last_holder_row + 1}"
+            sheet.data_validation(
+                row, pct_col, row, pct_col,
+                {
+                    'validate': 'custom',
+                    'value': f'={sum_range}<1',
+                    'error_type': 'stop',
+                    'error_title': 'Invalid Pro Rata Percentage',
+                    'error_message': 'The sum of pro rata percentages in this round cannot be 100% or greater. Please adjust the values.'
                 }
             )
 
@@ -740,7 +781,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             )
 
             # Define a Named Range for this round's total pro rata shares so other sheets can reference it
-            round_name_key = round_data.get('name', '').replace(' ', '_')
+            round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
             pr_total_named = f"{round_name_key}_ProRataShares"
             cell_ref_abs = f"'Pro Rata Allocations'!${shares_col_letter}${row + 1}"
             self.workbook.define_name(pr_total_named, cell_ref_abs)

@@ -9,7 +9,6 @@ from typing import Dict, List, Any, Tuple
 from .schema_validator import SchemaValidator
 from .relationship_validator import RelationshipValidator
 from .business_rules import BusinessRulesValidator
-from .feo_validator import FEOValidator
 
 
 class CapTableValidator:
@@ -28,7 +27,7 @@ class CapTableValidator:
         self.schema_validator = SchemaValidator()
         self.relationship_validator = RelationshipValidator()
         self.business_rules_validator = BusinessRulesValidator()
-        self.feo_validator = FEOValidator()
+        # FEO validation removed (no formula objects supported)
     
     def validate(self, data: Dict[str, Any]) -> Tuple[bool, List[str]]:
         """
@@ -53,8 +52,7 @@ class CapTableValidator:
             # Step 3: Business rules validation
             errors.extend(self.business_rules_validator.validate(data))
             
-            # Step 4: FEO validation
-            errors.extend(self.feo_validator.validate(data))
+            # Step 4: (removed) FEO validation no longer applicable
         
         return (len(errors) == 0, errors)
 

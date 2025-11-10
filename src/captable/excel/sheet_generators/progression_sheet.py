@@ -507,7 +507,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
                 self.formats.get('total_number')
             )
             # Define named range for Pre-Round Shares for this round
-            round_name_key = rounds[round_idx].get('name', '').replace(' ', '_')
+            round_name_key = self._sanitize_excel_name(rounds[round_idx].get('name', ''))
             named_range_name = f"{round_name_key}_PreRoundShares"
             # Register with DLM and workbook (absolute reference)
             try:

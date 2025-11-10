@@ -103,6 +103,37 @@ class BaseSheetGenerator(ABC):
             col_idx //= 26
         return ''.join(reversed(result))
 
+    def _sanitize_excel_name(self, name: str) -> str:
+        """
+        Sanitize a string for use as an Excel named range.
+        
+        Excel named range rules:
+        - Can contain letters, numbers, underscores, and periods
+        - Cannot contain spaces, hyphens, or other special characters
+        - Cannot start with a number
+        - Cannot be a cell reference (like A1, B2, etc.)
+        
+        Args:
+            name: String to sanitize (e.g., round name)
+            
+        Returns:
+            Sanitized string safe for Excel named ranges
+        """
+        import re
+        # Replace spaces, hyphens, and other invalid characters with underscores
+        sanitized = re.sub(r'[^a-zA-Z0-9_.]', '_', name)
+        # Remove leading numbers (prepend underscore if starts with digit)
+        if sanitized and sanitized[0].isdigit():
+            sanitized = '_' + sanitized
+        # Remove consecutive underscores
+        sanitized = re.sub(r'_+', '_', sanitized)
+        # Remove leading/trailing underscores
+        sanitized = sanitized.strip('_')
+        # Ensure it's not empty
+        if not sanitized:
+            sanitized = 'Name'
+        return sanitized
+
     def _get_cell_reference(
         self,
         row: int,

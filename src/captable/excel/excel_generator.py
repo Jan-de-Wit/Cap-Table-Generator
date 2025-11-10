@@ -31,7 +31,6 @@ import xlsxwriter
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from ..dlm import DeterministicLayoutMap
-from ..formulas import FormulaResolver
 from .formatters import ExcelFormatters
 from .sheet_generators import (
     RoundsSheetGenerator,
@@ -62,7 +61,7 @@ class ExcelGenerator:
         self.sheets = {}
         self.formats = {}
         self.dlm = DeterministicLayoutMap()
-        self.formula_resolver = FormulaResolver(self.dlm)
+        self.formula_resolver = None
 
     def generate(self) -> str:
         """

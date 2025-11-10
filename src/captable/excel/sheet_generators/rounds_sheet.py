@@ -333,17 +333,13 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 constants_to_write.append(
                     ('Valuation Cap Basis:', valuation_cap_basis, 'param_text', 'Valuation Cap Basis:'))
 
-            # Pre-Money Valuation
-            if 'pre_money_valuation' in round_data:
-                pre_money_val = round_data.get('pre_money_valuation')
-                constants_to_write.append(
-                    ('Pre-Money Valuation:', pre_money_val, 'currency', 'Pre-Money Valuation:'))
-
-            # Post-Money Valuation
-            if 'post_money_valuation' in round_data:
-                post_money_val = round_data.get('post_money_valuation')
-                constants_to_write.append(
-                    ('Post-Money Valuation:', post_money_val, 'currency', 'Post-Money Valuation:'))
+            # Pre/Post-Money Valuation (always include, infer if missing)
+            pre_money_val = round_data.get('pre_money_valuation')
+            post_money_val = round_data.get('post_money_valuation')
+            constants_to_write.append(
+                ('Pre-Money Valuation:', pre_money_val, 'currency', 'Pre-Money Valuation:'))
+            constants_to_write.append(
+                ('Post-Money Valuation:', post_money_val, 'currency', 'Post-Money Valuation:'))
 
             # Price Per Share
             if 'price_per_share' in round_data or calc_type == 'convertible':
@@ -370,14 +366,9 @@ class RoundsSheetGenerator(BaseSheetGenerator):
             # Let me put value in column 4 for now, but we can adjust
             col_value = self.padding_offset + 3  # Values in column 4
 
-            # Regular value
-            if isinstance(first_value, dict) and first_value.get('is_calculated'):
-                formula = self.formula_resolver.resolve_feo(first_value)
-                sheet.write_formula(
-                    round_name_row, col_value, formula, self.formats.get(first_format_type))
-            else:
-                sheet.write(round_name_row, col_value, first_value or '',
-                            self.formats.get(first_format_type))
+            # Regular value (no formula objects supported)
+            sheet.write(round_name_row, col_value, first_value or '',
+                        self.formats.get(first_format_type))
 
             current_row = round_name_row + 1
         else:
@@ -410,15 +401,26 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                     col_letter = self._col_letter(col_value_ref)
                     valuation_cap_basis_ref = f"{col_letter}{valuation_cap_basis_row + 1}" if valuation_cap_basis_row is not None else None
 
-                    pre_money_ref = f"{col_letter}{self._find_constant_row(round_idx, 'Pre-Money Valuation:') + 1}"
-                    post_money_ref = f"{col_letter}{self._find_constant_row(round_idx, 'Post-Money Valuation:') + 1}"
+                    pre_row = self._find_constant_row(round_idx, 'Pre-Money Valuation:')
+                    post_row = self._find_constant_row(round_idx, 'Post-Money Valuation:')
+                    pre_money_ref = f"{col_letter}{pre_row + 1}" if pre_row is not None else None
+                    post_money_ref = f"{col_letter}{post_row + 1}" if post_row is not None else None
 
                     if valuation_cap_basis_ref:
+                        inv_total = self._get_round_investment_total_ref(round_idx, round_data)
+                        if pre_money_ref is None and post_money_ref is not None:
+                            pre_ref_safe = f"({post_money_ref} - {inv_total})"
+                        else:
+                            pre_ref_safe = pre_money_ref or "0"
+                        if post_money_ref is None and pre_money_ref is not None:
+                            post_ref_safe = f"({pre_money_ref} + {inv_total})"
+                        else:
+                            post_ref_safe = post_money_ref or "0"
                         pre_money_pps_formula = valuation.create_price_per_share_from_valuation_formula(
-                            pre_money_ref, pre_round_shares_ref
+                            pre_ref_safe, pre_round_shares_ref
                         )
                         post_money_pps_formula = valuation.create_price_per_share_from_valuation_formula(
-                            post_money_ref, pre_round_shares_ref
+                            post_ref_safe, pre_round_shares_ref
                         )
                         pre_money_pps_formula_no_eq = pre_money_pps_formula.lstrip(
                             '=')
@@ -429,27 +431,25 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                         sheet.write_formula(
                             current_row, col_value, pps_formula, self.formats.get('currency'))
                     else:
+                        inv_total = self._get_round_investment_total_ref(round_idx, round_data)
                         if valuation_cap_basis == 'pre_money':
+                            ref = pre_money_ref or (f"({post_money_ref} - {inv_total})" if post_money_ref else "0")
                             pps_formula = valuation.create_price_per_share_from_valuation_formula(
-                                pre_money_ref, pre_round_shares_ref
+                                ref, pre_round_shares_ref
                             )
                         else:
+                            ref = post_money_ref or (f"({pre_money_ref} + {inv_total})" if pre_money_ref else "0")
                             pps_formula = valuation.create_price_per_share_from_valuation_formula(
-                                post_money_ref, pre_round_shares_ref
+                                ref, pre_round_shares_ref
                             )
                         sheet.write_formula(
                             current_row, col_value, pps_formula, self.formats.get('currency'))
                 else:
-                    if isinstance(pps, dict) and pps.get('is_calculated'):
-                        formula = self.formula_resolver.resolve_feo(pps)
-                        sheet.write_formula(
-                            current_row, col_value, formula, self.formats.get('currency'))
-                    else:
-                        sheet.write(current_row, col_value, pps or 0,
-                                    self.formats.get('currency'))
+                    sheet.write(current_row, col_value, pps or 0,
+                                self.formats.get('currency'))
 
                 # Register named range
-                round_name_key = round_data.get('name', '').replace(' ', '_')
+                round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
                 col_letter = self._col_letter(col_value)
                 price_per_share_cell = f"${col_letter}${current_row + 1}"
                 named_range_name = f"{round_name_key}_PricePerShare"
@@ -458,11 +458,27 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 self.workbook.define_name(
                     named_range_name, f"'Rounds'!{price_per_share_cell}")
             else:
-                # Regular value
-                if isinstance(value, dict) and value.get('is_calculated'):
-                    formula = self.formula_resolver.resolve_feo(value)
-                    sheet.write_formula(
-                        current_row, col_value, formula, self.formats.get(format_type))
+                # Regular value or inferred valuation
+                if label in ('Pre-Money Valuation:', 'Post-Money Valuation:') and (value is None or value == ''):
+                    # Build inference formula using investment total and the counterpart constant
+                    inv_total = self._get_round_investment_total_ref(round_idx, round_data)
+                    col_letter = self._col_letter(col_value)
+                    if label == 'Pre-Money Valuation:':
+                        # Find the row of Post-Money (may be upcoming); prefer tracked, else assume next occurrence
+                        post_row = self._find_constant_row(round_idx, 'Post-Money Valuation:')
+                        if post_row is None:
+                            # Assume Post is the next constant in sequence
+                            post_row = current_row + 1
+                        post_ref = f"{col_letter}{post_row + 1}"
+                        formula = f"={post_ref} - {inv_total}"
+                    else:
+                        pre_row = self._find_constant_row(round_idx, 'Pre-Money Valuation:')
+                        if pre_row is None:
+                            # Assume Pre appeared just before
+                            pre_row = current_row - 1
+                        pre_ref = f"{col_letter}{pre_row + 1}"
+                        formula = f"={pre_ref} + {inv_total}"
+                    sheet.write_formula(current_row, col_value, formula, self.formats.get('currency'))
                 else:
                     sheet.write(current_row, col_value, value or '',
                                 self.formats.get(format_type))
@@ -536,13 +552,8 @@ class RoundsSheetGenerator(BaseSheetGenerator):
             # Write fields based on calculation type
             if calc_type == 'fixed_shares':
                 initial_qty = instrument.get('initial_quantity', 0)
-                if isinstance(initial_qty, dict) and initial_qty.get('is_calculated'):
-                    formula = self.formula_resolver.resolve_feo(initial_qty)
-                    sheet.write_formula(
-                        row, table_start_col + col_map['shares'], formula, self.formats.get('table_number'))
-                else:
-                    sheet.write(
-                        row, table_start_col + col_map['shares'], initial_qty or 0, self.formats.get('table_number'))
+                sheet.write(
+                    row, table_start_col + col_map['shares'], initial_qty or 0, self.formats.get('table_number'))
 
             elif calc_type == 'target_percentage':
                 target_pct = instrument.get('target_percentage', 0)
@@ -550,13 +561,18 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                             target_pct, self.formats.get('table_percent'))
 
                 # Calculated shares (base shares only - pro rata handled separately)
+                # Subtract existing shares from calculated shares, similar to pro rata calculation
                 pre_round_shares_ref = self._get_pre_round_shares_ref(
                     round_idx, round_data, all_rounds)
                 # Target percentage column (shifted by table_start_col)
                 target_pct_col = self._col_letter(
                     table_start_col + col_map['target_percentage'])
+                # Get holder's current shares before this round
+                holder_name = instrument.get('holder_name', '')
+                holder_current_shares_ref = self._get_holder_current_shares_ref(
+                    round_idx, holder_name, all_rounds)
                 shares_formula = valuation.create_shares_from_percentage_formula(
-                    f"{target_pct_col}{row + 1}", pre_round_shares_ref
+                    f"{target_pct_col}{row + 1}", pre_round_shares_ref, holder_current_shares_ref
                 )
                 sheet.write_formula(
                     row, table_start_col + col_map['shares'], shares_formula, self.formats.get('table_number'))
@@ -581,33 +597,47 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                     3  # Values column (column 4)
                 col_letter = self._col_letter(col_value_ref)
                 valuation_basis_ref = f"{col_letter}{valuation_basis_row + 1}" if valuation_basis_row is not None else None
-                pre_money_ref = f"{col_letter}{self._find_constant_row(round_idx, 'Pre-Money Valuation:') + 1}"
-                post_money_ref = f"{col_letter}{self._find_constant_row(round_idx, 'Post-Money Valuation:') + 1}"
+                pre_row = self._find_constant_row(round_idx, 'Pre-Money Valuation:')
+                post_row = self._find_constant_row(round_idx, 'Post-Money Valuation:')
+                pre_money_ref = f"{col_letter}{pre_row + 1}" if pre_row is not None else None
+                post_money_ref = f"{col_letter}{post_row + 1}" if post_row is not None else None
 
                 # Create dynamic formula that checks valuation_basis cell value
                 if valuation_basis_ref:
-                    # Dynamic formula using IF to check valuation_basis cell
+                    # Dynamic formula using IF to check valuation_basis cell; infer missing using round investment total
+                    inv_total = self._get_round_investment_total_ref(round_idx, round_data)
+                    if pre_money_ref is None and post_money_ref is not None:
+                        pre_ref_safe = f"({post_money_ref} - {inv_total})"
+                    else:
+                        pre_ref_safe = pre_money_ref or "0"
+                    if post_money_ref is None and pre_money_ref is not None:
+                        post_ref_safe = f"({pre_money_ref} + {inv_total})"
+                    else:
+                        post_ref_safe = post_money_ref or "0"
                     pre_money_formula = valuation.create_shares_from_investment_premoney_formula(
-                        f"{investment_col}{row + 1}", pre_money_ref, pre_round_shares_ref
+                        f"{investment_col}{row + 1}", pre_ref_safe, pre_round_shares_ref
                     )
                     post_money_formula = valuation.create_shares_from_investment_postmoney_formula(
-                        f"{investment_col}{row + 1}", post_money_ref, pre_round_shares_ref
+                        f"{investment_col}{row + 1}", post_ref_safe, pre_round_shares_ref
                     )
                     # Remove leading = from formulas for IF statement
                     pre_money_formula_no_eq = pre_money_formula.lstrip('=')
                     post_money_formula_no_eq = post_money_formula.lstrip('=')
                     shares_formula = f"=IF({valuation_basis_ref}=\"pre_money\", {pre_money_formula_no_eq}, {post_money_formula_no_eq})"
                 else:
-                    # Fallback to static value
+                    # Fallback to static value with inference from investment total
+                    inv_total = self._get_round_investment_total_ref(round_idx, round_data)
                     valuation_basis = round_data.get(
                         'valuation_basis', 'pre_money')
                     if valuation_basis == 'pre_money':
+                        ref = pre_money_ref or (f"({post_money_ref} - {inv_total})" if post_money_ref else "0")
                         shares_formula = valuation.create_shares_from_investment_premoney_formula(
-                            f"{investment_col}{row + 1}", f"{interest_col}{row + 1}", pre_money_ref, pre_round_shares_ref
+                            f"{investment_col}{row + 1}", ref, pre_round_shares_ref
                         )
                     else:
+                        ref = post_money_ref or (f"({pre_money_ref} + {inv_total})" if pre_money_ref else "0")
                         shares_formula = valuation.create_shares_from_investment_postmoney_formula(
-                            f"{investment_col}{row + 1}", f"{interest_col}{row + 1}", post_money_ref, pre_round_shares_ref
+                            f"{investment_col}{row + 1}", ref, pre_round_shares_ref
                         )
 
                 # Write base shares (pro rata handled separately in Pro Rata Allocations sheet)
@@ -628,21 +658,15 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                             interest_end, self.formats.get('table_date'))
 
                 # Days passed
-                days_passed = instrument.get('days_passed')
-                if isinstance(days_passed, dict) and days_passed.get('is_calculated'):
-                    formula = self.formula_resolver.resolve_feo(days_passed)
-                    sheet.write_formula(
-                        row, table_start_col + col_map['days_passed'], formula, self.formats.get('table_number'))
-                else:
-                    start_col = self._col_letter(
-                        table_start_col + col_map['interest_start_date'])
-                    end_col = self._col_letter(
-                        table_start_col + col_map['interest_end_date'])
-                    days_formula = interest.create_days_passed_formula(
-                        f"{start_col}{row + 1}", f"{end_col}{row + 1}"
-                    )
-                    sheet.write_formula(
-                        row, table_start_col + col_map['days_passed'], days_formula, self.formats.get('table_number'))
+                start_col = self._col_letter(
+                    table_start_col + col_map['interest_start_date'])
+                end_col = self._col_letter(
+                    table_start_col + col_map['interest_end_date'])
+                days_formula = interest.create_days_passed_formula(
+                    f"{start_col}{row + 1}", f"{end_col}{row + 1}"
+                )
+                sheet.write_formula(
+                    row, table_start_col + col_map['days_passed'], days_formula, self.formats.get('table_number'))
 
                 interest_rate = instrument.get('interest_rate', 0)
                 sheet.write(row, table_start_col + col_map['interest_rate'],
@@ -655,34 +679,26 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 interest_type_rows.append(row)
 
                 # Accrued interest
-                accrued_interest = instrument.get('accrued_interest')
-                if isinstance(accrued_interest, dict) and accrued_interest.get('is_calculated'):
-                    formula = self.formula_resolver.resolve_feo(
-                        accrued_interest)
-                    sheet.write_formula(
-                        row, table_start_col + col_map['accrued_interest'], formula, self.formats.get('table_currency'))
-                else:
-                    # Use dynamic column references based on col_map (shifted by table_start_col)
-                    principal_col = self._col_letter(
-                        table_start_col + col_map['investment_amount'])
-                    rate_col = self._col_letter(
-                        table_start_col + col_map['interest_rate'])
-                    start_col = self._col_letter(
-                        table_start_col + col_map['interest_start_date'])
-                    end_col = self._col_letter(
-                        table_start_col + col_map['interest_end_date'])
-                    interest_type_col = self._col_letter(
-                        table_start_col + col_map['interest_type'])
-                    # Pass the cell reference for interest_type so formula updates dynamically
-                    interest_formula = interest.create_accrued_interest_formula(
-                        f"{principal_col}{row + 1}", f"{rate_col}{row + 1}",
-                        f"{start_col}{row + 1}", f"{end_col}{row + 1}",
-                        interest_type=interest_type,  # Keep for initial value
-                        # Reference for dynamic formula
-                        interest_type_ref=f"{interest_type_col}{row + 1}"
-                    )
-                    sheet.write_formula(
-                        row, table_start_col + col_map['accrued_interest'], interest_formula, self.formats.get('table_currency'))
+                # Use dynamic column references based on col_map (shifted by table_start_col)
+                principal_col = self._col_letter(
+                    table_start_col + col_map['investment_amount'])
+                rate_col = self._col_letter(
+                    table_start_col + col_map['interest_rate'])
+                start_col = self._col_letter(
+                    table_start_col + col_map['interest_start_date'])
+                end_col = self._col_letter(
+                    table_start_col + col_map['interest_end_date'])
+                interest_type_col = self._col_letter(
+                    table_start_col + col_map['interest_type'])
+                # Pass the cell reference for interest_type so formula updates dynamically
+                interest_formula = interest.create_accrued_interest_formula(
+                    f"{principal_col}{row + 1}", f"{rate_col}{row + 1}",
+                    f"{start_col}{row + 1}", f"{end_col}{row + 1}",
+                    interest_type=interest_type,
+                    interest_type_ref=f"{interest_type_col}{row + 1}"
+                )
+                sheet.write_formula(
+                    row, table_start_col + col_map['accrued_interest'], interest_formula, self.formats.get('table_currency'))
 
                 discount_rate = instrument.get('discount_rate', 0)
                 sheet.write(row, table_start_col + col_map['discount_rate'],
@@ -828,7 +844,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
     def _get_pre_round_shares_ref(self, round_idx: int, round_data: Dict[str, Any],
                                   all_rounds: List[Dict[str, Any]]) -> str:
         """Get Excel reference for pre_round_shares."""
-        round_name_key = round_data.get('name', '').replace(' ', '_')
+        round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
         named_range = f"{round_name_key}_PreRoundShares"
 
         # Try to resolve from DLM, otherwise construct cell reference
@@ -840,14 +856,57 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         # For now, use named range directly
         return named_range
 
+    def _get_holder_current_shares_ref(self, round_idx: int, holder_name: str,
+                                       all_rounds: List[Dict[str, Any]]) -> str:
+        """
+        Get Excel reference for holder's current shares before this round.
+        Uses SUMIF to get the holder's total shares from the previous round in Cap Table Progression.
+        
+        Args:
+            round_idx: Current round index
+            holder_name: Name of the holder
+            all_rounds: List of all rounds data
+            
+        Returns:
+            Excel formula string that references holder's current shares
+        """
+        if round_idx == 0:
+            # First round - no previous shares
+            return "0"
+        
+        # Get the previous round's total column in progression sheet
+        # Each round has 4 columns: Start, New, Total, %
+        # Total is 2 columns after Start
+        # Formula: col = 2 + ((round_idx - 1) * 5) + 4 (for Total column)
+        prev_round_idx = round_idx - 1
+        prev_round_total_col_idx = 2 + (prev_round_idx * 5) + 4
+        prev_round_total_col = self._col_letter(prev_round_total_col_idx)
+        
+        # Holder names are in column B (padding_offset + 1 = column 2, which is B)
+        holder_name_col = self._col_letter(self.padding_offset + 1)
+        
+        # Use SUMIF to match holder name and get their total from previous round
+        # Format: SUMIF('Cap Table Progression'!B:B, holder_name, 'Cap Table Progression'!<col>:<col>)
+        holder_name_escaped = f'"{holder_name}"'
+        progression_sheet = "'Cap Table Progression'"
+        holder_range = f"{progression_sheet}!{holder_name_col}:{holder_name_col}"
+        total_range = f"{progression_sheet}!{prev_round_total_col}:{prev_round_total_col}"
+        
+        return f"IFERROR(SUMIF({holder_range}, {holder_name_escaped}, {total_range}), 0)"
+
     def _get_pro_rata_total_ref(self, round_idx: int, round_data: Dict[str, Any],
                                 all_rounds: List[Dict[str, Any]]) -> str:
         """Get Named Range for total pro rata shares for a given round."""
-        round_name_key = round_data.get('name', '').replace(' ', '_')
+        round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
         named_range = f"{round_name_key}_ProRataShares"
         # Prefer DLM resolve if available, otherwise return named range directly
         ref = self.dlm.resolve_reference(named_range)
         return ref or named_range
+
+    def _get_round_investment_total_ref(self, round_idx: int, round_data: Dict[str, Any]) -> str:
+        """Return an Excel SUM over this round's Investment Amount column using table structured refs."""
+        table_name = self._get_round_table_name(round_idx, round_data)
+        return f"SUM({table_name}[[#All],[Investment Amount]])"
 
     def _find_constant_row(self, round_idx: int, constant_label: str) -> Optional[int]:
         """Find the row where a constant label appears."""

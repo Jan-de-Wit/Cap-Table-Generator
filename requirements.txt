@@ -1,4 +1,8 @@
 xlsxwriter
 jsonschema
 python-dateutil
+fastapi
+uvicorn
+openai
+pydantic
 

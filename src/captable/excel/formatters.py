@@ -255,5 +255,20 @@ class ExcelFormatters:
                 'bottom': 1,
                 'left': 1,
                 'right': 1
+            }),
+            'error': workbook.add_format({
+                'font_name': 'PT Sans',
+                'font_size': 11,
+                'font_color': '#000000',
+                'bg_color': '#FF0000',  # Red background
+                'num_format': '0.00%;-0.00%;"-"',  # Percent format for pro rata %
+                'align': 'left'
+            }),
+            'error_text': workbook.add_format({
+                'font_name': 'PT Sans',
+                'font_size': 11,
+                'font_color': '#000000',
+                'bg_color': '#FF0000',  # Red background
+                'align': 'left'
             })
         }

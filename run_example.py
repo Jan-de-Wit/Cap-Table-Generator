@@ -14,7 +14,7 @@ try:
 
     # Paths
     input_file = Path(__file__).parent / "examples" / \
-        "round_based_example.json"
+        "chatgpt.json"
     output_file = Path(__file__).parent / "output_v2.xlsx"
 
     print("🚀 Generating Excel from round-based example...")
