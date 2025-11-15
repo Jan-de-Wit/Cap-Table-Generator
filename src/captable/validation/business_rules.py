@@ -99,17 +99,17 @@ class BusinessRulesValidator:
             
             # Validate convertible-specific fields
             if calc_type == "convertible":
-                if "valuation_cap_basis" not in round_data:
+                if "valuation_basis" not in round_data:
                     errors.append(
-                        f"Round '{round_name}': Convertible rounds must have 'valuation_cap_basis' "
+                        f"Round '{round_name}': Convertible rounds must have 'valuation_basis' "
                         f"(pre_money or post_money)"
                     )
             
             # Validate SAFE-specific fields
             if calc_type == "safe":
-                if "valuation_cap_basis" not in round_data:
+                if "valuation_basis" not in round_data:
                     errors.append(
-                        f"Round '{round_name}': SAFE rounds must have 'valuation_cap_basis' "
+                        f"Round '{round_name}': SAFE rounds must have 'valuation_basis' "
                         f"(pre_money or post_money)"
                     )
         
@@ -256,14 +256,12 @@ class BusinessRulesValidator:
             
             # valuation_based, convertible, and safe types need valuation data
             if calc_type in ["valuation_based", "convertible", "safe"]:
-                has_pre_money = "pre_money_valuation" in round_data
-                has_post_money = "post_money_valuation" in round_data
+                has_valuation = "valuation" in round_data
                 has_price_per_share = "price_per_share" in round_data
                 
-                if not (has_pre_money or has_post_money or has_price_per_share):
+                if not (has_valuation or has_price_per_share):
                     errors.append(
-                        f"Round '{round_name}': {calc_type} type requires at least one of: "
-                        f"'pre_money_valuation', 'post_money_valuation', or 'price_per_share'"
+                        f"Round '{round_name}': {calc_type} type requires either 'valuation' or 'price_per_share'"
                     )
         
         return errors

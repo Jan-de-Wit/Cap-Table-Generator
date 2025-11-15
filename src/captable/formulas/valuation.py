@@ -202,7 +202,7 @@ def create_shares_from_percentage_formula(percentage_ownership_ref: str,
 def create_convertible_shares_formula(conversion_amount_ref: str,
                                       discount_rate_ref: str, round_pps_ref: str,
                                       valuation_cap_ref: str, total_shares_ref: str,
-                                      valuation_cap_basis: str, post_money_ref: str = None,
+                                      valuation_basis: str, post_money_ref: str = None,
                                       is_safe: bool = False,
                                       future_round_pps_ref: str = None,
                                       future_round_pre_investment_cap_ref: str = None,
@@ -219,22 +219,21 @@ def create_convertible_shares_formula(conversion_amount_ref: str,
         Shares = Conversion amount / Conversion price
     
     Method 2 (valuation cap method):
-        Price per share = Pre-conversion Valuation Cap / Total Shares Pre-conversion
+        Price per share = Pre-investment Valuation Cap / Total Shares Pre-conversion
         Shares = Conversion amount / Price per share
         
-        Where Pre-conversion Valuation Cap:
-        - If post_money basis: Post-money Valuation - Conversion Amount
-        - If pre_money basis: Pre-money Valuation (directly)
-        - If post-conversion valuation is given: Post-conversion - Conversion Amount
+        Where Pre-investment Valuation Cap:
+        - If post_money basis: Post-investment Valuation - Conversion Amount
+        - If pre_money basis: Pre-investment Valuation (directly from valuation_cap_ref)
 
     Args:
         conversion_amount_ref: Reference to conversion amount (Principal + Interest, or just Principal for SAFE)
         discount_rate_ref: Reference to discount rate (as decimal)
         round_pps_ref: Reference to current round price per share (used for Method 2 fallback)
-        valuation_cap_ref: Reference to valuation cap (pre_money or post_money valuation)
+        valuation_cap_ref: Reference to pre-investment valuation cap
         total_shares_ref: Reference to total shares (pre-round shares)
-        valuation_cap_basis: Basis for valuation cap ('pre_money', 'post_money', or 'fixed')
-        post_money_ref: Reference to post-money valuation (required for post_money basis)
+        valuation_basis: Basis for valuation ('pre_money' or 'post_money')
+        post_money_ref: Reference to post-investment valuation (used when valuation_basis is 'post_money')
         is_safe: If True, this is a SAFE (no interest). If False, this is a convertible note.
         future_round_pps_ref: Optional reference to future valuation-based round's price per share
         future_round_pre_investment_cap_ref: Optional reference to future round's pre-investment valuation cap
@@ -259,19 +258,17 @@ def create_convertible_shares_formula(conversion_amount_ref: str,
         method1_shares = None
     
     # Method 2: Using valuation cap from current round
-    # Calculate pre-conversion valuation cap
-    if valuation_cap_basis == 'post_money' and post_money_ref:
-        # For post_money: calculate pre-money by subtracting conversion amount
-        # Pre-conversion = Post-money - Conversion Amount
-        pre_conversion_cap = f"({post_money_ref} - {conversion_amount_ref})"
+    # Calculate pre-investment valuation cap
+    if valuation_basis == 'post_money' and post_money_ref:
+        # For post_money: calculate pre-investment by subtracting conversion amount
+        # Pre-investment = Post-investment - Conversion Amount
+        pre_investment_cap = f"({post_money_ref} - {conversion_amount_ref})"
     else:
-        # For pre_money or fixed: use valuation cap directly
-        # If post-conversion valuation is given, we'd subtract conversion amount
-        # But for now, we use the valuation cap as-is (it's already pre-conversion for pre_money basis)
-        pre_conversion_cap = valuation_cap_ref
+        # For pre_money: use valuation cap directly (it's already pre-investment)
+        pre_investment_cap = valuation_cap_ref
     
     # Price per share from valuation cap
-    method2_price_per_share = f"({pre_conversion_cap} / {total_shares_ref})"
+    method2_price_per_share = f"({pre_investment_cap} / {total_shares_ref})"
     method2_shares = f"({conversion_amount_ref} / {method2_price_per_share})"
     
     # Return the maximum (best for investor) of the two methods

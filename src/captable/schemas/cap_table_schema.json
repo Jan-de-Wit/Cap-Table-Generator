@@ -259,27 +259,18 @@
           ],
           "description": "Calculation method for all instruments in this round"
         },
-        "valuation_cap_basis": {
-          "type": "string",
-          "enum": ["pre_money", "post_money", "fixed"],
-          "description": "Valuation basis for convertible and SAFE instruments (required for convertible and safe types). Use 'fixed' to specify a fixed price per share instead of calculating from valuation."
-        },
         "valuation_basis": {
           "type": "string",
           "enum": ["pre_money", "post_money"],
-          "description": "Valuation basis for valuation_based calculation type - determines how shares are calculated from investment amount"
+          "description": "Valuation basis for valuation_based, convertible, and safe calculation types. Determines how the valuation field is interpreted: if pre_money, valuation is pre-investment; if post_money, valuation is post-investment. The other valuation will be calculated using formulas."
         },
         "instruments": {
           "type": "array",
           "description": "Instruments issued in this round. Can include regular instruments (based on calculation_type) and ProRataAllocation instruments."
         },
-        "pre_money_valuation": {
+        "valuation": {
           "type": "number",
-          "description": "Pre-money valuation (used for valuation_based, convertible, and safe calculations)"
-        },
-        "post_money_valuation": {
-          "type": "number",
-          "description": "Post-money valuation (can be calculated or used for calculations)"
+          "description": "Valuation amount (for valuation_based, convertible, and safe rounds). Interpretation depends on valuation_basis: if pre_money, this is pre-investment valuation; if post_money, this is post-investment valuation. The other valuation will be calculated using formulas."
         },
         "price_per_share": {
           "type": "number",
@@ -351,7 +342,7 @@
             "properties": { "calculation_type": { "const": "convertible" } }
           },
           "then": {
-            "required": ["valuation_cap_basis"],
+            "required": ["valuation_basis"],
             "properties": {
               "instruments": {
                 "type": "array",
@@ -370,7 +361,7 @@
             "properties": { "calculation_type": { "const": "safe" } }
           },
           "then": {
-            "required": ["valuation_cap_basis"],
+            "required": ["valuation_basis"],
             "properties": {
               "instruments": {
                 "type": "array",

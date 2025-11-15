@@ -66,7 +66,7 @@
         {
           "holder_name": "Seed Investor",
           "class_name": "Preferred Stock",
-          "target_percentage": 0.20
+          "target_percentage": 0.2
         }
       ]
     },
@@ -75,8 +75,7 @@
       "round_date": "2024-01-10",
       "calculation_type": "valuation_based",
       "valuation_basis": "pre_money",
-      "pre_money_valuation": 10000000,
-      "post_money_valuation": 15000000,
+      "valuation": 10000000,
       "instruments": [
         {
           "holder_name": "Series A Investor",
@@ -94,10 +93,8 @@
       "name": "Convertible Note Round",
       "round_date": "2024-03-01",
       "calculation_type": "convertible",
-      "valuation_cap_basis": "pre_money",
-      "pre_money_valuation": 8000000,
-      "post_money_valuation": 10000000,
-      "price_per_share": 0.50,
+      "valuation_basis": "pre_money",
+      "valuation": 8000000,
       "instruments": [
         {
           "holder_name": "Convertible Note Holder",
@@ -107,7 +104,7 @@
           "interest_type": "simple",
           "payment_date": "2024-03-01",
           "expected_conversion_date": "2024-12-31",
-          "discount_rate": 0.20
+          "discount_rate": 0.2
         },
         {
           "holder_name": "Convertible Note Holder",
@@ -121,10 +118,8 @@
       "name": "SAFE Round",
       "round_date": "2024-05-15",
       "calculation_type": "safe",
-      "valuation_cap_basis": "post_money",
-      "pre_money_valuation": 12000000,
-      "post_money_valuation": 15000000,
-      "price_per_share": 0.60,
+      "valuation_basis": "post_money",
+      "valuation": 15000000,
       "instruments": [
         {
           "holder_name": "SAFE Holder",
@@ -156,10 +151,8 @@
       "name": "CLA REF",
       "round_date": "2024-02-01",
       "calculation_type": "convertible",
-      "valuation_cap_basis": "pre_money",
-      "pre_money_valuation": 7000000,
-      "post_money_valuation": 8500000,
-      "price_per_share": 0.40,
+      "valuation_basis": "post_money",
+      "valuation": 7000000,
       "conversion_round_ref": "Series B",
       "instruments": [
         {
@@ -174,14 +167,13 @@
         }
       ]
     },
-   
+
     {
       "name": "Series B",
       "round_date": "2025-03-15",
       "calculation_type": "valuation_based",
       "valuation_basis": "pre_money",
-      "pre_money_valuation": 20000000,
-      "post_money_valuation": 30000000,
+      "valuation": 20000000,
       "instruments": [
         {
           "holder_name": "Series A Investor",
