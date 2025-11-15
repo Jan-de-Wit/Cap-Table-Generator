@@ -1,14 +1,14 @@
 """
-Cap Table Progression Sheet Generator
+Cap Table Sheet Generator
 
-Creates the Cap Table Progression sheet showing ownership evolution across rounds.
+Creates the Cap Table sheet showing ownership evolution across rounds.
 This sheet is a SUMMARY VIEW that references the Rounds sheet for instrument data.
 
 In round-based architecture v2.0, instruments are nested within rounds.
-This progression sheet aggregates shares by holder and shows evolution across rounds.
+This sheet aggregates shares by holder and shows evolution across rounds.
 """
 
-from typing import Dict, Any, List, Set
+from typing import Dict, Any, List, Set, Optional
 import xlsxwriter
 
 from ..base import BaseSheetGenerator
@@ -16,7 +16,7 @@ from ..base import BaseSheetGenerator
 
 class ProgressionSheetGenerator(BaseSheetGenerator):
     """
-    Generates the Cap Table Progression sheet as a summary view.
+    Generates the Cap Table sheet as a summary view.
     
     In v2.0 architecture:
     - Instruments are nested within rounds (data['rounds'][i]['instruments'])
@@ -33,12 +33,15 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         self.padding_offset = 1
     
     def _get_sheet_name(self) -> str:
-        """Returns 'Cap Table Progression'."""
-        return "Cap Table Progression"
+        """Returns 'Cap Table'."""
+        return "Cap Table"
     
-    def generate(self) -> xlsxwriter.worksheet.Worksheet:
-        """Generate the Cap Table Progression sheet."""
-        sheet = self.workbook.add_worksheet('Cap Table Progression')
+    def generate(self, existing_sheet: Optional[xlsxwriter.worksheet.Worksheet] = None) -> xlsxwriter.worksheet.Worksheet:
+        """Generate the Cap Table sheet."""
+        if existing_sheet:
+            sheet = existing_sheet
+        else:
+            sheet = self.workbook.add_worksheet('Cap Table')
         self.sheet = sheet
         
         rounds = self.data.get('rounds', [])
@@ -48,7 +51,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         
         # Title row inside border (top-left of table, respecting padding)
         title_row = self.padding_offset + 1
-        sheet.write(title_row, self.padding_offset + 1, 'Cap Table Progression', self.formats.get('round_header_plain'))
+        sheet.write(title_row, self.padding_offset + 1, 'Cap Table', self.formats.get('round_header_plain'))
 
         # Extract holders with grouping
         holders_by_group, all_holders = self._get_holders_with_groups(rounds)
@@ -136,6 +139,43 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
                     holders_set.add(holder_name)
         return sorted(list(holders_set))
     
+    def _sort_groups(self, groups: List[str]) -> List[str]:
+        """
+        Sort groups according to the default order:
+        1. Founders
+        2. ESOP
+        3. Noteholders
+        4. Investors
+        5. Other groups (alphabetically)
+        
+        Args:
+            groups: List of group names to sort
+            
+        Returns:
+            Sorted list of group names
+        """
+        # Define the default order
+        default_order = ['Founders', 'ESOP', 'Noteholders', 'Investors']
+        
+        # Separate groups into ordered and unordered
+        ordered_groups = []
+        unordered_groups = []
+        
+        for group in groups:
+            if group in default_order:
+                ordered_groups.append(group)
+            else:
+                unordered_groups.append(group)
+        
+        # Sort ordered groups by their position in default_order
+        ordered_groups.sort(key=lambda g: default_order.index(g))
+        
+        # Sort unordered groups alphabetically
+        unordered_groups.sort()
+        
+        # Combine: ordered groups first, then unordered groups
+        return ordered_groups + unordered_groups
+    
     def _get_holders_with_groups(self, rounds: List[Dict[str, Any]]) -> tuple:
         """
         Get holders list with grouping information.
@@ -176,9 +216,10 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             else:
                 ungrouped.append(holder_name)
         
-        # Build flat list: groups first (sorted by group name), then ungrouped
+        # Build flat list: groups first (sorted by custom order), then ungrouped
         all_holders = []
-        for group in sorted(holders_by_group.keys()):
+        sorted_groups = self._sort_groups(list(holders_by_group.keys()))
+        for group in sorted_groups:
             all_holders.extend(holders_by_group[group])
         all_holders.extend(ungrouped)
         
@@ -368,7 +409,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         else:
             # Reference previous round's Total
             # Previous total is 3 columns back (from the start column)
-            # Format: =Cap Table Progression!E4 (for example)
+            # Format: =Cap Table!E4 (for example)
             prev_total_col = start_col - 3
             prev_col_letter = self._col_letter(prev_total_col)
             prev_cell = f"'{self._get_sheet_name()}'!{prev_col_letter}{row + 1}"

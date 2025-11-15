@@ -6,4 +6,3 @@ uvicorn
 openai
 pydantic
 streamlit
-

@@ -138,6 +138,43 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                     holders_set.add(holder_name)
         return sorted(list(holders_set))
 
+    def _sort_groups(self, groups: List[str]) -> List[str]:
+        """
+        Sort groups according to the default order:
+        1. Founders
+        2. ESOP
+        3. Noteholders
+        4. Investors
+        5. Other groups (alphabetically)
+        
+        Args:
+            groups: List of group names to sort
+            
+        Returns:
+            Sorted list of group names
+        """
+        # Define the default order
+        default_order = ['Founders', 'ESOP', 'Noteholders', 'Investors']
+        
+        # Separate groups into ordered and unordered
+        ordered_groups = []
+        unordered_groups = []
+        
+        for group in groups:
+            if group in default_order:
+                ordered_groups.append(group)
+            else:
+                unordered_groups.append(group)
+        
+        # Sort ordered groups by their position in default_order
+        ordered_groups.sort(key=lambda g: default_order.index(g))
+        
+        # Sort unordered groups alphabetically
+        unordered_groups.sort()
+        
+        # Combine: ordered groups first, then unordered groups
+        return ordered_groups + unordered_groups
+
     def _get_holders_with_groups(self, rounds: List[Dict[str, Any]]) -> tuple:
         """
         Get holders list with grouping information.
@@ -178,9 +215,10 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             else:
                 ungrouped.append(holder_name)
 
-        # Build flat list: groups first (sorted by group name), then ungrouped
+        # Build flat list: groups first (sorted by custom order), then ungrouped
         all_holders = []
-        for group in sorted(holders_by_group.keys()):
+        sorted_groups = self._sort_groups(list(holders_by_group.keys()))
+        for group in sorted_groups:
             all_holders.extend(holders_by_group[group])
         all_holders.extend(ungrouped)
 
@@ -373,6 +411,49 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         self._add_pro_rata_dropdowns(
             sheet, rounds, pro_rata_type_rows_by_round)
 
+    def _has_shares_in_previous_rounds(
+        self,
+        holder_name: str,
+        round_idx: int,
+        rounds: List[Dict[str, Any]]
+    ) -> bool:
+        """
+        Check if a shareholder has shares in previous rounds by examining JSON data.
+        
+        Args:
+            holder_name: Name of the shareholder to check
+            round_idx: Current round index (0-based)
+            rounds: List of all rounds data
+            
+        Returns:
+            True if holder has shares in any previous round, False otherwise
+        """
+        if round_idx == 0:
+            # First round - no previous rounds
+            return False
+        
+        # Check all previous rounds (0 to round_idx - 1)
+        for prev_round_idx in range(round_idx):
+            prev_round = rounds[prev_round_idx]
+            prev_instruments = prev_round.get('instruments', [])
+            
+            # Check if holder has any instrument in this previous round
+            for instrument in prev_instruments:
+                if instrument.get('holder_name') == holder_name:
+                    # Check if instrument has shares (initial_quantity, or calculated shares > 0)
+                    # For fixed_shares, check initial_quantity
+                    if 'initial_quantity' in instrument:
+                        if instrument.get('initial_quantity', 0) > 0:
+                            return True
+                    # For other types, if the instrument exists, they likely have shares
+                    # (valuation_based, target_percentage, convertible all result in shares)
+                    # We can check if there's an investment_amount, target_percentage, principal, etc.
+                    if any(key in instrument for key in ['investment_amount', 'target_percentage', 'principal', 'shares']):
+                        # If any of these fields exist, the holder will have shares
+                        return True
+        
+        return False
+
     def _write_round_pro_rata_data(
         self,
         sheet: xlsxwriter.worksheet.Worksheet,
@@ -410,52 +491,63 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             pro_rata_type = holder_instrument.get('pro_rata_type', 'none')
             pro_rata_pct = holder_instrument.get('pro_rata_percentage')
 
-        # Write pro rata type (will have dropdown validation added later)
-        sheet.write(row, type_col, pro_rata_type, self.formats.get('text'))
+        # Check if holder has shares in previous rounds from JSON data
+        has_previous_shares = self._has_shares_in_previous_rounds(
+            holder_name, round_idx, rounds
+        )
+        
+        if has_previous_shares:
+            # Holder has shares in previous rounds - add dropdown with None, Standard, Super
+            # Format pro rata type for display (capitalize first letter)
+            pro_rata_type_display = pro_rata_type.capitalize() if pro_rata_type else 'None'
+            sheet.write(row, type_col, pro_rata_type_display, self.formats.get('text'))
+            # Add dropdown validation
+            sheet.data_validation(
+                row, type_col, row, type_col,
+                {
+                    'validate': 'list',
+                    'source': ['None', 'Standard', 'Super'],
+                    'error_type': 'stop',
+                    'error_title': 'Invalid Value',
+                    'error_message': 'Please select one of: None, Standard, Super'
+                }
+            )
+        else:
+            # Holder has no shares in previous rounds - show "-"
+            sheet.write(row, type_col, '-', self.formats.get('text'))
 
-        # Add conditional formatting and validation for pro rata enabled without prev round shares
+        # Get references needed for formulas (used regardless of has_previous_shares)
         type_col_letter = self._col_letter(type_col)
         type_cell_ref = f"{type_col_letter}{row + 1}"
         
-        # Get holder's shares at start of round for validation
+        # Get holder's shares at start of round for formulas
         if round_idx == 0:
             holder_shares_start_ref = "0"
         else:
             prev_round_total_col = self._get_progression_total_col(
                 round_idx - 1, rounds)
             holder_row = row + 1
-            holder_shares_start_ref = f"'Cap Table Progression'!{prev_round_total_col}{holder_row}"
-        
-        # Conditional formatting: highlight red if pro rata enabled (standard/super) but no prev round shares
-        sheet.conditional_format(
-            row, type_col, row, type_col,
-            {
-                'type': 'formula',
-                'criteria': f'=AND(OR({type_cell_ref}="standard", {type_cell_ref}="super"), {holder_shares_start_ref}<=0)',
-                'format': self.formats.get('error_text')
-            }
-        )
-        
-        # Data validation: prevent enabling pro rata if no shares in prev round
-        # Valid if: type is "none"/empty OR (type is "standard"/"super" AND holder has shares > 0)
-        sheet.data_validation(
-            row, type_col, row, type_col,
-            {
-                'validate': 'custom',
-                'value': f'=OR({type_cell_ref}="none", {type_cell_ref}="", AND(OR({type_cell_ref}="standard", {type_cell_ref}="super"), {holder_shares_start_ref}>0))',
-                'error_type': 'stop',
-                'error_title': 'Invalid Pro Rata Rights',
-                'error_message': f'Pro rata rights cannot be enabled (standard or super) when the shareholder has no shares in the previous round. Current shares: {holder_shares_start_ref}'
-            }
-        )
+            holder_shares_start_ref = f"'Cap Table'!{prev_round_total_col}{holder_row}"
+
+        # Add conditional formatting as safety measure (in case someone manually edits the cell)
+        # This will highlight if pro rata is enabled but holder has no shares
+        if has_previous_shares:
+            # Conditional formatting: highlight red if pro rata enabled (standard/super) but no prev round shares
+            # This is a safety measure in case the Excel calculation shows 0 shares even though JSON had shares
+            # Check for both lowercase and capitalized versions
+            sheet.conditional_format(
+                row, type_col, row, type_col,
+                {
+                    'type': 'formula',
+                    'criteria': f'=AND(OR({type_cell_ref}="standard", {type_cell_ref}="super", {type_cell_ref}="Standard", {type_cell_ref}="Super"), {holder_shares_start_ref}<=0)',
+                    'format': self.formats.get('error_text')
+                }
+            )
 
         # Pro Rata % column: dynamic formula based on pro_rata_type
         # For "standard": calculate ownership % = holder_shares_start / pre_round_shares
         # For "super": use the value from data (allow manual entry)
         # For "none": empty
-        type_col_letter = self._col_letter(type_col)
-        type_cell_ref = f"{type_col_letter}{row + 1}"
-
         # Get references needed for ownership % calculation
         round_data = rounds[round_idx]
         round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
@@ -467,9 +559,10 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         # Otherwise: empty
         ownership_pct_formula = f"IFERROR({holder_shares_start_ref} / {pre_round_shares_ref}, 0)"
 
-        # Always use ownership % for both standard and super; blank for none
+        # Always use ownership % for both standard and super; blank for none or "-"
+        # Check for both lowercase and capitalized versions
         pct_formula = (
-            f"=IF(OR({type_cell_ref}=\"standard\", {type_cell_ref}=\"super\"), {ownership_pct_formula}, \"\")"
+            f"=IF(OR({type_cell_ref}=\"standard\", {type_cell_ref}=\"super\", {type_cell_ref}=\"Standard\", {type_cell_ref}=\"Super\"), {ownership_pct_formula}, \"\")"
         )
         sheet.write_formula(row, pct_col, pct_formula,
                             self.formats.get('table_percent'))
@@ -480,10 +573,11 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         ).lstrip('=')
 
         # Dynamic formula using nested IF to check pro_rata_type cell
-        # Handles: "none", "standard", "super", or empty/invalid (defaults to 0)
+        # Handles: "none", "None", "-", "standard", "super", "Standard", "Super", or empty/invalid (defaults to 0)
         # Use the standard formula for both standard and super
+        # Check for both lowercase and capitalized versions
         shares_formula = (
-            f"=IFERROR(IF(OR({type_cell_ref}=\"\", {type_cell_ref}=\"none\"), 0, {pro_rata_formula}), 0)"
+            f"=IFERROR(IF(OR({type_cell_ref}=\"\", {type_cell_ref}=\"none\", {type_cell_ref}=\"None\", {type_cell_ref}=\"-\"), 0, {pro_rata_formula}), 0)"
         )
         sheet.write_formula(row, shares_col, shares_formula,
                             self.formats.get('table_number'))
@@ -547,7 +641,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         prev_round_total_col = self._get_progression_total_col(
             round_idx - 1, rounds) if round_idx > 0 else None
         holder_row = row + 1
-        prev_total_ref = f"'Cap Table Progression'!{prev_round_total_col}{holder_row}" if prev_round_total_col else "0"
+        prev_total_ref = f"'Cap Table'!{prev_round_total_col}{holder_row}" if prev_round_total_col else "0"
         holder_base_shares_ref = self._get_holder_base_shares_ref(
             round_idx, holder_row)
         holder_shares_start_ref = f"({prev_total_ref} + {holder_base_shares_ref})"
@@ -662,7 +756,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         else:
             prev_round_total_col = self._get_progression_total_col(
                 round_idx - 1, rounds)
-            progression_range = f"'Cap Table Progression'!{prev_round_total_col}{first_holder_row + 1}:{prev_round_total_col}{last_holder_row + 1}"
+            progression_range = f"'Cap Table'!{prev_round_total_col}{first_holder_row + 1}:{prev_round_total_col}{last_holder_row + 1}"
 
         type_filter = f"(({type_range}=\"standard\")+({type_range}=\"super\")>0)"
         return f"SUMPRODUCT(--({type_filter}), {progression_range} + {base_sum_array})"
@@ -831,15 +925,15 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             first_row = min(rows)
             last_row = max(rows)
 
-            # Add dropdown with valid pro rata type options
+            # Add dropdown with valid pro rata type options (capitalized)
             sheet.data_validation(
                 first_row, type_col,
                 last_row, type_col,
                 {
                     'validate': 'list',
-                    'source': ['none', 'standard', 'super'],
+                    'source': ['None', 'Standard', 'Super'],
                     'error_type': 'stop',
                     'error_title': 'Invalid Pro Rata Type',
-                    'error_message': 'Please select "none", "standard", or "super" from the dropdown.'
+                    'error_message': 'Please select "None", "Standard", or "Super" from the dropdown.'
                 }
             )

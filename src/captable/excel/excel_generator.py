@@ -10,7 +10,7 @@ The main ExcelGenerator class orchestrates generation by calling specialized gen
 ARCHITECTURE - ROUND-BASED DESIGN:
 
 The Excel workbook centers around the ROUNDS sheet as the source of truth, with each
-round containing nested instruments. The Cap Table Progression provides a summary view.
+round containing nested instruments. The Cap Table provides a summary view.
 
 Data Flow:
 1. Rounds Sheet (Source of Truth)
@@ -18,7 +18,7 @@ Data Flow:
    - Formulas calculate share quantities based on round's calculation_type
    - Different column sets for: fixed_shares, target_percentage, valuation_based, convertible
 
-2. Cap Table Progression (Summary View)
+2. Cap Table (Summary View)
    - Shows ownership evolution across rounds
    - References instrument shares from Rounds sheet
    - Chains rounds: Round 1 Total → Round 2 Start → Round 2 Total, etc.
@@ -68,8 +68,9 @@ class ExcelGenerator:
         Generate the complete Excel workbook with round-based architecture.
 
         Sheet creation order:
-        1. Rounds (SOURCE OF TRUTH - contains all instruments nested within rounds)
-        2. Cap Table Progression (SUMMARY VIEW - references Rounds sheet)
+        1. Cap Table (SUMMARY VIEW - references Rounds sheet) - created first to appear first
+        2. Rounds (SOURCE OF TRUTH - contains all instruments nested within rounds)
+        3. Pro Rata Allocations (pro rata share calculations)
 
         Returns:
             Path to generated Excel file
@@ -85,7 +86,11 @@ class ExcelGenerator:
         # Create formats
         self.formats = ExcelFormatters.create_formats(self.workbook)
 
-        # STEP 1: Create Rounds sheet (SOURCE OF TRUTH)
+        # STEP 1: Create "Cap Table" worksheet first (empty) so it appears first in Excel
+        # XLSXWriter sorts sheets by creation order, so we create this first
+        cap_table_sheet = self.workbook.add_worksheet('Cap Table')
+
+        # STEP 2: Create Rounds sheet (SOURCE OF TRUTH)
         # Each round contains constants and nested instruments
         # Instruments displayed with columns based on round's calculation_type
         # Contains base shares only (no pro rata)
@@ -94,7 +99,7 @@ class ExcelGenerator:
         )
         self.sheets['Rounds'] = rounds_gen.generate()
 
-        # STEP 2: Create Pro Rata Allocations sheet
+        # STEP 3: Create Pro Rata Allocations sheet
         # Lists all stakeholders per round and calculates pro rata share allocations
         # Pro rata calculations happen AFTER regular round shares are calculated
         pro_rata_gen = ProRataSheetGenerator(
@@ -104,15 +109,15 @@ class ExcelGenerator:
         # Pass shares_issued references for each round
         self.sheets['Pro Rata Allocations'] = pro_rata_gen.generate()
 
-        # STEP 3: Create Cap Table Progression sheet (SUMMARY VIEW)
+        # STEP 4: Populate Cap Table sheet (SUMMARY VIEW)
         # References instrument shares from Rounds sheet + Pro Rata Allocations sheet
         # Shows ownership evolution across rounds
         progression_gen = ProgressionSheetGenerator(
             self.workbook, self.data, self.formats, self.dlm, self.formula_resolver
         )
-        # Pass round ranges from rounds sheet
+        # Pass round ranges from rounds sheet and the existing worksheet
         progression_gen.round_ranges = rounds_gen.get_round_ranges()
-        self.sheets['Cap Table Progression'] = progression_gen.generate()
+        self.sheets['Cap Table'] = progression_gen.generate(existing_sheet=cap_table_sheet)
 
         # Close and save
         self.workbook.close()

@@ -220,6 +220,22 @@ class BusinessRulesValidator:
                             f"Round '{round_name}', Instrument {inst_idx} ({holder_name}/{class_name}): "
                             f"convertible type requires: {', '.join(missing_fields)}"
                         )
+                    
+                    # Validate valuation_cap and valuation_cap_type consistency
+                    valuation_cap = instrument.get('valuation_cap')
+                    valuation_cap_type = instrument.get('valuation_cap_type', 'default')
+                    
+                    if valuation_cap is not None and valuation_cap_type == 'default':
+                        errors.append(
+                            f"Round '{round_name}', Instrument {inst_idx} ({holder_name}/{class_name}): "
+                            f"valuation_cap cannot be provided when valuation_cap_type is 'default' (use round-level cap)"
+                        )
+                    
+                    if valuation_cap is None and valuation_cap_type != 'default':
+                        errors.append(
+                            f"Round '{round_name}', Instrument {inst_idx} ({holder_name}/{class_name}): "
+                            f"valuation_cap must be provided when valuation_cap_type is '{valuation_cap_type}'"
+                        )
                 
                 elif calc_type == "safe":
                     # SafeInstrument requires: investment_amount, expected_conversion_date, discount_rate
@@ -230,6 +246,22 @@ class BusinessRulesValidator:
                         errors.append(
                             f"Round '{round_name}', Instrument {inst_idx} ({holder_name}/{class_name}): "
                             f"safe type requires: {', '.join(missing_fields)}"
+                        )
+                    
+                    # Validate valuation_cap and valuation_cap_type consistency
+                    valuation_cap = instrument.get('valuation_cap')
+                    valuation_cap_type = instrument.get('valuation_cap_type', 'default')
+                    
+                    if valuation_cap is not None and valuation_cap_type == 'default':
+                        errors.append(
+                            f"Round '{round_name}', Instrument {inst_idx} ({holder_name}/{class_name}): "
+                            f"valuation_cap cannot be provided when valuation_cap_type is 'default' (use round-level cap)"
+                        )
+                    
+                    if valuation_cap is None and valuation_cap_type != 'default':
+                        errors.append(
+                            f"Round '{round_name}', Instrument {inst_idx} ({holder_name}/{class_name}): "
+                            f"valuation_cap must be provided when valuation_cap_type is '{valuation_cap_type}'"
                         )
         
         return errors

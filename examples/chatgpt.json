@@ -2,185 +2,94 @@
   "schema_version": "2.0",
   "holders": [
     {
-      "name": "Founder A",
+      "name": "Bergsma & De Wit B.V.",
       "group": "Founders",
-      "description": "Co-founder and CEO"
+      "description": "Bastiaan de Wit"
     },
     {
-      "name": "Founder B",
+      "name": "Damado B.V.",
       "group": "Founders",
-      "description": "Co-founder and CTO"
+      "description": "Ralph Winkelmolen"
     },
     {
-      "name": "Seed Investor",
-      "group": "Investors"
+      "name": "Roswitha de Wit - Schneider",
+      "group": "Noteholders"
     },
     {
-      "name": "Series A Investor",
-      "group": "Investors"
+      "name": "STAK Employees",
+      "group": "ESOP",
+      "description": "Team"
     },
     {
-      "name": "Convertible Note Holder",
-      "group": "Investors"
-    },
-    {
-      "name": "SAFE Holder",
-      "group": "Investors"
-    },
-    {
-      "name": "Employee 1",
-      "group": "Employees"
-    },
-    {
-      "name": "Early Convertible Holder",
-      "group": "Investors"
-    },
-    {
-      "name": "Early SAFE Holder",
-      "group": "Investors"
+      "name": "InvestNL",
+      "group": "Series A"
     }
   ],
   "rounds": [
     {
       "name": "Incorporation",
-      "round_date": "2023-01-01",
+      "round_date": "2023-03-15",
       "calculation_type": "fixed_shares",
       "instruments": [
         {
-          "holder_name": "Founder A",
-          "class_name": "Common Stock",
-          "initial_quantity": 5000000
+          "holder_name": "Bergsma & De Wit B.V.",
+          "class_name": "Ordinary Shares",
+          "initial_quantity": 500000
         },
         {
-          "holder_name": "Founder B",
-          "class_name": "Common Stock",
-          "initial_quantity": 5000000
+          "holder_name": "Damado B.V.",
+          "class_name": "Ordinary Shares",
+          "initial_quantity": 500000
         }
       ]
     },
     {
-      "name": "Seed Round",
-      "round_date": "2023-06-15",
+      "name": "ESOP",
+      "round_date": "2025-11-01",
       "calculation_type": "target_percentage",
       "instruments": [
         {
-          "holder_name": "Seed Investor",
-          "class_name": "Preferred Stock",
-          "target_percentage": 0.2
+          "holder_name": "STAK Employees",
+          "class_name": "Ordinary Shares",
+          "target_percentage": 0.1
         }
       ]
+    },
+    {
+      "name": "Conversion",
+      "round_date": "2025-12-31",
+      "calculation_type": "convertible",
+      "conversion_round_ref": "Series A",
+      "instruments": [
+        {
+          "holder_name": "Roswitha de Wit - Schneider",
+          "class_name": "Preseed Preferred Shares",
+          "investment_amount": 100000.0,
+          "interest_rate": 0.06,
+          "interest_type": "compound_yearly",
+          "payment_date": "2024-11-15",
+          "expected_conversion_date": "2025-12-31",
+          "discount_rate": 0.2,
+          "valuation_cap": 4000000.0,
+          "valuation_cap_type": "post_conversion_own"
+        }
+      ],
+      "valuation_basis": "post_money",
+      "valuation": 5000000.0
     },
     {
       "name": "Series A",
-      "round_date": "2024-01-10",
+      "round_date": "2025-12-31",
       "calculation_type": "valuation_based",
+      "instruments": [
+        {
+          "holder_name": "InvestNL",
+          "class_name": "Preseed Preferred Shares",
+          "investment_amount": 2500000.0
+        }
+      ],
       "valuation_basis": "pre_money",
-      "valuation": 10000000,
-      "instruments": [
-        {
-          "holder_name": "Series A Investor",
-          "class_name": "Series A Preferred",
-          "investment_amount": 5000000
-        },
-        {
-          "holder_name": "Series A Investor",
-          "class_name": "Series A Preferred",
-          "pro_rata_type": "standard"
-        }
-      ]
-    },
-    {
-      "name": "Convertible Note Round",
-      "round_date": "2024-03-01",
-      "calculation_type": "convertible",
-      "valuation_basis": "pre_money",
-      "valuation": 8000000,
-      "instruments": [
-        {
-          "holder_name": "Convertible Note Holder",
-          "class_name": "Convertible Note",
-          "investment_amount": 1000000,
-          "interest_rate": 0.08,
-          "interest_type": "simple",
-          "payment_date": "2024-03-01",
-          "expected_conversion_date": "2024-12-31",
-          "discount_rate": 0.2
-        },
-        {
-          "holder_name": "Convertible Note Holder",
-          "class_name": "Convertible Note",
-          "pro_rata_type": "super",
-          "pro_rata_percentage": 0.25
-        }
-      ]
-    },
-    {
-      "name": "SAFE Round",
-      "round_date": "2024-05-15",
-      "calculation_type": "safe",
-      "valuation_basis": "post_money",
-      "valuation": 15000000,
-      "instruments": [
-        {
-          "holder_name": "SAFE Holder",
-          "class_name": "SAFE",
-          "investment_amount": 500000,
-          "discount_rate": 0.15,
-          "expected_conversion_date": "2025-05-15"
-        },
-        {
-          "holder_name": "SAFE Holder",
-          "class_name": "SAFE",
-          "pro_rata_type": "standard"
-        }
-      ]
-    },
-    {
-      "name": "Employee Grant",
-      "round_date": "2024-07-01",
-      "calculation_type": "fixed_shares",
-      "instruments": [
-        {
-          "holder_name": "Employee 1",
-          "class_name": "Common Stock",
-          "initial_quantity": 100000
-        }
-      ]
-    },
-    {
-      "name": "CLA REF",
-      "round_date": "2024-02-01",
-      "calculation_type": "convertible",
-      "valuation_basis": "post_money",
-      "valuation": 7000000,
-      "conversion_round_ref": "Series B",
-      "instruments": [
-        {
-          "holder_name": "Early Convertible Holder",
-          "class_name": "Convertible Note",
-          "investment_amount": 750000,
-          "interest_rate": 0.06,
-          "interest_type": "simple",
-          "payment_date": "2024-02-01",
-          "expected_conversion_date": "2024-12-31",
-          "discount_rate": 0.25
-        }
-      ]
-    },
-
-    {
-      "name": "Series B",
-      "round_date": "2025-03-15",
-      "calculation_type": "valuation_based",
-      "valuation_basis": "pre_money",
-      "valuation": 20000000,
-      "instruments": [
-        {
-          "holder_name": "Series A Investor",
-          "class_name": "Series B Preferred",
-          "investment_amount": 10000000
-        }
-      ]
+      "valuation": 8000000.0
     }
   ]
 }

@@ -68,7 +68,7 @@ The round-based architecture has been successfully implemented with all core fun
 - ✅ Migration path from v1.0 explained
 - ✅ Common issues and solutions documented
 
-### 9. Cap Table Progression Sheet (Placeholder)
+### 9. Cap Table Sheet (Placeholder)
 - ⚠️ Placeholder implementation with TODO comments
 - ⚠️ Shows message directing users to Rounds sheet
 - ⚠️ Ready for future implementation
@@ -183,7 +183,7 @@ Excel Generation
   │    ├─ Round 2: Heading + Constants + Instruments
   │    └─ Round N: Heading + Constants + Instruments
   │
-  └─→ Cap Table Progression (SUMMARY - placeholder)
+  └─→ Cap Table (SUMMARY - placeholder)
        └─ Aggregated view of ownership changes
 ```
 
@@ -198,7 +198,7 @@ Excel Generation
 
 ## ⚠️ Known Limitations
 
-### Cap Table Progression Sheet
+### Cap Table Sheet
 **Status**: Placeholder implementation
 
 **What works**:
@@ -242,7 +242,7 @@ Excel Generation
 ## 🎯 Next Steps (Priority Order)
 
 ### High Priority
-1. **Complete Cap Table Progression Sheet**
+1. **Complete Cap Table Sheet**
    - Most visible user-facing feature
    - Required for full workflow
    - Estimated effort: Medium

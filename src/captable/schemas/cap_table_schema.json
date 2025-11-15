@@ -182,6 +182,16 @@
           "type": "string",
           "format": "date",
           "description": "Deprecated: use expected_conversion_date instead. Kept for backward compatibility."
+        },
+        "valuation_cap": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Optional per-instrument valuation cap. If not provided, uses the pre-conversion cap from the round parameters."
+        },
+        "valuation_cap_type": {
+          "type": "string",
+          "enum": ["default", "pre_conversion", "post_conversion_own", "post_conversion_total"],
+          "description": "Type of valuation cap: 'default' uses the round's pre-investment valuation (default option), 'pre_conversion' uses cap directly, 'post_conversion_own' subtracts only own conversion amount, 'post_conversion_total' subtracts round's total conversion amount."
         }
       }
     },
@@ -213,6 +223,16 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Discount rate (as decimal, e.g., 0.20 for 20%)"
+        },
+        "valuation_cap": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Optional per-instrument valuation cap. If not provided, uses the pre-conversion cap from the round parameters."
+        },
+        "valuation_cap_type": {
+          "type": "string",
+          "enum": ["default", "pre_conversion", "post_conversion_own", "post_conversion_total"],
+          "description": "Type of valuation cap: 'default' uses the round's pre-investment valuation (default option), 'pre_conversion' uses cap directly, 'post_conversion_own' subtracts only own conversion amount, 'post_conversion_total' subtracts round's total conversion amount."
         }
       }
     },
@@ -227,7 +247,7 @@
         },
         "description": {
           "type": "string",
-          "description": "Optional description shown next to the holder name in Cap Table Progression"
+          "description": "Optional description shown next to the holder name in Cap Table"
         },
         "group": {
           "type": "string",
