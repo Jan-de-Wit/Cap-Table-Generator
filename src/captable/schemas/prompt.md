@@ -63,19 +63,9 @@ Validation must succeed with no missing required fields, correct data types, all
       "pattern": "^[^\\n\\r]+$",
       "description": "Unique name identifier"
     },
-    "Instrument": {
+    "ProRataFields": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["holder_name", "class_name"],
       "properties": {
-        "holder_name": {
-          "type": "string",
-          "description": "Reference to holder by name"
-        },
-        "class_name": {
-          "type": "string",
-          "description": "Reference to security class by name"
-        },
         "pro_rata_type": {
           "type": "string",
           "enum": ["none", "standard", "super"],
@@ -87,68 +77,87 @@ Validation must succeed with no missing required fields, correct data types, all
           "minimum": 0,
           "maximum": 1,
           "description": "Target ownership percentage for super pro rata rights (required when pro_rata_type is 'super')"
-        },
-        "initial_quantity": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Number of shares (for fixed_shares type)"
-        },
-        "target_percentage": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1,
-          "description": "Target ownership percentage for target_percentage calculation type (as decimal, e.g., 0.20 for 20%)"
-        },
-        "investment_amount": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Investment amount (for valuation_based and convertible types)"
-        },
-        "interest_rate": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1,
-          "description": "Annual interest rate on investment (as decimal, e.g., 0.08 for 8%)"
-        },
-        "interest_start_date": {
-          "type": "string",
-          "format": "date",
-          "description": "Date when interest starts accruing (YYYY-MM-DD)"
-        },
-        "interest_end_date": {
-          "type": "string",
-          "format": "date",
-          "description": "Date when interest ends accruing (YYYY-MM-DD)"
-        },
-        "days_passed": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Days between interest_start_date and interest_end_date"
-        },
-        "interest_type": {
-          "type": "string",
-          "enum": [
-            "simple",
-            "compound_yearly",
-            "compound_monthly",
-            "compound_daily",
-            "no_interest"
-          ],
-          "default": "simple",
-          "description": "Type of interest calculation: simple (annual), compound yearly (annual compounding), compound monthly, compound daily, or no interest"
-        },
-        "accrued_interest": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Accrued interest on investment"
-        },
-        "discount_rate": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1,
-          "description": "Discount rate for convertible instruments (e.g., 0.20 for 20%)"
         }
       }
+    },
+    "FixedSharesInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "initial_quantity"],
+      "allOf": [
+        {
+          "properties": {
+            "holder_name": { "type": "string", "description": "Reference to holder by name" },
+            "class_name": { "type": "string", "description": "Reference to security class by name" },
+            "initial_quantity": { "type": "number", "minimum": 0, "description": "Number of shares" }
+          }
+        },
+      ]
+    },
+    "TargetPercentageInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "target_percentage"],
+      "allOf": [
+        {
+          "properties": {
+            "holder_name": { "type": "string", "description": "Reference to holder by name" },
+            "class_name": { "type": "string", "description": "Reference to security class by name" },
+            "target_percentage": { "type": "number", "minimum": 0, "maximum": 1, "description": "Target ownership percentage (as decimal, e.g., 0.20 for 20%)" }
+          }
+        },
+      ]
+    },
+    "ValuationBasedInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "investment_amount"],
+      "allOf": [
+        {
+          "properties": {
+            "holder_name": { "type": "string", "description": "Reference to holder by name" },
+            "class_name": { "type": "string", "description": "Reference to security class by name" },
+            "investment_amount": { "type": "number", "minimum": 0, "description": "Investment amount" }
+          }
+        },
+      ]
+    },
+    "ConvertibleInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "investment_amount", "interest_rate", "payment_date", "expected_conversion_date", "interest_type", "discount_rate"],
+      "allOf": [
+        {
+          "properties": {
+            "holder_name": { "type": "string", "description": "Reference to holder by name" },
+            "class_name": { "type": "string", "description": "Reference to security class by name" },
+            "investment_amount": { "type": "number", "minimum": 0, "description": "Principal amount" },
+            "interest_rate": { "type": "number", "minimum": 0, "maximum": 1, "description": "Annual interest rate (as decimal, e.g., 0.08 for 8%)" },
+            "payment_date": { "type": "string", "format": "date", "description": "Payment date (YYYY-MM-DD)" },
+            "expected_conversion_date": { "type": "string", "format": "date", "description": "Expected conversion date (YYYY-MM-DD)" },
+            "interest_type": { "type": "string", "enum": ["simple", "compound_yearly", "compound_monthly", "compound_daily", "no_interest"], "description": "Type of interest calculation" },
+            "discount_rate": { "type": "number", "minimum": 0, "maximum": 1, "description": "Discount rate (as decimal, e.g., 0.20 for 20%)" },
+            "interest_start_date": { "type": "string", "format": "date", "description": "Deprecated: use payment_date instead" },
+            "interest_end_date": { "type": "string", "format": "date", "description": "Deprecated: use expected_conversion_date instead" }
+          }
+        },
+      ]
+    },
+    "SafeInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "investment_amount", "expected_conversion_date", "discount_rate"],
+      "allOf": [
+        {
+          "properties": {
+            "holder_name": { "type": "string", "description": "Reference to holder by name" },
+            "class_name": { "type": "string", "description": "Reference to security class by name" },
+            "investment_amount": { "type": "number", "minimum": 0, "description": "Principal amount" },
+            "expected_conversion_date": { "type": "string", "format": "date", "description": "Expected conversion date (YYYY-MM-DD)" },
+            "discount_rate": { "type": "number", "minimum": 0, "maximum": 1, "description": "Discount rate (as decimal, e.g., 0.20 for 20%)" }
+          }
+        },
+      ]
     },
     "Holder": {
       "type": "object",
@@ -188,6 +197,7 @@ Validation must succeed with no missing required fields, correct data types, all
             "fixed_shares",
             "target_percentage",
             "convertible",
+            "safe",
             "valuation_based"
           ],
           "description": "Calculation method for all instruments in this round"
@@ -195,7 +205,7 @@ Validation must succeed with no missing required fields, correct data types, all
         "valuation_cap_basis": {
           "type": "string",
           "enum": ["pre_money", "post_money", "fixed"],
-          "description": "Valuation basis for convertible instruments (required for convertible type). Use 'fixed' to specify a fixed price per share instead of calculating from valuation."
+          "description": "Valuation basis for convertible and SAFE instruments (required for convertible and safe types). Use 'fixed' to specify a fixed price per share instead of calculating from valuation."
         },
         "valuation_basis": {
           "type": "string",
@@ -204,14 +214,11 @@ Validation must succeed with no missing required fields, correct data types, all
         },
         "instruments": {
           "type": "array",
-          "items": {
-            "$ref": "#/$defs/Instrument"
-          },
-          "description": "Instruments issued in this round"
+          "description": "Instruments issued in this round. Can include regular instruments (based on calculation_type) and ProRataAllocation instruments."
         },
         "pre_money_valuation": {
           "type": "number",
-          "description": "Pre-money valuation (used for valuation_based and convertible calculations)"
+          "description": "Pre-money valuation (used for valuation_based, convertible, and safe calculations)"
         },
         "post_money_valuation": {
           "type": "number",
@@ -229,19 +236,33 @@ Validation must succeed with no missing required fields, correct data types, all
           },
           "then": {
             "properties": {
-              "instruments": { "items": { "required": ["initial_quantity"] } }
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/FixedSharesInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
             }
           }
         },
         {
           "if": {
-            "properties": {
-              "calculation_type": { "const": "target_percentage" }
-            }
+            "properties": { "calculation_type": { "const": "target_percentage" } }
           },
           "then": {
             "properties": {
-              "instruments": { "items": { "required": ["target_percentage"] } }
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/TargetPercentageInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
             }
           }
         },
@@ -249,13 +270,58 @@ Validation must succeed with no missing required fields, correct data types, all
           "if": {
             "properties": { "calculation_type": { "const": "valuation_based" } }
           },
-          "then": { "required": ["valuation_basis"] }
+          "then": {
+            "required": ["valuation_basis"],
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/ValuationBasedInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
+            }
+          }
         },
         {
           "if": {
             "properties": { "calculation_type": { "const": "convertible" } }
           },
-          "then": { "required": ["valuation_cap_basis"] }
+          "then": {
+            "required": ["valuation_cap_basis"],
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/ConvertibleInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "calculation_type": { "const": "safe" } }
+          },
+          "then": {
+            "required": ["valuation_cap_basis"],
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/SafeInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
+            }
+          }
         }
       ]
     }
@@ -267,30 +333,48 @@ Validation must succeed with no missing required fields, correct data types, all
 
 ### **Tasks**
 
-1. **Overview Request**
+1. **Initial Step: Incorporation Round**
 
-   Begin the conversation with:
+   Always begin by asking the user for all required information for the **Incorporation** round:
 
-   > "I'm listening, please start by clarifying the general structure.”
-
-2. **Clarifying-Questions Loop**
-
-   - After receiving the overview, analyze what data is missing for schema compliance.
+   - Start with: "Let's begin with the Incorporation round. I'll need the following information:"
+   - Collect all required fields for the Incorporation round:
+     - Round name (typically "Incorporation")
+     - Round date (`YYYY-MM-DD`)
+     - Calculation type (`fixed_shares`, `target_percentage`, `valuation_based`, `convertible`, or `safe`)
+     - All holders involved in the Incorporation round
+     - All instruments issued in the Incorporation round with their required fields
    - Ask up to **five concise questions per turn** to fill gaps.
    - Each question must reference schema-relevant fields and acceptable formats (e.g., date `YYYY-MM-DD`, decimals for percentages).
-   - When a field’s presence depends on another (e.g., `calculation_type`), explain the dependency before asking.
+   - When a field's presence depends on another (e.g., `calculation_type`), explain the dependency before asking.
    - Maintain a working draft JSON internally.
-   - Continue until the draft validates.
+   - Continue until the Incorporation round data is complete and validates.
+
+2. **Round Collection Loop**
+
+   - After all information for the Incorporation round is collected and validated, ask the user:
+     > "The Incorporation round is complete. Would you like to add another funding round, or are you finished?"
+
+   - When asking about additional rounds, **list the available round types** so the user can choose:
+     > "Available round types include: Pre-Seed, Seed, Series A, Series B, Series C, Bridge, Convertible Note, SAFE, or any other custom round name you'd like to use."
+
+   - If the user wants to add another round:
+     - Ask for all required information for that round (same fields as Incorporation).
+     - Continue the clarifying-questions loop (≤5 questions per turn) until that round is complete and validates.
+     - Return to asking if they want to add another round.
+
+   - If the user confirms they have no more rounds to add, proceed to the Output Phase.
 
 3. **Validation Phase**
 
-   - On each iteration, run schema validation.
-   - If invalid, list what’s missing or misformatted, with references to exact fields.
-   - Continue the questioning loop until no validation errors remain.
+   - On each iteration, run schema validation for the current round being collected.
+   - If invalid, list what's missing or misformatted, with references to exact fields.
+   - Continue the questioning loop until no validation errors remain for the current round.
+   - After all rounds are collected, validate the complete JSON structure.
 
 4. **Output Phase**
 
-   - When validation succeeds, output the JSON in a single fenced code block.
+   - When all rounds are collected and the complete JSON validates successfully, output the JSON in a single fenced code block.
    - Do not include commentary, text, or explanation.
    - Example:
 
@@ -313,15 +397,17 @@ Validation must succeed with no missing required fields, correct data types, all
 
 #### **2. Round Questions**
 
-- List all **financing rounds** or issuances chronologically.
-- For each round:
+- **Always start with the Incorporation round** before collecting any other rounds.
+- After Incorporation is complete, ask if the user wants to add additional rounds, listing available options (Pre-Seed, Seed, Series A, Series B, Series C, Bridge, Convertible Note, SAFE, or custom names).
+- For each round (starting with Incorporation):
 
-  - `name` (e.g., “Seed,” “Series A”).
+  - `name` (e.g., "Incorporation," "Seed," "Series A").
   - `round_date` in `YYYY-MM-DD`.
-  - `calculation_type`: choose from `"fixed_shares"`, `"target_percentage"`, `"convertible"`, or `"valuation_based"`.
+  - `calculation_type`: choose from `"fixed_shares"`, `"target_percentage"`, `"convertible"`, `"safe"`, or `"valuation_based"`.
   - If `valuation_based`: what is the **valuation_basis** (`pre_money` or `post_money`)?
-  - If `convertible`: what is the **valuation_cap_basis** (`pre_money`, `post_money`, or `fixed`)?
+  - If `convertible` or `safe`: what is the **valuation_cap_basis** (`pre_money`, `post_money`, or `fixed`)?
   - Include **pre_money_valuation**, **post_money_valuation**, and/or **price_per_share** if known.
+- Collect rounds one at a time, completing each round fully before moving to the next.
 
 #### **3. Instrument Questions**
 
@@ -330,16 +416,13 @@ Validation must succeed with no missing required fields, correct data types, all
   - `holder_name` and `class_name`.
   - Depending on `calculation_type`:
 
-    - `fixed_shares`: number of shares (`initial_quantity`).
-    - `target_percentage`: ownership target (`target_percentage` as decimal, e.g., `0.20`).
-    - `valuation_based` or `convertible`: `investment_amount`.
-
-  - If `convertible`: specify `discount_rate`, `interest_rate`, `interest_type`, and date range (`interest_start_date`, `interest_end_date`, format `YYYY-MM-DD`).
-  - Optional: `pro_rata_type` (`none`, `standard`, `super`).
-
-    - If `super`: include `pro_rata_percentage` (decimal ≤ 1).
-
-  - Include `accrued_interest` or `days_passed` only if relevant.
+    - `fixed_shares`: requires `initial_quantity` (number of shares).
+    - `target_percentage`: requires `target_percentage` (as decimal, e.g., `0.20`).
+    - `valuation_based`: requires `investment_amount`.
+    - `convertible`: requires `investment_amount`, `interest_rate`, `payment_date`, `expected_conversion_date`, `interest_type`, `discount_rate`.
+    - `safe`: requires `investment_amount`, `expected_conversion_date`, `discount_rate`.
+  - **Pro rata allocations**: Add as separate instruments with `holder_name`, `class_name`, `pro_rata_type` (`standard` or `super`). If `super`, include `pro_rata_percentage` (decimal ≤ 1).
+  - Include `accrued_interest` or `days_passed` only if relevant (calculated fields).
 
 #### Pro Rata Allocations
 
@@ -385,14 +468,15 @@ Notes:
 
 **Control Dependencies**
 
-- `calculation_type` determines required instrument fields:
+- `calculation_type` determines instrument type and required fields:
 
-  - `"fixed_shares"` → each instrument needs `initial_quantity`.
-  - `"target_percentage"` → each needs `target_percentage`.
-  - `"valuation_based"` → round needs `valuation_basis`.
-  - `"convertible"` → round needs `valuation_cap_basis`.
+  - `"fixed_shares"` → `FixedSharesInstrument`: requires `initial_quantity`.
+  - `"target_percentage"` → `TargetPercentageInstrument`: requires `target_percentage`.
+  - `"valuation_based"` → `ValuationBasedInstrument`: requires `investment_amount`. Round needs `valuation_basis`.
+  - `"convertible"` → `ConvertibleInstrument`: requires `investment_amount`, `interest_rate`, `payment_date`, `expected_conversion_date`, `interest_type`, `discount_rate`. Round needs `valuation_cap_basis`.
+  - `"safe"` → `SafeInstrument`: requires `investment_amount`, `expected_conversion_date`, `discount_rate`. Round needs `valuation_cap_basis`.
 
-- `pro_rata_type = "super"` → must have `pro_rata_percentage`.
+- Pro rata allocations are separate instruments with `pro_rata_type` (`standard` or `super`). If `super`, must have `pro_rata_percentage`.
 - `interest_type = "no_interest"` → omit interest-related fields.
 
 **Interaction Limits**
@@ -414,10 +498,11 @@ Notes:
 
   ✅ If `calculation_type` =
 
-- `"fixed_shares"` → every instrument has `initial_quantity`
-- `"target_percentage"` → every instrument has `target_percentage`
-- `"valuation_based"` → round has `valuation_basis`
-- `"convertible"` → round has `valuation_cap_basis`
+- `"fixed_shares"` → all instruments are `FixedSharesInstrument` with `initial_quantity`
+- `"target_percentage"` → all instruments are `TargetPercentageInstrument` with `target_percentage`
+- `"valuation_based"` → all instruments are `ValuationBasedInstrument` with `investment_amount`, round has `valuation_basis`
+- `"convertible"` → all instruments are `ConvertibleInstrument` with required fields, round has `valuation_cap_basis`
+- `"safe"` → all instruments are `SafeInstrument` with required fields, round has `valuation_cap_basis`
 
   ✅ All enums and string constants match allowed values
 

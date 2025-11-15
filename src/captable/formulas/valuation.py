@@ -9,6 +9,10 @@ def create_safe_conversion_price_formula(round_pps_ref: str, discount_rate_ref: 
                                          price_cap_ref: str, shares_preround_ref: str) -> str:
     """
     Create SAFE/convertible note conversion price formula.
+    
+    Uses the best (maximum) of two conversion prices:
+    1. Discounted price: Price per Share * (1 - discount%)
+    2. Cap price: Valuation Cap / Total # shares
 
     Args:
         round_pps_ref: Reference to round price per share
@@ -21,7 +25,7 @@ def create_safe_conversion_price_formula(round_pps_ref: str, discount_rate_ref: 
     """
     discounted_price = f"{round_pps_ref} * (1 - {discount_rate_ref})"
     cap_price = f"{price_cap_ref} / {shares_preround_ref}"
-    return f"=MIN({discounted_price}, {cap_price})"
+    return f"=MAX({discounted_price}, {cap_price})"
 
 
 def create_safe_conversion_shares_formula(investment_ref: str, conversion_price_ref: str) -> str:
@@ -195,32 +199,83 @@ def create_shares_from_percentage_formula(percentage_ownership_ref: str,
     return f"=IFERROR(MAX(0, {new_shares}), 0)"
 
 
-def create_convertible_shares_formula(investment_ref: str, interest_ref: str,
-                                      discount_rate_ref: str, round_pps_ref: str) -> str:
+def create_convertible_shares_formula(conversion_amount_ref: str,
+                                      discount_rate_ref: str, round_pps_ref: str,
+                                      valuation_cap_ref: str, total_shares_ref: str,
+                                      valuation_cap_basis: str, post_money_ref: str = None,
+                                      is_safe: bool = False,
+                                      future_round_pps_ref: str = None,
+                                      future_round_pre_investment_cap_ref: str = None,
+                                      total_conversion_amount_ref: str = None) -> str:
     """
     Calculate shares from convertible instrument (SAFE or convertible note).
 
     CONVERTIBLE CALCULATION:
-    - Uses the lower of: discounted price or full price per share
-    - Conversion price = MIN(round_pps * (1 - discount), round_pps)
-    - Shares = (investment + interest) / conversion_price
-
-    Note: When valuation_cap_basis is used, price_per_share is calculated separately
-    based on the basis (pre_money, post_money, or fixed). This formula uses that
-    price_per_share directly.
+    Uses the best (maximum shares = minimum price) of two methods:
+    
+    Method 1 (when future_round_pps_ref is provided):
+        Price per share = (Pre-investment Valuation Cap - Total Conversion Amount) / Total Shares Pre-conversion
+        Conversion price = Price per share * (1 - discount%)
+        Shares = Conversion amount / Conversion price
+    
+    Method 2 (valuation cap method):
+        Price per share = Pre-conversion Valuation Cap / Total Shares Pre-conversion
+        Shares = Conversion amount / Price per share
+        
+        Where Pre-conversion Valuation Cap:
+        - If post_money basis: Post-money Valuation - Conversion Amount
+        - If pre_money basis: Pre-money Valuation (directly)
+        - If post-conversion valuation is given: Post-conversion - Conversion Amount
 
     Args:
-        investment_ref: Reference to investment amount
-        interest_ref: Reference to accrued interest
+        conversion_amount_ref: Reference to conversion amount (Principal + Interest, or just Principal for SAFE)
         discount_rate_ref: Reference to discount rate (as decimal)
-        round_pps_ref: Reference to round price per share (already calculated based on basis)
+        round_pps_ref: Reference to current round price per share (used for Method 2 fallback)
+        valuation_cap_ref: Reference to valuation cap (pre_money or post_money valuation)
+        total_shares_ref: Reference to total shares (pre-round shares)
+        valuation_cap_basis: Basis for valuation cap ('pre_money', 'post_money', or 'fixed')
+        post_money_ref: Reference to post-money valuation (required for post_money basis)
+        is_safe: If True, this is a SAFE (no interest). If False, this is a convertible note.
+        future_round_pps_ref: Optional reference to future valuation-based round's price per share
+        future_round_pre_investment_cap_ref: Optional reference to future round's pre-investment valuation cap
+        total_conversion_amount_ref: Optional reference to total conversion amount (for Method 1 calculation)
 
     Returns:
         Excel formula string
     """
-    discounted_price = f"({round_pps_ref} * (1 - {discount_rate_ref}))"
-    # Conversion price is the lower of discounted price or full price
-    # Since discount is typically positive, this is usually just the discounted price
-    conversion_price = f"MIN({discounted_price}, {round_pps_ref})"
-
-    return f"=IFERROR(({investment_ref} + {interest_ref}) / {conversion_price}, 0)"
+    # Method 1: Using future round's price per share with discount
+    # This method requires a future valuation-based round reference
+    # We need the pre-investment cap and total conversion amount to calculate the adjusted price per share
+    if future_round_pre_investment_cap_ref and total_conversion_amount_ref:
+        # The price per share is calculated from the pre-investment valuation cap minus total conversion amount
+        # Price per share = (Pre-investment Valuation Cap - Total Conversion Amount) / Total Shares Pre-conversion
+        # Note: We use the future round's pre-investment cap, but adjust it by subtracting total conversion
+        adjusted_price_per_share = f"(({future_round_pre_investment_cap_ref} - {total_conversion_amount_ref}) / {total_shares_ref})"
+        # Apply discount to get conversion price
+        method1_conversion_price = f"({adjusted_price_per_share} * (1 - {discount_rate_ref}))"
+        # Calculate shares: Conversion amount / Conversion price
+        method1_shares = f"({conversion_amount_ref} / {method1_conversion_price})"
+    else:
+        method1_shares = None
+    
+    # Method 2: Using valuation cap from current round
+    # Calculate pre-conversion valuation cap
+    if valuation_cap_basis == 'post_money' and post_money_ref:
+        # For post_money: calculate pre-money by subtracting conversion amount
+        # Pre-conversion = Post-money - Conversion Amount
+        pre_conversion_cap = f"({post_money_ref} - {conversion_amount_ref})"
+    else:
+        # For pre_money or fixed: use valuation cap directly
+        # If post-conversion valuation is given, we'd subtract conversion amount
+        # But for now, we use the valuation cap as-is (it's already pre-conversion for pre_money basis)
+        pre_conversion_cap = valuation_cap_ref
+    
+    # Price per share from valuation cap
+    method2_price_per_share = f"({pre_conversion_cap} / {total_shares_ref})"
+    method2_shares = f"({conversion_amount_ref} / {method2_price_per_share})"
+    
+    # Return the maximum (best for investor) of the two methods
+    if method1_shares:
+        return f"=IFERROR(MAX({method1_shares}, {method2_shares}), 0)"
+    else:
+        return f"=IFERROR({method2_shares}, 0)"

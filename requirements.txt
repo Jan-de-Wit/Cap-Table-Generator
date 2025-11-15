@@ -5,4 +5,5 @@ fastapi
 uvicorn
 openai
 pydantic
+streamlit
 

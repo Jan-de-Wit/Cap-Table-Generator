@@ -31,10 +31,10 @@
       "pattern": "^[^\\n\\r]+$",
       "description": "Unique name identifier"
     },
-    "Instrument": {
+    "ProRataAllocation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["holder_name", "class_name"],
+      "required": ["holder_name", "class_name", "pro_rata_type"],
       "properties": {
         "holder_name": {
           "type": "string",
@@ -46,75 +46,173 @@
         },
         "pro_rata_type": {
           "type": "string",
-          "enum": ["none", "standard", "super"],
-          "default": "none",
-          "description": "Pro rata rights type: none (no rights), standard (maintain ownership), super (exceed ownership up to specified percentage)"
+          "enum": ["standard", "super"],
+          "description": "Pro rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
         },
         "pro_rata_percentage": {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
           "description": "Target ownership percentage for super pro rata rights (required when pro_rata_type is 'super')"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "pro_rata_type": { "const": "super" } }
+          },
+          "then": {
+            "required": ["pro_rata_percentage"]
+          }
+        }
+      ]
+    },
+    "FixedSharesInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "initial_quantity"],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
         },
         "initial_quantity": {
-              "type": "number",
+          "type": "number",
           "minimum": 0,
-          "description": "Number of shares (for fixed_shares type)"
+          "description": "Number of shares"
+        }
+      }
+    },
+    "TargetPercentageInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "target_percentage"],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
         },
         "target_percentage": {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "description": "Target ownership percentage for target_percentage calculation type (as decimal, e.g., 0.20 for 20%)"
+          "description": "Target ownership percentage (as decimal, e.g., 0.20 for 20%)"
+        }
+      }
+    },
+    "ValuationBasedInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "investment_amount"],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
         },
         "investment_amount": {
           "type": "number",
           "minimum": 0,
-          "description": "Investment amount (for valuation_based and convertible types)"
+          "description": "Investment amount"
+        }
+      }
+    },
+    "ConvertibleInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "investment_amount", "interest_rate", "payment_date", "expected_conversion_date", "interest_type", "discount_rate"],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
+        },
+        "investment_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Principal amount (investment amount)"
         },
         "interest_rate": {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "description": "Annual interest rate on investment (as decimal, e.g., 0.08 for 8%)"
+          "description": "Annual interest rate (as decimal, e.g., 0.08 for 8%)"
         },
-        "interest_start_date": {
+        "payment_date": {
           "type": "string",
           "format": "date",
-          "description": "Date when interest starts accruing (YYYY-MM-DD)"
+          "description": "Payment date (YYYY-MM-DD)"
         },
-        "interest_end_date": {
+        "expected_conversion_date": {
           "type": "string",
           "format": "date",
-          "description": "Date when interest ends accruing (YYYY-MM-DD)"
-        },
-        "days_passed": {
-              "type": "number",
-          "minimum": 0,
-          "description": "Days between interest_start_date and interest_end_date"
+          "description": "Expected conversion date (YYYY-MM-DD)"
         },
         "interest_type": {
           "type": "string",
-          "enum": [
-            "simple",
-            "compound_yearly",
-            "compound_monthly",
-            "compound_daily",
-            "no_interest"
-          ],
-          "default": "simple",
-          "description": "Type of interest calculation: simple (annual), compound yearly (annual compounding), compound monthly, compound daily, or no interest"
-        },
-        "accrued_interest": {
-              "type": "number",
-          "minimum": 0,
-          "description": "Accrued interest on investment"
+          "enum": ["simple", "compound_yearly", "compound_monthly", "compound_daily", "no_interest"],
+          "description": "Type of interest calculation"
         },
         "discount_rate": {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "description": "Discount rate for convertible instruments (e.g., 0.20 for 20%)"
+          "description": "Discount rate (as decimal, e.g., 0.20 for 20%)"
+        },
+        "interest_start_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Deprecated: use payment_date instead. Kept for backward compatibility."
+        },
+        "interest_end_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Deprecated: use expected_conversion_date instead. Kept for backward compatibility."
+        }
+      }
+    },
+    "SafeInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "investment_amount", "expected_conversion_date", "discount_rate"],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
+        },
+        "investment_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Principal amount (investment amount)"
+        },
+        "expected_conversion_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Expected conversion date (YYYY-MM-DD)"
+        },
+        "discount_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Discount rate (as decimal, e.g., 0.20 for 20%)"
         }
       }
     },
@@ -156,6 +254,7 @@
             "fixed_shares",
             "target_percentage",
             "convertible",
+            "safe",
             "valuation_based"
           ],
           "description": "Calculation method for all instruments in this round"
@@ -163,7 +262,7 @@
         "valuation_cap_basis": {
           "type": "string",
           "enum": ["pre_money", "post_money", "fixed"],
-          "description": "Valuation basis for convertible instruments (required for convertible type). Use 'fixed' to specify a fixed price per share instead of calculating from valuation."
+          "description": "Valuation basis for convertible and SAFE instruments (required for convertible and safe types). Use 'fixed' to specify a fixed price per share instead of calculating from valuation."
         },
         "valuation_basis": {
           "type": "string",
@@ -172,14 +271,11 @@
         },
         "instruments": {
           "type": "array",
-          "items": {
-            "$ref": "#/$defs/Instrument"
-          },
-          "description": "Instruments issued in this round"
+          "description": "Instruments issued in this round. Can include regular instruments (based on calculation_type) and ProRataAllocation instruments."
         },
         "pre_money_valuation": {
           "type": "number",
-          "description": "Pre-money valuation (used for valuation_based and convertible calculations)"
+          "description": "Pre-money valuation (used for valuation_based, convertible, and safe calculations)"
         },
         "post_money_valuation": {
           "type": "number",
@@ -188,28 +284,46 @@
         "price_per_share": {
           "type": "number",
           "description": "Price per share in this round (can be calculated from valuation)"
-        }
         },
+        "conversion_round_ref": {
+          "type": "string",
+          "description": "Optional reference to a future valuation-based round (for convertible and safe calculation types). When provided, the conversion price will be calculated using that round's pre-investment valuation cap minus total conversion amount, with discount applied. If not provided, uses the valuation cap from the current round."
+        }
+      },
       "allOf": [
-            {
+        {
           "if": {
             "properties": { "calculation_type": { "const": "fixed_shares" } }
           },
           "then": {
             "properties": {
-              "instruments": { "items": { "required": ["initial_quantity"] } }
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/FixedSharesInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
             }
           }
         },
         {
           "if": {
-            "properties": {
-              "calculation_type": { "const": "target_percentage" }
-            }
+            "properties": { "calculation_type": { "const": "target_percentage" } }
           },
           "then": {
-          "properties": {
-              "instruments": { "items": { "required": ["target_percentage"] } }
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/TargetPercentageInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
             }
           }
         },
@@ -217,13 +331,58 @@
           "if": {
             "properties": { "calculation_type": { "const": "valuation_based" } }
           },
-          "then": { "required": ["valuation_basis"] }
+          "then": {
+            "required": ["valuation_basis"],
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/ValuationBasedInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
+            }
+          }
         },
         {
           "if": {
             "properties": { "calculation_type": { "const": "convertible" } }
           },
-          "then": { "required": ["valuation_cap_basis"] }
+          "then": {
+            "required": ["valuation_cap_basis"],
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/ConvertibleInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "calculation_type": { "const": "safe" } }
+          },
+          "then": {
+            "required": ["valuation_cap_basis"],
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/SafeInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
+            }
+          }
         }
       ]
     }

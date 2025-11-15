@@ -104,6 +104,14 @@ class BusinessRulesValidator:
                         f"Round '{round_name}': Convertible rounds must have 'valuation_cap_basis' "
                         f"(pre_money or post_money)"
                     )
+            
+            # Validate SAFE-specific fields
+            if calc_type == "safe":
+                if "valuation_cap_basis" not in round_data:
+                    errors.append(
+                        f"Round '{round_name}': SAFE rounds must have 'valuation_cap_basis' "
+                        f"(pre_money or post_money)"
+                    )
         
         return errors
     
@@ -111,8 +119,8 @@ class BusinessRulesValidator:
         """
         Check if an instrument is a pro rata allocation.
         
-        A pro rata allocation has only holder_name, class_name, and pro_rata_type.
-        It may optionally have pro_rata_percentage.
+        A pro rata allocation is a separate instrument with only holder_name, class_name, and pro_rata_type.
+        It may optionally have pro_rata_percentage (required for super type).
         
         Args:
             instrument: Instrument dictionary
@@ -142,7 +150,8 @@ class BusinessRulesValidator:
         1. fixed_shares: Requires initial_quantity
         2. target_percentage: Requires target_percentage
         3. valuation_based: Requires investment_amount
-        4. convertible: Requires investment_amount, interest_rate, interest_start_date, interest_end_date
+        4. convertible: Requires investment_amount, interest_rate, payment_date, expected_conversion_date, interest_type, discount_rate
+        5. safe: Requires investment_amount, expected_conversion_date, discount_rate
         
         Note: Pro rata allocations (holder_name, class_name, pro_rata_type) are valid
         for any round type and skip the above validation.
@@ -195,13 +204,32 @@ class BusinessRulesValidator:
                         )
                 
                 elif calc_type == "convertible":
-                    required_fields = ["investment_amount", "interest_rate", "interest_start_date", "interest_end_date"]
+                    # ConvertibleInstrument requires: investment_amount, interest_rate, payment_date, expected_conversion_date, interest_type, discount_rate
+                    required_fields = ["investment_amount", "interest_rate", "payment_date", "expected_conversion_date", "interest_type", "discount_rate"]
+                    # Support backward compatibility with old field names
+                    if "payment_date" not in instrument and "interest_start_date" in instrument:
+                        # Old format - allow but prefer new
+                        pass
+                    if "expected_conversion_date" not in instrument and "interest_end_date" in instrument:
+                        # Old format - allow but prefer new
+                        pass
                     missing_fields = [f for f in required_fields if f not in instrument]
                     
                     if missing_fields:
                         errors.append(
                             f"Round '{round_name}', Instrument {inst_idx} ({holder_name}/{class_name}): "
                             f"convertible type requires: {', '.join(missing_fields)}"
+                        )
+                
+                elif calc_type == "safe":
+                    # SafeInstrument requires: investment_amount, expected_conversion_date, discount_rate
+                    required_fields = ["investment_amount", "expected_conversion_date", "discount_rate"]
+                    missing_fields = [f for f in required_fields if f not in instrument]
+                    
+                    if missing_fields:
+                        errors.append(
+                            f"Round '{round_name}', Instrument {inst_idx} ({holder_name}/{class_name}): "
+                            f"safe type requires: {', '.join(missing_fields)}"
                         )
         
         return errors
@@ -226,8 +254,8 @@ class BusinessRulesValidator:
             if not calc_type:
                 continue  # Already caught in _validate_round_calculation_types
             
-            # valuation_based and convertible types need valuation data
-            if calc_type in ["valuation_based", "convertible"]:
+            # valuation_based, convertible, and safe types need valuation data
+            if calc_type in ["valuation_based", "convertible", "safe"]:
                 has_pre_money = "pre_money_valuation" in round_data
                 has_post_money = "post_money_valuation" in round_data
                 has_price_per_share = "price_per_share" in round_data
@@ -243,6 +271,7 @@ class BusinessRulesValidator:
     def _validate_interest_dates(self, data: Dict[str, Any]) -> List[str]:
         """
         Validate that interest_end_date is after interest_start_date for convertible instruments.
+        (SAFE instruments do not require interest dates.)
         
         Args:
             data: Cap table JSON data
@@ -261,8 +290,9 @@ class BusinessRulesValidator:
             if calc_type == "convertible":
                 for inst_idx, instrument in enumerate(instruments):
                     holder_name = instrument.get("holder_name", "Unknown")
-                    start_date_str = instrument.get("interest_start_date")
-                    end_date_str = instrument.get("interest_end_date")
+                    # Support both new and old field names
+                    start_date_str = instrument.get("payment_date") or instrument.get("interest_start_date")
+                    end_date_str = instrument.get("expected_conversion_date") or instrument.get("interest_end_date")
                     
                     if start_date_str and end_date_str:
                         try:
@@ -272,7 +302,7 @@ class BusinessRulesValidator:
                             if end_date <= start_date:
                                 errors.append(
                                     f"Round '{round_name}', Instrument {inst_idx} ({holder_name}): "
-                                    f"interest_end_date must be after interest_start_date"
+                                    f"expected_conversion_date (or interest_end_date) must be after payment_date (or interest_start_date)"
                                 )
                         except ValueError:
                             # Date format errors will be caught by schema validation

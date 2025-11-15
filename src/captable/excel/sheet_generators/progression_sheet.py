@@ -447,8 +447,11 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             # Columns: holder_name, class_name, investment_amount, calculated_shares
             return 'D'  # calculated_shares is column D (4th column)
         elif calc_type == 'convertible':
-            # Columns: holder_name, class_name, investment_amount, ..., calculated_shares
-            return 'K'  # calculated_shares is column K (11th column)
+            # Columns: holder_name, class_name, principal, interest_rate, discount_rate, payment_date, expected_conversion_date, days_passed, interest_type, accrued_interest, conversion_amount, shares
+            return 'L'  # calculated_shares is column L (12th column)
+        elif calc_type == 'safe':
+            # Columns: holder_name, class_name, principal, discount_rate, expected_conversion_date, conversion_amount, shares
+            return 'G'  # calculated_shares is column G (7th column)
         else:
             return 'D'  # Default to column D
     
