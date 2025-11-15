@@ -57,6 +57,34 @@ export function HolderDialog({
     }
   }, [open, holder]);
 
+  // Real-time validation for duplicate holder names
+  React.useEffect(() => {
+    if (!open || !name.trim()) {
+      setNameError("");
+      return;
+    }
+
+    // Debounce validation
+    const timeoutId = setTimeout(() => {
+      const trimmedName = name.trim();
+      
+      // Check for duplicate names (excluding current holder if editing)
+      const isDuplicate = existingHolders.some(
+        (h) => 
+          h.name.toLowerCase() === trimmedName.toLowerCase() && 
+          h.name !== holder?.name
+      );
+
+      if (isDuplicate) {
+        setNameError("A holder with this name already exists");
+      } else {
+        setNameError("");
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [name, existingHolders, holder, open]);
+
   // Get unique groups from existing holders and combine with common groups
   // Also include the currently typed group if it's a custom one
   const groupOptions = React.useMemo(() => {
@@ -81,9 +109,12 @@ export function HolderDialog({
       return;
     }
 
-    // Check for duplicate names (excluding current holder if editing)
+    // Final check for duplicate names (excluding current holder if editing)
+    const trimmedName = name.trim();
     const isDuplicate = existingHolders.some(
-      (h) => h.name.toLowerCase() === name.trim().toLowerCase() && h.name !== holder?.name
+      (h) => 
+        h.name.toLowerCase() === trimmedName.toLowerCase() && 
+        h.name !== holder?.name
     );
 
     if (isDuplicate) {
@@ -91,8 +122,13 @@ export function HolderDialog({
       return;
     }
 
+    // Don't save if there's still an error
+    if (nameError) {
+      return;
+    }
+
     const newHolder: Holder = {
-      name: name.trim(),
+      name: trimmedName,
       description: description.trim() || undefined,
       group: group.trim() || undefined,
     };
@@ -129,10 +165,13 @@ export function HolderDialog({
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
-                if (nameError) setNameError("");
               }}
               placeholder="e.g., John Doe, Acme Ventures"
-              className={nameError ? "border-destructive" : ""}
+              className={
+                nameError
+                  ? "border-destructive ring-destructive/20"
+                  : "focus:ring-primary/20"
+              }
               autoFocus
             />
           </FieldWithHelp>
@@ -171,7 +210,7 @@ export function HolderDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={!name.trim()}>
+          <Button onClick={handleSave} disabled={!name.trim() || !!nameError}>
             {isEditMode ? "Save Changes" : "Create Holder"}
           </Button>
         </DialogFooter>

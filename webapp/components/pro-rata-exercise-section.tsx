@@ -40,9 +40,9 @@ export function ProRataExerciseSection({
   }
 
   return (
-    <div className="space-y-4 border-t pt-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Exercise Pro-Rata Rights</h3>
+    <div className="space-y-5 border-t pt-6">
+      <div className="flex items-center justify-between border-b pb-3">
+        <h3 className="text-xl font-bold">Exercise Pro-Rata Rights</h3>
       </div>
       <div className="grid grid-cols-1 gap-3">
         {holdersWithProRataRights.map(
@@ -96,24 +96,24 @@ export function ProRataExerciseSection({
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <TrendingUp className="h-3 w-3" />
-                            <span>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1.5">
+                            <TrendingUp className="h-3.5 w-3.5" />
+                            <span className="font-medium">
                               {isSuper ? "Super" : "Standard"} Pro-Rata
                             </span>
                           </div>
                           {isSuper && percentage && (
-                            <div className="flex items-center gap-1">
-                              <Percent className="h-3 w-3" />
-                              <span>
+                            <div className="flex items-center gap-1.5">
+                              <Percent className="h-3.5 w-3.5" />
+                              <span className="font-semibold">
                                 {decimalToPercentage(percentage).toFixed(2)}%
                               </span>
                             </div>
                           )}
-                          <div className="flex items-center gap-1">
-                            <Building2 className="h-3 w-3" />
-                            <span>{class_name}</span>
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="h-3.5 w-3.5" />
+                            <span className="font-medium">{class_name}</span>
                           </div>
                         </div>
                       </div>

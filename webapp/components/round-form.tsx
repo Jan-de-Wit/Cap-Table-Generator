@@ -337,11 +337,28 @@ export function RoundForm({
     }
   };
 
+  // Get round number and display name
+  const roundNumber = roundIndex !== undefined ? roundIndex + 1 : 1;
+  const displayName = round.name || `Round ${roundNumber}`;
+  const roundType = round.name ? round.name.split(' ')[0] : '';
+  
+  // Get contextual info
+  const instrumentsCount = regularInstruments.length;
+  const holdersCount = new Set(
+    regularInstruments
+      .filter((inst) => "holder_name" in inst && inst.holder_name)
+      .map((inst) => ("holder_name" in inst ? inst.holder_name : ""))
+  ).size;
+
   return (
     <Card
-      className={isComplete ? "border-green-200 dark:border-green-800" : ""}
+      className={`shadow-md hover:shadow-lg transition-shadow ${
+        isComplete 
+          ? "border-green-200 dark:border-green-800 bg-green-50/30 dark:bg-green-950/20" 
+          : "border-border"
+      }`}
     >
-      <CardHeader>
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1">
             {onToggleExpand && (
@@ -353,36 +370,58 @@ export function RoundForm({
                 className="h-8 w-8 p-0"
               >
                 {isExpanded ? (
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-5 w-5" />
                 ) : (
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-5 w-5" />
                 )}
               </Button>
             )}
-            <div className="flex items-center gap-2 flex-1">
+            <div className="flex items-center gap-3 flex-1">
               {isComplete ? (
-                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400 shrink-0" />
               ) : (
-                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400 shrink-0" />
               )}
-              <CardTitle className="flex items-center gap-2">
-                {round.name || "New Round"}
-                {!isComplete && validation && (
-                  <Badge variant="outline" className="text-xs">
-                    {validation.errors.length} issue
-                    {validation.errors.length !== 1 ? "s" : ""}
-                  </Badge>
+              <div className="flex-1 min-w-0">
+                <CardTitle className="flex items-center gap-3 text-xl font-bold">
+                  <span className="text-primary font-extrabold">Round {roundNumber}</span>
+                  {round.name && (
+                    <>
+                      <span className="text-muted-foreground">—</span>
+                      <span>{round.name}</span>
+                    </>
+                  )}
+                  {!isComplete && validation && (
+                    <Badge variant="destructive" className="text-xs font-semibold ml-2">
+                      {validation.errors.length} issue{validation.errors.length !== 1 ? "s" : ""}
+                    </Badge>
+                  )}
+                </CardTitle>
+                {isExpanded && (
+                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                    <span className="font-medium">{instrumentsCount} instrument{instrumentsCount !== 1 ? "s" : ""}</span>
+                    <span>•</span>
+                    <span className="font-medium">{holdersCount} holder{holdersCount !== 1 ? "s" : ""}</span>
+                    {round.round_date && (
+                      <>
+                        <span>•</span>
+                        <span>{new Date(round.round_date).toLocaleDateString()}</span>
+                      </>
+                    )}
+                  </div>
                 )}
-              </CardTitle>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {onDuplicate && (
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={onDuplicate}
+                className="h-9 w-9 p-0 hover:bg-accent"
+                title="Duplicate round"
               >
                 <Copy className="h-4 w-4" />
               </Button>
@@ -390,9 +429,11 @@ export function RoundForm({
             {onDelete && (
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={onDelete}
+                className="h-9 w-9 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                title="Delete round"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -401,16 +442,18 @@ export function RoundForm({
         </div>
       </CardHeader>
       {isExpanded && (
-        <CardContent className="space-y-6">
-          <RoundParametersSection
-            round={round}
-            touchedFields={touchedFields}
-            validation={validation}
-            onUpdate={updateRound}
-            onFieldTouched={(field) =>
-              setTouchedFields((prev) => new Set([...prev, field]))
-            }
-          />
+        <CardContent className="space-y-8 pt-2">
+          <div className="border-b pb-6">
+            <RoundParametersSection
+              round={round}
+              touchedFields={touchedFields}
+              validation={validation}
+              onUpdate={updateRound}
+              onFieldTouched={(field) =>
+                setTouchedFields((prev) => new Set([...prev, field]))
+              }
+            />
+          </div>
 
           <div className="space-y-6">
             <RoundInstrumentsSection

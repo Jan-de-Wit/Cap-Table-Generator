@@ -156,43 +156,42 @@ export function InstrumentCard({
     >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary font-semibold text-sm">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary/10 text-primary font-bold text-xs shrink-0">
                 {displayIndex + 1}
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold text-sm">Instrument</h4>
-                  {hasError && (
-                    <Badge variant="destructive" className="text-xs">
-                      Error
-                    </Badge>
-                  )}
-                </div>
+              <div className="flex items-center gap-2 flex-1">
+                <h4 className="font-semibold text-sm">Instrument {displayIndex + 1}</h4>
+                {hasError && (
+                  <Badge variant="destructive" className="text-xs font-semibold">
+                    Error
+                  </Badge>
+                )}
               </div>
             </div>
             {details.length > 0 && (
-              <div className="grid grid-cols-1 gap-2.5 pl-10">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 pl-10">
                 {details.map((detail, idx) => (
                   <div key={idx} className="flex items-center gap-2 text-sm">
-                    <div className="text-muted-foreground flex items-center gap-1.5 min-w-[80px]">
-                      {detail.icon}
-                      <span>{detail.label}</span>
+                    <div className="text-muted-foreground flex items-center gap-1.5 shrink-0">
+                      <span className="text-muted-foreground/70">{detail.icon}</span>
+                      <span className="text-xs">{detail.label}:</span>
                     </div>
-                    <span className="font-medium text-foreground">{detail.value}</span>
+                    <span className="font-semibold text-foreground">{detail.value}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
-          <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button 
               type="button" 
               variant="ghost" 
               size="sm" 
               onClick={onEdit}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 hover:bg-accent"
+              title="Edit instrument"
             >
               <Pencil className="h-4 w-4" />
             </Button>
@@ -201,7 +200,8 @@ export function InstrumentCard({
               variant="ghost" 
               size="sm" 
               onClick={onDelete}
-              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+              className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+              title="Delete instrument"
             >
               <Trash2 className="h-4 w-4" />
             </Button>

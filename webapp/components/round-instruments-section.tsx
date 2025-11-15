@@ -28,16 +28,20 @@ export function RoundInstrumentsSection({
   onDeleteInstrument,
 }: RoundInstrumentsSectionProps) {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">
-          Round Instruments ({regularInstruments.length})
+    <div className="space-y-5">
+      <div className="flex items-center justify-between border-b pb-3">
+        <h3 className="text-xl font-bold">
+          Round Instruments
+          <span className="ml-2 text-base font-semibold text-muted-foreground">
+            ({regularInstruments.length})
+          </span>
         </h3>
         <Button
           type="button"
-          variant="outline"
+          variant="default"
           size="sm"
           onClick={onAddInstrument}
+          className="shadow-sm hover:shadow-md transition-shadow"
         >
           <Plus className="h-4 w-4 mr-2" />
           Add Instrument

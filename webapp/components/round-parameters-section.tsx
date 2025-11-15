@@ -13,10 +13,7 @@ import { FieldWithHelp } from "@/components/field-with-help";
 import type { Round, CalculationType, ValuationBasis } from "@/types/cap-table";
 import type { RoundValidation } from "@/lib/validation";
 import { getFieldError } from "@/lib/validation";
-import {
-  formatCurrency,
-  parseFormattedNumber,
-} from "@/lib/formatters";
+import { formatCurrency, parseFormattedNumber } from "@/lib/formatters";
 
 interface RoundParametersSectionProps {
   round: Round;
@@ -40,8 +37,8 @@ export function RoundParametersSection({
   ].includes(round.calculation_type);
 
   return (
-    <>
-      <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-6">
         <FieldWithHelp
           label="Round Name"
           helpText="A descriptive name for this financing round (e.g., 'Seed Round', 'Series A')"
@@ -59,12 +56,12 @@ export function RoundParametersSection({
             onChange={(e) => onUpdate({ name: e.target.value })}
             onBlur={() => onFieldTouched("name")}
             placeholder="e.g., Seed Round"
-            className={
+            className={`font-medium ${
               touchedFields.has("name") &&
               getFieldError(validation?.errors ?? [], "name")
-                ? "border-destructive"
-                : ""
-            }
+                ? "border-destructive ring-destructive/20"
+                : "focus:ring-primary/20"
+            }`}
           />
         </FieldWithHelp>
         <FieldWithHelp
@@ -87,8 +84,8 @@ export function RoundParametersSection({
             className={
               touchedFields.has("round_date") &&
               getFieldError(validation?.errors ?? [], "round_date")
-                ? "border-destructive"
-                : ""
+                ? "border-destructive ring-destructive/20"
+                : "focus:ring-primary/20"
             }
           />
         </FieldWithHelp>
@@ -109,9 +106,7 @@ export function RoundParametersSection({
               updates.instruments = [];
             }
             // Clear valuation fields if not needed
-            if (
-              !["valuation_based", "convertible", "safe"].includes(value)
-            ) {
+            if (!["valuation_based", "convertible", "safe"].includes(value)) {
               updates.valuation_basis = undefined;
               updates.valuation = undefined;
             }
@@ -119,14 +114,15 @@ export function RoundParametersSection({
             onFieldTouched("calculation_type");
           }}
         >
-          <SelectTrigger id="calculation-type">
+          <SelectTrigger
+            id="calculation-type"
+            className="focus:ring-primary/20"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="fixed_shares">Fixed Shares</SelectItem>
-            <SelectItem value="target_percentage">
-              Target Percentage
-            </SelectItem>
+            <SelectItem value="target_percentage">Target Percentage</SelectItem>
             <SelectItem value="valuation_based">Valuation Based</SelectItem>
             <SelectItem value="convertible">Convertible</SelectItem>
             <SelectItem value="safe">SAFE</SelectItem>
@@ -135,7 +131,7 @@ export function RoundParametersSection({
       </FieldWithHelp>
 
       {needsValuationBasis && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-6">
           <FieldWithHelp
             label="Valuation"
             helpText="The company valuation amount in dollars"
@@ -159,12 +155,12 @@ export function RoundParametersSection({
               }}
               onBlur={() => onFieldTouched("valuation")}
               placeholder="e.g., $10,000,000"
-              className={
+              className={`font-semibold ${
                 touchedFields.has("valuation") &&
                 getFieldError(validation?.errors ?? [], "valuation")
-                  ? "border-destructive"
-                  : ""
-              }
+                  ? "border-destructive ring-destructive/20"
+                  : "focus:ring-primary/20"
+              }`}
             />
           </FieldWithHelp>
           <FieldWithHelp
@@ -185,7 +181,10 @@ export function RoundParametersSection({
                 onFieldTouched("valuation_basis");
               }}
             >
-              <SelectTrigger id="valuation-basis">
+              <SelectTrigger
+                id="valuation-basis"
+                className="focus:ring-primary/20"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -196,7 +195,6 @@ export function RoundParametersSection({
           </FieldWithHelp>
         </div>
       )}
-    </>
+    </div>
   );
 }
-

@@ -28,17 +28,20 @@ export function FieldWithHelp({
   htmlFor,
 }: FieldWithHelpProps) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       <div className="flex items-center gap-2">
-        <Label htmlFor={htmlFor} className={error ? "text-destructive" : ""}>
+        <Label 
+          htmlFor={htmlFor} 
+          className={`text-sm font-semibold ${error ? "text-destructive" : required ? "text-foreground" : ""}`}
+        >
           {label}
-          {required && <span className="text-destructive ml-1">*</span>}
+          {required && <span className="text-destructive ml-1.5 font-bold">*</span>}
         </Label>
         {helpText && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
                 <p>{helpText}</p>
@@ -49,7 +52,7 @@ export function FieldWithHelp({
       </div>
       {children}
       {error && (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-sm font-medium text-destructive">{error}</p>
       )}
     </div>
   );
