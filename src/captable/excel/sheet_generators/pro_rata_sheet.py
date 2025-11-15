@@ -44,18 +44,21 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
         rounds = self.data.get('rounds', [])
         if not rounds:
-            sheet.write(self.padding_offset, self.padding_offset, 'No rounds found', self.formats.get('text'))
+            sheet.write(self.padding_offset, self.padding_offset,
+                        'No rounds found', self.formats.get('text'))
             return sheet
 
         # Title row inside border (top-left of table, respecting padding)
         title_row = self.padding_offset + 1
-        sheet.write(title_row, self.padding_offset + 1, 'Pro Rata Allocation', self.formats.get('round_header_plain'))
+        sheet.write(title_row, self.padding_offset + 1,
+                    'Pro Rata Allocation', self.formats.get('round_header_plain'))
 
         # Extract holders with grouping
         holders_by_group, all_holders = self._get_holders_with_groups(rounds)
 
         if not all_holders:
-            sheet.write(self.padding_offset + 1, self.padding_offset + 1, 'No instruments found', self.formats.get('text'))
+            sheet.write(self.padding_offset + 1, self.padding_offset + 1,
+                        'No instruments found', self.formats.get('text'))
             return sheet
 
         # Calculate table bounds for border (border includes 1 cell padding on all sides)
@@ -67,12 +70,13 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         num_rounds = len(rounds)
         border_end_col = self.padding_offset + 1 + 2 + (num_rounds * 6) - 1
         # Last row includes padding, so we need to calculate after writing data
-        
+
         # Write headers aligned with title row for round names
         self._write_headers(sheet, rounds)
 
         # Write holder data with grouping (shifted by padding offset + 1 for content within border)
-        data_start_row = self.padding_offset + 1 + 2  # After padding + title/round names + column headers
+        # After padding + title/round names + column headers
+        data_start_row = self.padding_offset + 1 + 2
         data_rows_per_holder, first_holder_row, last_holder_row = self._write_holder_data_with_groups(
             sheet, rounds, all_holders, holders_by_group, data_start_row
         )
@@ -94,9 +98,12 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
         column_widths = [
             (0, 0, 4.0),  # Outer padding column
-            (border_start_col, border_start_col, 4.0),  # Inner padding column (left border column)
-            (self.padding_offset + 1, self.padding_offset + 1, 35),  # Shareholders column
-            (self.padding_offset + 2, self.padding_offset + 2, 35),  # Description column
+            # Inner padding column (left border column)
+            (border_start_col, border_start_col, 4.0),
+            # Shareholders column
+            (self.padding_offset + 1, self.padding_offset + 1, 35),
+            # Description column
+            (self.padding_offset + 2, self.padding_offset + 2, 35),
         ]
 
         # For each round, set widths for Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount (15) and separator (5)
@@ -146,32 +153,32 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         3. Noteholders
         4. Investors
         5. Other groups (alphabetically)
-        
+
         Args:
             groups: List of group names to sort
-            
+
         Returns:
             Sorted list of group names
         """
         # Define the default order
         default_order = ['Founders', 'ESOP', 'Noteholders', 'Investors']
-        
+
         # Separate groups into ordered and unordered
         ordered_groups = []
         unordered_groups = []
-        
+
         for group in groups:
             if group in default_order:
                 ordered_groups.append(group)
             else:
                 unordered_groups.append(group)
-        
+
         # Sort ordered groups by their position in default_order
         ordered_groups.sort(key=lambda g: default_order.index(g))
-        
+
         # Sort unordered groups alphabetically
         unordered_groups.sort()
-        
+
         # Combine: ordered groups first, then unordered groups
         return ordered_groups + unordered_groups
 
@@ -224,20 +231,23 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
         return holders_by_group, all_holders
 
-
     def _write_headers(self, sheet: xlsxwriter.worksheet.Worksheet, rounds: List[Dict[str, Any]]):
         """Write the header rows (shifted by padding offset + 1 for content within border)."""
         # Place round names header on the same row as the title
         header_row = self.padding_offset + 1
         subheader_row = self.padding_offset + 2
-        start_col = self.padding_offset + 1 + 2  # Start after padding + "Shareholders" and "Description"
+        # Start after padding + "Shareholders" and "Description"
+        start_col = self.padding_offset + 1 + 2
 
         # Write Shareholders and Description headers first
-        sheet.write(subheader_row, self.padding_offset + 1, 'Shareholders', self.formats.get('header'))
-        sheet.write(subheader_row, self.padding_offset + 2, '', self.formats.get('header'))
+        sheet.write(subheader_row, self.padding_offset + 1,
+                    'Shareholders', self.formats.get('header'))
+        sheet.write(subheader_row, self.padding_offset +
+                    2, '', self.formats.get('header'))
 
         # Use utility function to write round headers
-        subheaders = ['Pro Rata Type', 'Pro Rata %', 'Pro Rata Shares', 'Price per Share', 'Investment']
+        subheaders = ['Pro Rata Type', 'Pro Rata %',
+                      'Pro Rata Shares', 'Price per Share', 'Investment']
         self.write_round_headers(
             sheet,
             rounds,
@@ -324,7 +334,8 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                     # Add spacing row after previous group
                     row += 1
                 # Write group header row (bold) - shifted by padding offset + 1 for content within border
-                sheet.write(row, self.padding_offset + 1, group, self.formats.get('label'))
+                sheet.write(row, self.padding_offset + 1,
+                            group, self.formats.get('label'))
                 # Leave other columns empty for group header
                 row += 1
                 current_group = group
@@ -334,7 +345,8 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                 current_group = None
 
             # Write holder name - shifted by padding offset + 1 for content within border
-            sheet.write(row, self.padding_offset + 1, holder_name, self.formats.get('text'))
+            sheet.write(row, self.padding_offset + 1,
+                        holder_name, self.formats.get('text'))
             # Description column - shifted by padding offset + 1 for content within border
             sheet.write(row, self.padding_offset + 2, holder_to_description.get(
                 holder_name, ''), self.formats.get('italic_text'))
@@ -419,24 +431,24 @@ class ProRataSheetGenerator(BaseSheetGenerator):
     ) -> bool:
         """
         Check if a shareholder has shares in previous rounds by examining JSON data.
-        
+
         Args:
             holder_name: Name of the shareholder to check
             round_idx: Current round index (0-based)
             rounds: List of all rounds data
-            
+
         Returns:
             True if holder has shares in any previous round, False otherwise
         """
         if round_idx == 0:
             # First round - no previous rounds
             return False
-        
+
         # Check all previous rounds (0 to round_idx - 1)
         for prev_round_idx in range(round_idx):
             prev_round = rounds[prev_round_idx]
             prev_instruments = prev_round.get('instruments', [])
-            
+
             # Check if holder has any instrument in this previous round
             for instrument in prev_instruments:
                 if instrument.get('holder_name') == holder_name:
@@ -451,7 +463,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                     if any(key in instrument for key in ['investment_amount', 'target_percentage', 'principal', 'shares']):
                         # If any of these fields exist, the holder will have shares
                         return True
-        
+
         return False
 
     def _write_round_pro_rata_data(
@@ -495,12 +507,13 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         has_previous_shares = self._has_shares_in_previous_rounds(
             holder_name, round_idx, rounds
         )
-        
+
         if has_previous_shares:
             # Holder has shares in previous rounds - add dropdown with None, Standard, Super
             # Format pro rata type for display (capitalize first letter)
             pro_rata_type_display = pro_rata_type.capitalize() if pro_rata_type else 'None'
-            sheet.write(row, type_col, pro_rata_type_display, self.formats.get('text'))
+            sheet.write(row, type_col, pro_rata_type_display,
+                        self.formats.get('text'))
             # Add dropdown validation
             sheet.data_validation(
                 row, type_col, row, type_col,
@@ -519,7 +532,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         # Get references needed for formulas (used regardless of has_previous_shares)
         type_col_letter = self._col_letter(type_col)
         type_cell_ref = f"{type_col_letter}{row + 1}"
-        
+
         # Get holder's shares at start of round for formulas
         if round_idx == 0:
             holder_shares_start_ref = "0"
@@ -819,7 +832,8 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
         # Add spacing row before total
         row = last_holder_row + 2
-        sheet.write(row, self.padding_offset + 1, 'TOTAL', self.formats.get('total_label'))
+        sheet.write(row, self.padding_offset + 1, 'TOTAL',
+                    self.formats.get('total_label'))
         sheet.write(row, self.padding_offset + 2, '', self.formats.get(
             'total_text'))  # Description column
         col = self.padding_offset + 1 + 2
@@ -851,7 +865,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                     'format': self.formats.get('error')
                 }
             )
-            
+
             # Add data validation with error message for sum >= 100%
             pct_cell_ref = f"{pct_col_letter}{row + 1}"
             sum_range = f"{pct_col_letter}{first_holder_row + 1}:{pct_col_letter}{last_holder_row + 1}"
@@ -875,7 +889,8 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             )
 
             # Define a Named Range for this round's total pro rata shares so other sheets can reference it
-            round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
+            round_name_key = self._sanitize_excel_name(
+                round_data.get('name', ''))
             pr_total_named = f"{round_name_key}_ProRataShares"
             cell_ref_abs = f"'Pro Rata Allocations'!${shares_col_letter}${row + 1}"
             self.workbook.define_name(pr_total_named, cell_ref_abs)

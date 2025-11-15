@@ -292,10 +292,6 @@
           "type": "number",
           "description": "Valuation amount (for valuation_based, convertible, and safe rounds). Interpretation depends on valuation_basis: if pre_money, this is pre-investment valuation; if post_money, this is post-investment valuation. The other valuation will be calculated using formulas."
         },
-        "price_per_share": {
-          "type": "number",
-          "description": "Price per share in this round (can be calculated from valuation)"
-        },
         "conversion_round_ref": {
           "type": "string",
           "description": "Optional reference to a future valuation-based round (for convertible and safe calculation types). When provided, the conversion price will be calculated using that round's pre-investment valuation cap minus total conversion amount, with discount applied. If not provided, uses the valuation cap from the current round."
