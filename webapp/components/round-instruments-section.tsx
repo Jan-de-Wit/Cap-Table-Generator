@@ -187,7 +187,7 @@ export function RoundInstrumentsSection({
         const rights = instrument.pro_rata_rights;
         return (
           <Badge
-            variant={rights === "super" ? "default" : "secondary"}
+            variant={rights === "super" ? "default" : "outline"}
             className="text-xs"
           >
             {rights === "super" ? "Super" : "Standard"}
@@ -231,9 +231,9 @@ export function RoundInstrumentsSection({
         id: "index",
         header: "#",
         cell: ({ row }) => (
-          <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary/10 text-primary font-semibold text-xs">
+          <span className="text-sm text-muted-foreground font-medium">
             {row.original.displayIndex + 1}
-          </div>
+          </span>
         ),
         enableSorting: false,
         enableHiding: false,
@@ -247,7 +247,7 @@ export function RoundInstrumentsSection({
               onClick={() =>
                 column.toggleSorting(column.getIsSorted() === "asc")
               }
-              className="h-auto p-0 hover:bg-transparent"
+              className="h-auto p-0 hover:bg-transparent cursor-pointer"
             >
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <User className="h-3.5 w-3.5 text-muted-foreground" />
@@ -280,7 +280,7 @@ export function RoundInstrumentsSection({
               onClick={() =>
                 column.toggleSorting(column.getIsSorted() === "asc")
               }
-              className="h-auto p-0 hover:bg-transparent"
+              className="h-auto p-0 hover:bg-transparent cursor-pointer"
             >
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -710,7 +710,7 @@ export function RoundInstrumentsSection({
                 onClick={() =>
                   onEditInstrument(row.original, row.original.actualIndex)
                 }
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-background/80 border border-transparent hover:border-border rounded cursor-pointer"
                 title="Edit instrument"
               >
                 <Pencil className="h-4 w-4" />
@@ -720,7 +720,7 @@ export function RoundInstrumentsSection({
                 variant="ghost"
                 size="sm"
                 onClick={() => onDeleteInstrument(row.original.actualIndex)}
-                className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/50 rounded cursor-pointer"
                 title="Delete instrument"
               >
                 <Trash2 className="h-4 w-4" />
@@ -790,7 +790,7 @@ export function RoundInstrumentsSection({
             variant="outline"
             size="sm"
             onClick={onAddInstrument}
-            className="font-medium"
+            className="font-medium cursor-pointer"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Instrument
@@ -799,20 +799,14 @@ export function RoundInstrumentsSection({
       ) : (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onAddInstrument}
-              className="font-medium"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Instrument
-            </Button>
             <div className="flex items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="cursor-pointer"
+                  >
                     Columns <ChevronDown className="ml-2 h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -865,6 +859,16 @@ export function RoundInstrumentsSection({
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={onAddInstrument}
+              className="font-medium cursor-pointer"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Instrument
+            </Button>
           </div>
           <div
             ref={tableContainerRef}
@@ -874,33 +878,58 @@ export function RoundInstrumentsSection({
               <div className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none bg-gradient-to-l from-background to-transparent z-10" />
             )}
             <Table className="min-w-full">
-              <TableHeader>
+              <TableHeader style={{ padding: 0, margin: 0 }}>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id} className="group">
                     {headerGroup.headers.map((header) => {
                       const isSticky = header.column.columnDef.meta?.sticky;
+                      const isActions = header.column.id === "actions";
                       return (
                         <TableHead
                           key={header.id}
-                          className={`min-w-[120px] whitespace-nowrap ${
-                            isSticky
-                              ? "sticky right-0 bg-background group-hover:bg-muted z-20 border-l border-border/50"
-                              : ""
+                          className={`${
+                            isActions ? "" : "min-w-[120px]"
+                          } whitespace-nowrap ${
+                            isSticky ? "sticky right-0 z-20 p-0 m-0" : ""
                           }`}
                           style={
-                            isSticky
+                            isSticky && !isActions
                               ? {
                                   minWidth: "100px",
                                 }
                               : undefined
                           }
                         >
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
+                          <div
+                            className={`h-full flex items-center relative ${
+                              isSticky
+                                ? `border-l border-border/50 ${
+                                    isActions ? "pl-6 pr-4 justify-end" : "px-4"
+                                  }`
+                                : ""
+                            }`}
+                          >
+                            {isSticky && (
+                              <>
+                                <div className="absolute inset-0 bg-background group-hover:bg-gray-50 dark:group-hover:bg-gray-900 transition-colors" />
+                                <div className="relative z-10">
+                                  {header.isPlaceholder
+                                    ? null
+                                    : flexRender(
+                                        header.column.columnDef.header,
+                                        header.getContext()
+                                      )}
+                                </div>
+                              </>
+                            )}
+                            {!isSticky &&
+                              (header.isPlaceholder
+                                ? null
+                                : flexRender(
+                                    header.column.columnDef.header,
+                                    header.getContext()
+                                  ))}
+                          </div>
                         </TableHead>
                       );
                     })}
@@ -908,48 +937,78 @@ export function RoundInstrumentsSection({
                 ))}
               </TableHeader>
               <TableBody>
-                {table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                    className={`group ${
-                      row.original.hasError
-                        ? "bg-destructive/5 hover:bg-destructive/10"
-                        : ""
-                    }`}
-                  >
-                    {row.getVisibleCells().map((cell) => {
-                      const isSticky = cell.column.columnDef.meta?.sticky;
-                      const rowHasError = row.original.hasError;
-                      return (
-                        <TableCell
-                          key={cell.id}
-                          className={`min-w-[120px] whitespace-nowrap ${
-                            isSticky
-                              ? `sticky right-0 z-20 bg-background border-l border-border/50 ${
-                                  rowHasError
-                                    ? "group-hover:!bg-destructive-50 dark:group-hover:!bg-destructive-950"
-                                    : "group-hover:!bg-muted"
-                                }`
-                              : ""
-                          }`}
-                          style={
-                            isSticky
-                              ? {
-                                  minWidth: "100px",
-                                }
-                              : undefined
-                          }
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))}
+                {table.getRowModel().rows.map((row) => {
+                  const rowHasError = row.original.hasError;
+                  const rowBgClass = rowHasError
+                    ? "bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-800"
+                    : "bg-background hover:bg-gray-50 dark:hover:bg-gray-900";
+                  const stickyBaseBg = rowHasError
+                    ? "bg-red-50 dark:bg-red-950/30"
+                    : "bg-background";
+                  const stickyHoverBg = rowHasError
+                    ? "group-hover:bg-red-100 dark:group-hover:bg-red-800"
+                    : "group-hover:bg-gray-50 dark:group-hover:bg-gray-900";
+                  return (
+                    <TableRow
+                      key={row.id}
+                      data-state={row.getIsSelected() && "selected"}
+                      className={`group transition-colors py-0 ${rowBgClass}`}
+                    >
+                      {row.getVisibleCells().map((cell) => {
+                        const isSticky = cell.column.columnDef.meta?.sticky;
+                        const isActions = cell.column.id === "actions";
+                        return (
+                          <TableCell
+                            key={cell.id}
+                            className={`${
+                              isActions ? "" : "min-w-[120px]"
+                            } whitespace-nowrap ${
+                              isSticky ? "sticky right-0 z-20 p-0 m-0" : "py-3"
+                            }`}
+                            style={
+                              isSticky && !isActions
+                                ? {
+                                    minWidth: "100px",
+                                  }
+                                : undefined
+                            }
+                          >
+                            <div
+                              className={`h-full flex items-center ${
+                                isSticky
+                                  ? `border-l border-border/50 py-3 relative ${
+                                      isActions
+                                        ? "pl-6 pr-4 justify-end"
+                                        : "px-4"
+                                    }`
+                                  : ""
+                              }`}
+                            >
+                              {isSticky && (
+                                <>
+                                  <div
+                                    className={`absolute inset-0 ${stickyBaseBg} ${stickyHoverBg} transition-colors`}
+                                  />
+                                  <div className="relative z-10">
+                                    {flexRender(
+                                      cell.column.columnDef.cell,
+                                      cell.getContext()
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                              {!isSticky &&
+                                flexRender(
+                                  cell.column.columnDef.cell,
+                                  cell.getContext()
+                                )}
+                            </div>
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

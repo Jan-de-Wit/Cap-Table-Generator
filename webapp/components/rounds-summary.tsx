@@ -60,14 +60,20 @@ export function RoundsSummary({ rounds, onRoundClick }: RoundsSummaryProps) {
                       {round.name || `Round ${index + 1}`}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {round.calculation_type.replace("_", " ")} • {instrumentCount} instrument{instrumentCount !== 1 ? "s" : ""}
-                      {proRataCount > 0 && ` • ${proRataCount} pro-rata`}
+                      {round.calculation_type.replace("_", " ")} •{" "}
+                      {instrumentCount} instrument
+                      {instrumentCount !== 1 ? "s" : ""}
+                      {proRataCount > 0 &&
+                        ` • ${proRataCount} pro-rata allocation${
+                          proRataCount !== 1 ? "s" : ""
+                        }`}
                     </div>
                   </div>
                 </div>
                 {!validation.isValid && (
                   <Badge variant="outline" className="text-xs">
-                    {validation.errors.length} issue{validation.errors.length !== 1 ? "s" : ""}
+                    {validation.errors.length} issue
+                    {validation.errors.length !== 1 ? "s" : ""}
                   </Badge>
                 )}
               </div>
@@ -78,4 +84,3 @@ export function RoundsSummary({ rounds, onRoundClick }: RoundsSummaryProps) {
     </Card>
   );
 }
-

@@ -209,10 +209,10 @@ export function HolderDialog({
           </FieldWithHelp>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="cursor-pointer">
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={!name.trim() || !!nameError}>
+          <Button onClick={handleSave} disabled={!name.trim() || !!nameError} className="cursor-pointer">
             {isEditMode ? "Save Changes" : "Create Holder"}
           </Button>
         </DialogFooter>

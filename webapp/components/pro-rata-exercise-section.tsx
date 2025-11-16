@@ -12,7 +12,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  CheckCircle2,
   Pencil,
   Percent,
   Building2,
@@ -20,6 +19,7 @@ import {
   Shield,
   ChevronDown,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { Round, Instrument } from "@/types/cap-table";
 import { decimalToPercentage } from "@/lib/formatters";
 import {
@@ -102,6 +102,14 @@ export function ProRataExerciseSection({
   const [isScrollable, setIsScrollable] = React.useState(false);
   const tableContainerRef = React.useRef<HTMLDivElement>(null);
 
+  // Ensure Actions column is always visible
+  React.useEffect(() => {
+    setColumnVisibility((prev) => ({
+      ...prev,
+      actions: true,
+    }));
+  }, []);
+
   // Get the actual pro-rata allocation data for display
   const getProRataData = (
     holderName: string,
@@ -170,19 +178,26 @@ export function ProRataExerciseSection({
         cell: ({ row }) => {
           const isExercised = row.original.isExercised;
           return (
-            <div
-              className={`flex items-center justify-center w-5 h-5 rounded border-2 transition-colors ${
-                isExercised
-                  ? "bg-primary border-primary text-primary-foreground"
-                  : "border-muted-foreground/30"
-              }`}
-            >
-              {isExercised && <CheckCircle2 className="h-3.5 w-3.5" />}
+            <div className="pr-2">
+              <Checkbox
+                checked={isExercised}
+                onCheckedChange={() => {
+                  const { originalData } = row.original;
+                  onToggleExercise(
+                    originalData.holderName,
+                    originalData.type,
+                    originalData.class_name,
+                    originalData.percentage
+                  );
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
           );
         },
         enableSorting: false,
         enableHiding: false,
+        size: 0,
       },
       {
         accessorKey: "holder_name",
@@ -193,7 +208,7 @@ export function ProRataExerciseSection({
               onClick={() =>
                 column.toggleSorting(column.getIsSorted() === "asc")
               }
-              className="h-auto p-0 hover:bg-transparent"
+              className="h-auto p-0 hover:bg-transparent cursor-pointer"
             >
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <User className="h-3.5 w-3.5 text-muted-foreground" />
@@ -215,7 +230,7 @@ export function ProRataExerciseSection({
               onClick={() =>
                 column.toggleSorting(column.getIsSorted() === "asc")
               }
-              className="h-auto p-0 hover:bg-transparent"
+              className="h-auto p-0 hover:bg-transparent cursor-pointer"
             >
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -242,10 +257,10 @@ export function ProRataExerciseSection({
           const isSuper = row.original.pro_rata_type === "super";
           return (
             <Badge
-              variant={isSuper ? "default" : "secondary"}
+              variant={isSuper ? "default" : "outline"}
               className="text-xs"
             >
-              {isSuper ? "Super" : "Standard"} Pro-Rata
+              {isSuper ? "Super" : "Standard"}
             </Badge>
           );
         },
@@ -261,7 +276,7 @@ export function ProRataExerciseSection({
         cell: ({ row }) => {
           const percentage = row.original.pro_rata_percentage;
           return percentage !== undefined ? (
-            <span className="font-semibold text-sm">
+            <span className="text-sm">
               {decimalToPercentage(percentage).toFixed(2)}%
             </span>
           ) : (
@@ -270,47 +285,56 @@ export function ProRataExerciseSection({
         },
       },
       {
-        accessorKey: "isExercised",
-        header: "Status",
-        cell: ({ row }) => {
-          const isExercised = row.original.isExercised;
-          return isExercised ? (
-            <Badge variant="secondary" className="text-xs">
-              Exercised
-            </Badge>
-          ) : (
-            <span className="text-muted-foreground text-sm">Not Exercised</span>
-          );
-        },
-      },
-      {
         id: "actions",
         header: () => <div className="text-right">Actions</div>,
         cell: ({ row }) => {
-          const { isExercised, existingProRata, originalData } = row.original;
-          if (isExercised && existingProRata) {
-            return (
-              <div className="flex items-center justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const actualIndex = round.instruments.findIndex(
-                      (inst) => inst === existingProRata
-                    );
-                    onEditProRata(existingProRata, actualIndex);
-                  }}
-                  title="Edit pro-rata allocation"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              </div>
+          const { existingProRata, originalData } = row.original;
+          // Find the pro-rata instrument if it exists
+          const proRataInstrument =
+            existingProRata ||
+            proRataInstruments.find(
+              (inst) =>
+                "holder_name" in inst &&
+                inst.holder_name === originalData.holderName
             );
-          }
-          return <span className="text-muted-foreground text-sm">—</span>;
+          
+          return (
+            <div className="flex items-center justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-background/80 border border-transparent hover:border-border rounded cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (proRataInstrument) {
+                    const actualIndex = round.instruments.findIndex(
+                      (inst) => inst === proRataInstrument
+                    );
+                    if (actualIndex !== -1) {
+                      onEditProRata(proRataInstrument, actualIndex);
+                    }
+                  } else {
+                    // If no instrument exists, create a new one and edit it
+                    // This will be handled by creating a new pro-rata instrument
+                    // The parent component should handle this case
+                    onEditProRata(
+                      {
+                        holder_name: originalData.holderName,
+                        class_name: originalData.class_name,
+                        pro_rata_type: originalData.type,
+                        pro_rata_percentage: originalData.percentage,
+                      } as Instrument,
+                      -1
+                    );
+                  }
+                }}
+                title="Edit pro-rata allocation"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </div>
+          );
         },
         enableSorting: false,
         enableHiding: false,
@@ -319,7 +343,7 @@ export function ProRataExerciseSection({
         },
       },
     ],
-    [round.instruments, onEditProRata]
+    [round.instruments, onEditProRata, proRataInstruments]
   );
 
   const table = useReactTable({
@@ -330,11 +354,24 @@ export function ProRataExerciseSection({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
+    onColumnVisibilityChange: (updater) => {
+      setColumnVisibility((prev) => {
+        const newVisibility =
+          typeof updater === "function" ? updater(prev) : updater;
+        // Ensure Actions column is always visible
+        return {
+          ...newVisibility,
+          actions: true,
+        };
+      });
+    },
     state: {
       sorting,
       columnFilters,
-      columnVisibility,
+      columnVisibility: {
+        ...columnVisibility,
+        actions: true, // Always keep Actions visible
+      },
     },
   });
 
@@ -363,7 +400,7 @@ export function ProRataExerciseSection({
       <div className="flex items-center justify-start">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" className="cursor-pointer">
               Columns <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -378,12 +415,13 @@ export function ProRataExerciseSection({
                   class_name: "Class",
                   pro_rata_type: "Pro-Rata Type",
                   pro_rata_percentage: "Pro-Rata Percentage",
-                  isExercised: "Status",
                 };
-                const displayName = headerNameMap[column.id] || column.id
-                  .split("_")
-                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                  .join(" ");
+                const displayName =
+                  headerNameMap[column.id] ||
+                  column.id
+                    .split("_")
+                    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(" ");
                 return (
                   <DropdownMenuCheckboxItem
                     key={column.id}
@@ -407,35 +445,59 @@ export function ProRataExerciseSection({
           <div className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none bg-gradient-to-l from-background to-transparent z-10" />
         )}
         <Table className="min-w-full">
-          <TableHeader>
+          <TableHeader style={{ padding: 0, margin: 0 }}>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="group">
                 {headerGroup.headers.map((header) => {
                   const isSticky = header.column.columnDef.meta?.sticky;
+                  const isCheckbox = header.column.id === "checkbox";
+                  const isActions = header.column.id === "actions";
                   return (
                     <TableHead
                       key={header.id}
-                      className={`min-w-[120px] whitespace-nowrap ${
-                        isSticky
-                          ? "sticky right-0 bg-background group-hover:bg-muted z-20"
-                          : ""
+                      className={`${
+                        isCheckbox || isActions ? "" : "min-w-[120px]"
+                      } whitespace-nowrap ${
+                        isSticky ? "sticky right-0 z-20 p-0 m-0" : ""
                       }`}
                       style={
-                        isSticky
+                        isSticky && !isActions
                           ? {
                               minWidth: "100px",
-                              borderLeft: "1px solid hsl(var(--border) / 0.5)",
-                              boxShadow: "inset 1px 0 0 0 hsl(var(--border) / 0.5)",
                             }
                           : undefined
                       }
                     >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                      <div
+                        className={`h-full flex items-center relative ${
+                          isSticky
+                            ? `border-l border-border/50 ${
+                                isActions ? "pl-6 pr-4 justify-end" : "px-4"
+                              }`
+                            : ""
+                        }`}
+                      >
+                        {isSticky && (
+                          <>
+                            <div className="absolute inset-0 bg-background group-hover:bg-gray-50 dark:group-hover:bg-gray-900 transition-colors" />
+                            <div className="relative z-10">
+                              {header.isPlaceholder
+                                ? null
+                                : flexRender(
+                                    header.column.columnDef.header,
+                                    header.getContext()
+                                  )}
+                            </div>
+                          </>
+                        )}
+                        {!isSticky &&
+                          (header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              ))}
+                      </div>
                     </TableHead>
                   );
                 })}
@@ -447,17 +509,26 @@ export function ProRataExerciseSection({
               table.getRowModel().rows.map((row) => {
                 const { originalData, isExercised } = row.original;
                 const isSuper = originalData.type === "super";
+                const rowBgClass = isExercised
+                  ? isSuper
+                    ? "bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-50 dark:hover:bg-blue-800"
+                    : "bg-green-50 dark:bg-green-950/30 hover:bg-green-50 dark:hover:bg-green-800"
+                  : "bg-background hover:bg-gray-50 dark:hover:bg-gray-900";
+                const stickyBaseBg = isExercised
+                  ? isSuper
+                    ? "bg-blue-50 dark:bg-blue-950/30"
+                    : "bg-green-50 dark:bg-green-950/30"
+                  : "bg-background";
+                const stickyHoverBg = isExercised
+                  ? isSuper
+                    ? "group-hover:bg-blue-50 dark:group-hover:bg-blue-800"
+                    : "group-hover:bg-green-50 dark:group-hover:bg-green-800"
+                  : "group-hover:bg-gray-50 dark:group-hover:bg-gray-900";
                 return (
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className={`group cursor-pointer transition-colors ${
-                      isExercised
-                        ? isSuper
-                          ? "bg-primary/5 hover:bg-primary/10"
-                          : "bg-green-500/5 hover:bg-green-500/10"
-                        : "hover:bg-muted/50"
-                    }`}
+                    className={`group cursor-pointer transition-colors py-0 ${rowBgClass}`}
                     onClick={() =>
                       onToggleExercise(
                         originalData.holderName,
@@ -469,34 +540,54 @@ export function ProRataExerciseSection({
                   >
                     {row.getVisibleCells().map((cell) => {
                       const isSticky = cell.column.columnDef.meta?.sticky;
-                      const isExercised = row.original.isExercised;
-                      const isSuper =
-                        row.original.originalData.type === "super";
-                      const bgClass = isExercised
-                        ? isSuper
-                          ? "bg-background group-hover:!bg-primary-50 dark:group-hover:!bg-primary-950"
-                          : "bg-background group-hover:!bg-green-50 dark:group-hover:!bg-green-950"
-                        : "bg-background group-hover:!bg-muted";
+                      const isCheckbox = cell.column.id === "checkbox";
+                      const isActions = cell.column.id === "actions";
                       return (
                         <TableCell
                           key={cell.id}
-                          className={`min-w-[120px] whitespace-nowrap ${
-                            isSticky ? `sticky right-0 z-20 ${bgClass}` : ""
+                          className={`${
+                            isCheckbox || isActions ? "" : "min-w-[120px]"
+                          } whitespace-nowrap ${
+                            isSticky
+                              ? "sticky right-0 z-20 p-0 m-0"
+                              : "py-3"
                           }`}
                           style={
-                            isSticky
+                            isSticky && !isActions
                               ? {
                                   minWidth: "100px",
-                                  borderLeft: "1px solid hsl(var(--border) / 0.5)",
-                                  boxShadow: "inset 1px 0 0 0 hsl(var(--border) / 0.5)",
                                 }
                               : undefined
                           }
                         >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
+                          <div
+                            className={`h-full flex items-center ${
+                              isSticky
+                                ? `border-l border-border/50 py-3 relative ${
+                                    isActions ? "pl-6 pr-4 justify-end" : "px-4"
+                                  }`
+                                : ""
+                            }`}
+                          >
+                            {isSticky && (
+                              <>
+                                <div
+                                  className={`absolute inset-0 ${stickyBaseBg} ${stickyHoverBg} transition-colors`}
+                                />
+                                <div className="relative z-10">
+                                  {flexRender(
+                                    cell.column.columnDef.cell,
+                                    cell.getContext()
+                                  )}
+                                </div>
+                              </>
+                            )}
+                            {!isSticky &&
+                              flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                          </div>
                         </TableCell>
                       );
                     })}

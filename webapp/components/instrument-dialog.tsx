@@ -157,8 +157,172 @@ export function InstrumentDialog({
     return Array.from(options).sort();
   }, [usedClassNames, className]);
 
+  // Validation function
+  const getValidationErrors = (): string[] => {
+    const errors: string[] = [];
+
+    // Required fields
+    if (!formData.holder_name || !formData.holder_name.trim()) {
+      errors.push("Holder name is required");
+    }
+    if (!formData.class_name || !formData.class_name.trim()) {
+      errors.push("Class name is required");
+    }
+
+    // Pro-rata validation
+    if (isProRata) {
+      const proRataType = (formData as any).pro_rata_type;
+      if (proRataType === "super") {
+        const proRataPercentage = (formData as any).pro_rata_percentage;
+        if (
+          proRataPercentage === undefined ||
+          proRataPercentage === null ||
+          proRataPercentage === 0
+        ) {
+          errors.push("Pro-rata percentage is required for super pro-rata");
+        } else {
+          const percentageError = validatePercentage(
+            decimalToPercentage(proRataPercentage),
+            "Pro-rata percentage"
+          );
+          if (percentageError) {
+            errors.push(percentageError);
+          }
+        }
+      }
+    } else {
+      // Non-pro-rata instruments: check pro-rata rights
+      const proRataRights = (formData as any).pro_rata_rights;
+      if (proRataRights === "super") {
+        const proRataPercentage = (formData as any).pro_rata_percentage;
+        if (
+          proRataPercentage === undefined ||
+          proRataPercentage === null ||
+          proRataPercentage === 0
+        ) {
+          errors.push("Super pro-rata percentage is required");
+        } else {
+          const percentageError = validatePercentage(
+            decimalToPercentage(proRataPercentage),
+            "Super pro-rata percentage"
+          );
+          if (percentageError) {
+            errors.push(percentageError);
+          }
+        }
+      }
+
+      // Calculation type specific validations
+      switch (calculationType) {
+        case "fixed_shares":
+          if (
+            (formData as any).initial_quantity === undefined ||
+            (formData as any).initial_quantity === null ||
+            (formData as any).initial_quantity <= 0
+          ) {
+            errors.push("Initial quantity must be greater than 0");
+          }
+          break;
+        case "target_percentage":
+          const targetPercentage = (formData as any).target_percentage;
+          if (targetPercentage === undefined || targetPercentage === null) {
+            errors.push("Target percentage is required");
+          } else {
+            const percentageError = validatePercentage(
+              decimalToPercentage(targetPercentage),
+              "Target percentage"
+            );
+            if (percentageError) {
+              errors.push(percentageError);
+            }
+          }
+          break;
+        case "valuation_based":
+          if (
+            (formData as any).investment_amount === undefined ||
+            (formData as any).investment_amount === null ||
+            (formData as any).investment_amount <= 0
+          ) {
+            errors.push("Investment amount must be greater than 0");
+          }
+          break;
+        case "convertible":
+          if (
+            (formData as any).investment_amount === undefined ||
+            (formData as any).investment_amount === null ||
+            (formData as any).investment_amount <= 0
+          ) {
+            errors.push("Investment amount must be greater than 0");
+          }
+          if (!(formData as any).payment_date) {
+            errors.push("Payment date is required");
+          }
+          if (!(formData as any).expected_conversion_date) {
+            errors.push("Expected conversion date is required");
+          }
+          const interestRate = (formData as any).interest_rate;
+          if (interestRate === undefined || interestRate === null) {
+            errors.push("Interest rate is required");
+          } else {
+            const percentageError = validatePercentage(
+              decimalToPercentage(interestRate),
+              "Interest rate"
+            );
+            if (percentageError) {
+              errors.push(percentageError);
+            }
+          }
+          const discountRate = (formData as any).discount_rate;
+          if (discountRate === undefined || discountRate === null) {
+            errors.push("Discount rate is required");
+          } else {
+            const percentageError = validatePercentage(
+              decimalToPercentage(discountRate),
+              "Discount rate"
+            );
+            if (percentageError) {
+              errors.push(percentageError);
+            }
+          }
+          break;
+        case "safe":
+          if (
+            (formData as any).investment_amount === undefined ||
+            (formData as any).investment_amount === null ||
+            (formData as any).investment_amount <= 0
+          ) {
+            errors.push("Investment amount must be greater than 0");
+          }
+          if (!(formData as any).expected_conversion_date) {
+            errors.push("Expected conversion date is required");
+          }
+          const safeDiscountRate = (formData as any).discount_rate;
+          if (safeDiscountRate === undefined || safeDiscountRate === null) {
+            errors.push("Discount rate is required");
+          } else {
+            const percentageError = validatePercentage(
+              decimalToPercentage(safeDiscountRate),
+              "Discount rate"
+            );
+            if (percentageError) {
+              errors.push(percentageError);
+            }
+          }
+          break;
+      }
+    }
+
+    return errors;
+  };
+
+  const validationErrors = React.useMemo(() => getValidationErrors(), [
+    formData,
+    calculationType,
+    isProRata,
+  ]);
+
   const handleSave = () => {
-    if (!formData.holder_name || !formData.class_name) {
+    if (validationErrors.length > 0) {
       return;
     }
     onSave(formData as Instrument);
@@ -197,7 +361,7 @@ export function InstrumentDialog({
                 Essential details about the instrument
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
               <FieldWithHelp
                 label="Holder"
                 helpText={
@@ -1151,12 +1315,13 @@ export function InstrumentDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="cursor-pointer">
             Cancel
           </Button>
           <Button
             onClick={handleSave}
-            disabled={!formData.holder_name || !formData.class_name}
+            disabled={validationErrors.length > 0}
+            className="cursor-pointer"
           >
             {isEditMode ? "Save Changes" : "Create Instrument"}
           </Button>

@@ -44,7 +44,7 @@ export function SegmentedControl({
           role="tab"
           onClick={() => onValueChange(option.value)}
           className={cn(
-            "relative rounded-md font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex-1",
+            "relative rounded-md font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex-1 cursor-pointer",
             sizeClasses[size],
             value === option.value
               ? "bg-background text-foreground shadow-sm"

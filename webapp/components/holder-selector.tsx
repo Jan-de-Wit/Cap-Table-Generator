@@ -1,18 +1,12 @@
 "use client";
 
 import * as React from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil } from "lucide-react";
 import type { Holder } from "@/types/cap-table";
 import { HolderDialog } from "@/components/holder-dialog";
 import { sortGroups } from "@/lib/utils";
+import { Combobox } from "@/components/ui/combobox";
 
 interface HolderSelectorProps {
   value: string;
@@ -115,7 +109,7 @@ export function HolderSelector({
         <Button
           type="button"
           variant="outline"
-          className="w-full justify-start h-9"
+          className="w-full justify-start h-9 cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
             handleCreateNew();
@@ -136,35 +130,46 @@ export function HolderSelector({
     );
   }
 
+  // Format holder options for Combobox
+  const holderOptions = React.useMemo(() => {
+    return sortedHolders.map((holder) => {
+      const displayName = holder.group
+        ? `${holder.name} (${holder.group})`
+        : holder.name;
+      return displayName;
+    });
+  }, [sortedHolders]);
+
+  // Get the display value for the combobox
+  const displayValue = React.useMemo(() => {
+    const holder = sortedHolders.find((h) => h.name === value);
+    if (!holder) return "";
+    return holder.group ? `${holder.name} (${holder.group})` : holder.name;
+  }, [value, sortedHolders]);
+
+  const handleValueChange = (selectedDisplayValue: string) => {
+    // Extract the holder name from the display value (remove group if present)
+    const holderName = selectedDisplayValue.split(" (")[0];
+    onChange(holderName);
+  };
+
   return (
     <>
       <div className="flex gap-2">
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger className="flex-1">
-            <SelectValue placeholder={placeholder} />
-          </SelectTrigger>
-          <SelectContent>
-            {sortedHolders.map((holder) => (
-              <SelectItem key={holder.name} value={holder.name}>
-                <div className="flex items-center justify-between w-full">
-                  <span>
-                    {holder.name}
-                    {holder.group && (
-                      <span className="text-muted-foreground ml-2">
-                        ({holder.group})
-                      </span>
-                    )}
-                  </span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Combobox
+          options={holderOptions}
+          value={displayValue}
+          onValueChange={handleValueChange}
+          placeholder={placeholder}
+          searchPlaceholder="Search holders..."
+          emptyText="No holder found."
+          allowCustom={false}
+        />
         {selectedHolder && (
           <Button
             type="button"
             variant="outline"
-            className="h-10"
+            className="h-10 cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
               handleEdit(selectedHolder.name);
@@ -178,7 +183,7 @@ export function HolderSelector({
           <Button
             type="button"
             variant="outline"
-            className="h-10"
+            className="h-10 cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
               handleCreateNew();

@@ -104,6 +104,7 @@ export function Sidebar({
   const [overId, setOverId] = React.useState<string | null>(null);
   const sidebarWrapperRef = useRef<HTMLDivElement>(null);
   const sidebarContentRef = useRef<HTMLDivElement>(null);
+  const lenisRef = useRef<Lenis | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -118,6 +119,10 @@ export function Sidebar({
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
+    // Disable Lenis during drag
+    if (lenisRef.current) {
+      lenisRef.current.stop();
+    }
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -128,6 +133,10 @@ export function Sidebar({
     const { active, over } = event;
     setActiveId(null);
     setOverId(null);
+    // Re-enable Lenis after drag
+    if (lenisRef.current) {
+      lenisRef.current.start();
+    }
     if (!over) return;
 
     // Handle round reordering
@@ -267,6 +276,9 @@ export function Sidebar({
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
     });
 
+    // Store lenis instance in ref
+    lenisRef.current = lenis;
+
     function raf(time: number) {
       lenis.raf(time);
       requestAnimationFrame(raf);
@@ -276,6 +288,7 @@ export function Sidebar({
 
     return () => {
       lenis.destroy();
+      lenisRef.current = null;
     };
   }, []);
 
@@ -343,7 +356,7 @@ export function Sidebar({
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full text-xs"
+                    className="w-full text-xs cursor-pointer"
                     size="sm"
                     onClick={onAddRound}
                   >
@@ -444,7 +457,7 @@ export function Sidebar({
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full text-xs"
+                    className="w-full text-xs cursor-pointer"
                     size="sm"
                     onClick={onAddHolder}
                   >
@@ -473,7 +486,7 @@ export function Sidebar({
                   <Button
                     type="button"
                     variant="default"
-                    className="flex-1"
+                    className="flex-1 cursor-pointer"
                     onClick={onDownloadExcel}
                     disabled={!canDownload}
                   >
@@ -577,13 +590,13 @@ function DraggableHolder({
               </div>
             )}
           </div>
-          <div className="flex gap-1 shrink-0">
+          <div className="flex shrink-0">
             {onEdit && (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-5 w-5 p-0"
+                className="h-6 w-6 p-0 border border-transparent hover:border-border rounded cursor-pointer"
                 onClick={() => onEdit(holder)}
                 title="Edit holder"
               >
@@ -595,7 +608,7 @@ function DraggableHolder({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                className="h-6 w-6 p-0 text-destructive hover:text-destructive border border-transparent hover:border-destructive/50 rounded cursor-pointer"
                 onClick={() => onDelete(holder.name)}
                 title="Delete holder"
               >
@@ -693,7 +706,7 @@ function JsonDropdownMenu({
           type="button"
           variant="outline"
           size="icon"
-          className="shrink-0"
+          className="shrink-0 cursor-pointer"
           disabled={!canDownload}
         >
           {open ? (
@@ -709,7 +722,7 @@ function JsonDropdownMenu({
             <Button
               type="button"
               variant="ghost"
-              className="w-full justify-start"
+              className="w-full justify-start cursor-pointer"
               onClick={handleCopy}
             >
               <Copy className="h-4 w-4 mr-2" />
@@ -720,7 +733,7 @@ function JsonDropdownMenu({
             <Button
               type="button"
               variant="ghost"
-              className="w-full justify-start"
+              className="w-full justify-start cursor-pointer"
               onClick={handleDownload}
             >
               <Download className="h-4 w-4 mr-2" />
@@ -843,11 +856,15 @@ function DraggableRoundSidebar({
                       <TooltipContent>
                         <div className="space-y-1">
                           {!hasInstrumentsOrProRata && (
-                            <p>Add at least one instrument or pro-rata allocation</p>
+                            <p>
+                              Add at least one instrument or pro-rata allocation
+                            </p>
                           )}
                           {hasValidationErrors && (
                             <p>
-                              {!hasInstrumentsOrProRata ? "and fix validation errors" : "Fix validation errors"}
+                              {!hasInstrumentsOrProRata
+                                ? "and fix validation errors"
+                                : "Fix validation errors"}
                             </p>
                           )}
                         </div>
@@ -889,7 +906,8 @@ function DraggableRoundSidebar({
               {proRataHolders.length > 0 && (
                 <div className="space-y-1.5 mt-2">
                   <div className="text-xs font-medium text-muted-foreground">
-                    Pro-Rata ({proRataHolders.length})
+                    Pro-Rata Allocation{proRataHolders.length !== 1 ? "s" : ""}{" "}
+                    ({proRataHolders.length})
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {proRataHolders.map((holder) => (
@@ -905,25 +923,13 @@ function DraggableRoundSidebar({
                 </div>
               )}
             </div>
-            <div className="flex gap-1 shrink-0">
-              {onEdit && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0"
-                  onClick={() => onEdit(index)}
-                  title="Edit round"
-                >
-                  <Pencil className="h-2.5 w-2.5" />
-                </Button>
-              )}
+            <div className="flex shrink-0">
               {onDelete && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                  className="h-6 w-6 p-0 text-destructive hover:text-destructive border border-transparent hover:bg-destructive/10 hover:border-destructive/50 rounded cursor-pointer"
                   onClick={() => onDelete(index)}
                   title="Delete round"
                 >
@@ -952,7 +958,7 @@ function ErrorSummary({
   const contentRef = React.useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = React.useState(0);
 
-  // Collect all errors from all rounds
+  // Collect all errors from all rounds, excluding instrument and pro-rata allocation errors
   const allErrors = React.useMemo(() => {
     const errors: Array<{
       roundIndex: number;
@@ -966,12 +972,22 @@ function ErrorSummary({
         const round = rounds[roundIndex];
         const roundName = round?.name || `Round ${roundIndex + 1}`;
         validation.errors.forEach((error) => {
-          errors.push({
-            roundIndex,
-            roundName,
-            field: error.field,
-            message: error.message,
-          });
+          // Filter out instrument and pro-rata allocation errors
+          const field = error.field;
+          const isInstrumentError = field.startsWith("instruments");
+          const isProRataError =
+            field.includes("pro_rata") ||
+            field.includes("proRata") ||
+            field.includes("pro-rata");
+
+          if (!isInstrumentError && !isProRataError) {
+            errors.push({
+              roundIndex,
+              roundName,
+              field: error.field,
+              message: error.message,
+            });
+          }
         });
       }
     });

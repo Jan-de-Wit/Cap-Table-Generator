@@ -170,7 +170,58 @@ export default function Home() {
     const newRounds = Array.from(rounds);
     const [removed] = newRounds.splice(startIndex, 1);
     newRounds.splice(endIndex, 0, removed);
-    setRounds(newRounds);
+
+    // Remove invalid pro-rata allocations after reordering
+    // A pro-rata allocation is invalid if the holder doesn't have shares in previous rounds
+    const cleanedRounds = newRounds.map((round, roundIndex) => {
+      // Check if there are previous rounds
+      if (roundIndex === 0) {
+        // First round can't have pro-rata allocations
+        return {
+          ...round,
+          instruments: round.instruments.filter(
+            (inst) => !("pro_rata_type" in inst)
+          ),
+        };
+      }
+
+      // Collect all holders who have shares in previous rounds
+      const holdersWithShares = new Set<string>();
+      for (let i = 0; i < roundIndex; i++) {
+        newRounds[i]?.instruments.forEach((instrument) => {
+          // Only count regular instruments, not pro-rata allocations
+          if (
+            "holder_name" in instrument &&
+            instrument.holder_name &&
+            !("pro_rata_type" in instrument)
+          ) {
+            holdersWithShares.add(instrument.holder_name);
+          }
+        });
+      }
+
+      // Filter out pro-rata allocations for holders without shares in previous rounds
+      const validInstruments = round.instruments.filter((instrument) => {
+        // Keep all non-pro-rata instruments
+        if (!("pro_rata_type" in instrument)) {
+          return true;
+        }
+
+        // For pro-rata allocations, check if holder has shares in previous rounds
+        if ("holder_name" in instrument && instrument.holder_name) {
+          return holdersWithShares.has(instrument.holder_name);
+        }
+
+        return false;
+      });
+
+      return {
+        ...round,
+        instruments: validInstruments,
+      };
+    });
+
+    setRounds(cleanedRounds);
 
     // Update selected round index after reordering
     if (selectedRoundIndex === startIndex) {
@@ -431,11 +482,18 @@ export default function Home() {
                       }`
                     : "Select a Round"}
                 </h2>
-                {rounds.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    {rounds.length}
-                  </Badge>
-                )}
+
+                {selectedRoundIndex !== null &&
+                  rounds[selectedRoundIndex] &&
+                  rounds[selectedRoundIndex].round_date && (
+                    <Badge variant="outline" className="text-xs">
+                      <span>
+                        {new Date(
+                          rounds[selectedRoundIndex].round_date
+                        ).toLocaleDateString()}
+                      </span>
+                    </Badge>
+                  )}
               </div>
               {/* Summary badges */}
               {selectedRoundIndex !== null && rounds[selectedRoundIndex] && (
@@ -516,15 +574,6 @@ export default function Home() {
 
                       return statusElement;
                     })()}
-                  {rounds[selectedRoundIndex].round_date && (
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <span>
-                        {new Date(
-                          rounds[selectedRoundIndex].round_date
-                        ).toLocaleDateString()}
-                      </span>
-                    </div>
-                  )}
                   {(() => {
                     const round = rounds[selectedRoundIndex];
                     const regularInstruments = round.instruments.filter(

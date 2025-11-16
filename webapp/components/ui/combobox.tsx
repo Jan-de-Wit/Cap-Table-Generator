@@ -77,7 +77,7 @@ export function Combobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className="w-full justify-between cursor-pointer"
         >
           <span className="truncate">{value || placeholder}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -104,7 +104,7 @@ export function Combobox({
                 </div>
                 <Button
                   variant="ghost"
-                  className="w-full justify-start"
+                  className="w-full justify-start cursor-pointer"
                   onClick={handleCustomValue}
                 >
                   Use "{searchValue}"
