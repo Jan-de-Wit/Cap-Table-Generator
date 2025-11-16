@@ -15,6 +15,8 @@ import {
   useSensors,
   DragEndEvent,
   useDroppable,
+  DragStartEvent,
+  DragOverEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -52,15 +54,32 @@ export function Sidebar({
   onReorderRounds,
   onMoveHolderToGroup,
 }: SidebarProps) {
+  const [activeId, setActiveId] = React.useState<string | null>(null);
+  const [overId, setOverId] = React.useState<string | null>(null);
+  
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px of movement before drag starts
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    setOverId(event.over?.id as string ?? null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
+    setOverId(null);
     if (!over) return;
 
     // Handle round reordering
@@ -83,16 +102,28 @@ export function Sidebar({
     }
 
     // Handle holder group movement
-    if (
-      active.id.toString().startsWith("holder-") &&
-      over.id.toString().startsWith("group-")
-    ) {
-      if (onMoveHolderToGroup) {
+    if (active.id.toString().startsWith("holder-")) {
+      let targetGroup: string | undefined;
+      
+      // Check if dropped on a group container
+      if (over.id.toString().startsWith("group-")) {
+        targetGroup = over.id.toString().replace("group-", "");
+      }
+      // Check if dropped on another holder card (use that holder's group)
+      else if (over.id.toString().startsWith("holder-")) {
+        const targetHolderName = over.id.toString().replace("holder-", "");
+        const targetHolder = holders.find((h) => h.name === targetHolderName);
+        if (targetHolder) {
+          // Use the target holder's group, or "ungrouped" if no group
+          targetGroup = targetHolder.group || "ungrouped";
+        }
+      }
+      
+      if (targetGroup !== undefined && onMoveHolderToGroup) {
         const holderName = active.id.toString().replace("holder-", "");
-        const newGroup = over.id.toString().replace("group-", "");
         onMoveHolderToGroup(
           holderName,
-          newGroup === "ungrouped" ? undefined : newGroup
+          targetGroup === "ungrouped" ? undefined : targetGroup
         );
       }
       return;
@@ -161,6 +192,8 @@ export function Sidebar({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
       <div className="hidden lg:block w-80 border-l bg-muted/20 flex flex-col h-screen sticky top-0">
@@ -178,7 +211,13 @@ export function Sidebar({
 
               {/* Grouped Holders */}
               {groupedHolders.groups.map(([groupName, groupHolders]) => (
-                <DroppableGroup key={groupName} groupName={groupName}>
+                <DroppableGroup 
+                  key={groupName} 
+                  groupName={groupName}
+                  activeId={activeId}
+                  overId={overId}
+                  holders={groupHolders}
+                >
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-medium text-muted-foreground">
@@ -194,6 +233,9 @@ export function Sidebar({
                           key={holder.name}
                           holder={holder}
                           onEdit={onEditHolder}
+                          isDragging={activeId === `holder-${holder.name}`}
+                          groupName={groupName}
+                          activeId={activeId}
                         />
                       ))}
                     </div>
@@ -203,7 +245,12 @@ export function Sidebar({
 
               {/* Ungrouped Holders */}
               {groupedHolders.ungrouped.length > 0 && (
-                <DroppableGroup groupName="ungrouped">
+                <DroppableGroup 
+                  groupName="ungrouped"
+                  activeId={activeId}
+                  overId={overId}
+                  holders={groupedHolders.ungrouped}
+                >
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-medium text-muted-foreground">
@@ -219,6 +266,9 @@ export function Sidebar({
                           key={holder.name}
                           holder={holder}
                           onEdit={onEditHolder}
+                          isDragging={activeId === `holder-${holder.name}`}
+                          groupName="ungrouped"
+                          activeId={activeId}
                         />
                       ))}
                     </div>
@@ -282,6 +332,7 @@ export function Sidebar({
                           roundHolders={roundHolders}
                           proRataHolders={proRataHolders}
                           onEdit={onEditRound}
+                          isDragging={activeId === `sidebar-round-${index}`}
                         />
                       );
                     })}
@@ -329,9 +380,15 @@ export function Sidebar({
 function DraggableHolder({
   holder,
   onEdit,
+  isDragging: externalIsDragging,
+  groupName,
+  activeId,
 }: {
   holder: Holder;
   onEdit?: (holder: Holder) => void;
+  isDragging?: boolean;
+  groupName?: string;
+  activeId?: string | null;
 }) {
   const {
     attributes,
@@ -339,23 +396,49 @@ function DraggableHolder({
     setNodeRef,
     transform,
     transition,
-    isDragging,
+    isDragging: internalIsDragging,
   } = useSortable({ id: `holder-${holder.name}` });
+
+  // Make the card itself also a droppable zone for its group
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: `holder-${holder.name}`,
+    data: {
+      groupName: groupName || "ungrouped",
+    },
+  });
+
+  const isDragging = externalIsDragging || internalIsDragging;
+
+  // Combine refs - both sortable and droppable need the same node
+  const combinedRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      setNodeRef(node);
+      setDroppableRef(node);
+    },
+    [setNodeRef, setDroppableRef]
+  );
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: isDragging ? undefined : transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 50 : 1,
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
-      <Card className="p-2.5 border-border/50 shadow-none">
+    <div ref={combinedRef} style={style}>
+      <Card 
+        className={`p-2.5 border-border/50 shadow-none transition-all ${
+          isDragging 
+            ? "shadow-lg border-primary/50 scale-105" 
+            : "hover:shadow-sm hover:border-border"
+        }`}
+      >
         <div className={`flex justify-between gap-2 ${holder.description ? "items-start" : "items-center"}`}>
           <div
             {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing p-0.5 text-muted-foreground hover:text-foreground mr-0.5"
+            className="cursor-grab active:cursor-grabbing p-0.5 text-muted-foreground hover:text-foreground mr-0.5 touch-none"
           >
             <GripVertical className="h-4 w-4" />
           </div>
@@ -389,18 +472,51 @@ function DraggableHolder({
 function DroppableGroup({
   groupName,
   children,
+  activeId,
+  overId,
+  holders,
 }: {
   groupName: string;
   children: React.ReactNode;
+  activeId?: string | null;
+  overId?: string | null;
+  holders: Holder[];
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `group-${groupName}`,
   });
 
+  const isDraggingHolder = activeId?.toString().startsWith("holder-");
+  
+  // Check if hovering over the group container directly
+  const isOverGroup = isOver && isDraggingHolder;
+  
+  // Check if hovering over any holder card in this group
+  const isOverHolderInGroup = React.useMemo(() => {
+    if (!overId || !isDraggingHolder) return false;
+    if (overId.toString().startsWith("holder-")) {
+      const holderName = overId.toString().replace("holder-", "");
+      return holders.some((h) => h.name === holderName);
+    }
+    return false;
+  }, [overId, isDraggingHolder, holders]);
+
+  const isActiveDropZone = isOverGroup || isOverHolderInGroup;
+
   return (
     <div
       ref={setNodeRef}
-      className={isOver ? "ring-2 ring-primary rounded-lg p-1" : ""}
+      className={`rounded-lg transition-all duration-200 ${
+        isActiveDropZone
+          ? "ring-2 ring-primary ring-offset-2 bg-primary/5 border-2 border-primary border-dashed"
+          : isDraggingHolder
+          ? "ring-1 ring-muted border border-dashed border-muted"
+          : ""
+      }`}
+      style={{
+        minHeight: isActiveDropZone ? "60px" : "auto",
+        padding: isActiveDropZone ? "8px" : "0",
+      }}
     >
       {children}
     </div>
@@ -415,6 +531,7 @@ function DraggableRoundSidebar({
   roundHolders,
   proRataHolders,
   onEdit,
+  isDragging: externalIsDragging,
 }: {
   id: string;
   round: Round;
@@ -422,6 +539,7 @@ function DraggableRoundSidebar({
   roundHolders: Holder[];
   proRataHolders: Holder[];
   onEdit?: (index: number) => void;
+  isDragging?: boolean;
 }) {
   const {
     attributes,
@@ -429,24 +547,33 @@ function DraggableRoundSidebar({
     setNodeRef,
     transform,
     transition,
-    isDragging,
+    isDragging: internalIsDragging,
   } = useSortable({ id });
+
+  const isDragging = externalIsDragging || internalIsDragging;
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: isDragging ? undefined : transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 50 : 1,
   };
 
   return (
     <div ref={setNodeRef} style={style}>
-      <Card className="p-3 border-border/50 shadow-none">
+      <Card 
+        className={`p-3 border-border/50 shadow-none transition-all ${
+          isDragging 
+            ? "shadow-lg border-primary/50 scale-105" 
+            : "hover:shadow-sm hover:border-border"
+        }`}
+      >
         <div className="space-y-2.5">
           <div className="flex items-start justify-between gap-2">
             <div
               {...attributes}
               {...listeners}
-              className="cursor-grab active:cursor-grabbing p-0.5 text-muted-foreground hover:text-foreground"
+              className="cursor-grab active:cursor-grabbing p-0.5 text-muted-foreground hover:text-foreground touch-none"
             >
               <GripVertical className="h-4 w-4" />
             </div>

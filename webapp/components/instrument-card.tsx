@@ -163,11 +163,11 @@ export function InstrumentCard({
               </div>
               <div className="flex items-center gap-2 flex-1">
                 <h4 className="font-semibold text-sm">Instrument {displayIndex + 1}</h4>
-                {hasError && (
+                  {hasError && (
                   <Badge variant="destructive" className="text-xs font-semibold">
-                    Error
-                  </Badge>
-                )}
+                      Error
+                    </Badge>
+                  )}
               </div>
             </div>
             {details.length > 0 && (

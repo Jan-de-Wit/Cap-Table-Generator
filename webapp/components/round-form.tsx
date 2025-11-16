@@ -391,12 +391,12 @@ export function RoundForm({
                       <span>{round.name}</span>
                     </>
                   )}
-                  {!isComplete && validation && (
+                {!isComplete && validation && (
                     <Badge variant="destructive" className="text-xs font-semibold ml-2">
                       {validation.errors.length} issue{validation.errors.length !== 1 ? "s" : ""}
-                    </Badge>
-                  )}
-                </CardTitle>
+                  </Badge>
+                )}
+              </CardTitle>
                 {isExpanded && (
                   <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                     <span className="font-medium">{instrumentsCount} instrument{instrumentsCount !== 1 ? "s" : ""}</span>
@@ -444,15 +444,15 @@ export function RoundForm({
       {isExpanded && (
         <CardContent className="space-y-8 pt-2">
           <div className="border-b pb-6">
-            <RoundParametersSection
-              round={round}
-              touchedFields={touchedFields}
-              validation={validation}
-              onUpdate={updateRound}
-              onFieldTouched={(field) =>
-                setTouchedFields((prev) => new Set([...prev, field]))
-              }
-            />
+          <RoundParametersSection
+            round={round}
+            touchedFields={touchedFields}
+            validation={validation}
+            onUpdate={updateRound}
+            onFieldTouched={(field) =>
+              setTouchedFields((prev) => new Set([...prev, field]))
+            }
+          />
           </div>
 
           <div className="space-y-6">
