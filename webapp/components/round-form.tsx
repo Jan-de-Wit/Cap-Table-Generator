@@ -141,10 +141,11 @@ export function RoundForm({
 
         // Also update the pro-rata allocation in the current round if it exists
         // Find the pro-rata allocation by matching holder_name
-        const holderName = "holder_name" in instrument && instrument.holder_name
-          ? instrument.holder_name
-          : null;
-        
+        const holderName =
+          "holder_name" in instrument && instrument.holder_name
+            ? instrument.holder_name
+            : null;
+
         if (holderName) {
           const proRataIndex = round.instruments.findIndex(
             (inst) =>
@@ -152,37 +153,43 @@ export function RoundForm({
               "holder_name" in inst &&
               inst.holder_name === holderName
           );
-          
+
           if (proRataIndex !== -1) {
             // Get the existing pro-rata allocation to preserve its data
             const existingProRata = round.instruments[proRataIndex];
-            const existingProRataType = "pro_rata_type" in existingProRata 
-              ? existingProRata.pro_rata_type 
-              : "standard";
-            const existingPercentage = "pro_rata_percentage" in existingProRata
-              ? existingProRata.pro_rata_percentage
-              : undefined;
-            
+            const existingProRataType =
+              "pro_rata_type" in existingProRata
+                ? existingProRata.pro_rata_type
+                : "standard";
+            const existingPercentage =
+              "pro_rata_percentage" in existingProRata
+                ? existingProRata.pro_rata_percentage
+                : undefined;
+
             // Determine the new pro-rata type from the updated original instrument
-            const newProRataType = "pro_rata_rights" in instrument && instrument.pro_rata_rights === "super"
-              ? "super"
-              : "standard";
-            
+            const newProRataType =
+              "pro_rata_rights" in instrument &&
+              instrument.pro_rata_rights === "super"
+                ? "super"
+                : "standard";
+
             // Get the new percentage if it's a super pro-rata
-            const newPercentage = newProRataType === "super" && "pro_rata_percentage" in instrument
-              ? instrument.pro_rata_percentage
-              : existingPercentage;
-            
+            const newPercentage =
+              newProRataType === "super" && "pro_rata_percentage" in instrument
+                ? instrument.pro_rata_percentage
+                : existingPercentage;
+
             // Update the pro-rata allocation with the new data
             const updatedProRata: Instrument = {
               holder_name: holderName,
-              class_name: "class_name" in instrument ? instrument.class_name : "",
+              class_name:
+                "class_name" in instrument ? instrument.class_name : "",
               pro_rata_type: newProRataType,
               ...(newProRataType === "super" && newPercentage
                 ? { pro_rata_percentage: newPercentage }
                 : {}),
             };
-            
+
             const updated = round.instruments.map((inst, i) =>
               i === proRataIndex ? updatedProRata : inst
             );
@@ -394,78 +401,75 @@ export function RoundForm({
       .map((inst) => ("holder_name" in inst ? inst.holder_name : ""))
   ).size;
 
-
   return (
-    <div className="relative">
+    <div className="relative pb-50">
       {/* Main Content Sections */}
       <div className="space-y-8">
         {/* Round Parameters - Merged with round name editing */}
-                <RoundParametersSection
-                  round={round}
-                  touchedFields={touchedFields}
-                  validation={validation}
-                  onUpdate={updateRound}
-                  onFieldTouched={(field) =>
-                    setTouchedFields((prev) => new Set([...prev, field]))
-                  }
-                  roundIndex={roundIndex}
-                />
+        <RoundParametersSection
+          round={round}
+          touchedFields={touchedFields}
+          validation={validation}
+          onUpdate={updateRound}
+          onFieldTouched={(field) =>
+            setTouchedFields((prev) => new Set([...prev, field]))
+          }
+          roundIndex={roundIndex}
+        />
 
-              {/* Divider */}
-              <div className="border-t border-border/50" />
+        {/* Divider */}
+        <div className="border-t border-border/50" />
 
-              {/* Instruments Section */}
+        {/* Instruments Section */}
         <div className="space-y-4">
-                <div>
-                  <h3 className="text-base font-semibold text-foreground mb-1">
-                    Instruments
-                  </h3>
+          <div>
+            <h3 className="text-base font-semibold text-foreground mb-1">
+              Instruments
+            </h3>
             <p className="text-sm text-muted-foreground">
-                    Define the instruments and share allocations for this round.
-                  </p>
-                </div>
-                <RoundInstrumentsSection
-                  round={round}
-                  calculationType={round.calculation_type}
-                  regularInstruments={regularInstruments}
-                  validation={validation}
-                  onAddInstrument={() =>
-                    handleOpenInstrumentDialog(null, -1, false)
-                  }
-                  onEditInstrument={(instrument, index) =>
-                    handleOpenInstrumentDialog(instrument, index, false)
-                  }
-                  onDeleteInstrument={removeInstrument}
-                />
-              </div>
-
-              {/* Pro-Rata Section */}
-              {hasPreviousRounds && holdersWithProRataRights.length > 0 && (
-                <>
-                  <div className="border-t border-border/50" />
-            <div className="space-y-4">
-                    <div>
-                      <h3 className="text-base font-semibold text-foreground mb-1">
-                  Pro-Rata Allocations
-                      </h3>
-                <p className="text-sm text-muted-foreground">
-                        Exercise pro-rata rights from previous rounds.
-                      </p>
-                    </div>
-                    <ProRataExerciseSection
-                      round={round}
-                      holdersWithProRataRights={holdersWithProRataRights}
-                      exercisedProRataRights={exercisedProRataRights}
-                      proRataInstruments={proRataInstruments}
-                      onToggleExercise={handleToggleProRataExercise}
-                      onEditProRata={(instrument, index) =>
-                        handleOpenInstrumentDialog(instrument, index, true)
-                      }
-                    />
-                  </div>
-                </>
-              )}
+              Define the instruments and share allocations for this round.
+            </p>
+          </div>
+          <RoundInstrumentsSection
+            round={round}
+            calculationType={round.calculation_type}
+            regularInstruments={regularInstruments}
+            validation={validation}
+            onAddInstrument={() => handleOpenInstrumentDialog(null, -1, false)}
+            onEditInstrument={(instrument, index) =>
+              handleOpenInstrumentDialog(instrument, index, false)
+            }
+            onDeleteInstrument={removeInstrument}
+          />
         </div>
+
+        {/* Pro-Rata Section */}
+        {hasPreviousRounds && holdersWithProRataRights.length > 0 && (
+          <>
+            <div className="border-t border-border/50" />
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-semibold text-foreground mb-1">
+                  Pro-Rata Allocations
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Exercise pro-rata rights from previous rounds.
+                </p>
+              </div>
+              <ProRataExerciseSection
+                round={round}
+                holdersWithProRataRights={holdersWithProRataRights}
+                exercisedProRataRights={exercisedProRataRights}
+                proRataInstruments={proRataInstruments}
+                onToggleExercise={handleToggleProRataExercise}
+                onEditProRata={(instrument, index) =>
+                  handleOpenInstrumentDialog(instrument, index, true)
+                }
+              />
+            </div>
+          </>
+        )}
+      </div>
 
       {editingInstrument && (
         <InstrumentDialog

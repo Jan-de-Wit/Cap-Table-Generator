@@ -411,14 +411,8 @@ export default function Home() {
         <div className="w-full max-w-3xl mx-auto p-3 sm:p-5 lg:p-6">
           {/* Header */}
           <div className="mb-6 pt-4">
-            <div className="mb-6">
-              <Image
-                src="/zebra.legal.svg"
-                alt="Zebra Legal"
-                width={100}
-                height={100}
-                className="h-5 w-auto"
-              />
+            <div className="mb-6 flex items-center gap-2  ">
+              <p className="text-lg font-semibold">zebra.legal</p>
             </div>
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight pt-4">
               Cap Table Generator
@@ -428,90 +422,100 @@ export default function Home() {
           {/* Rounds Section */}
           <div className="space-y-5">
             <div className="space-y-3 pb-2">
-            <div className="flex items-center gap-2 border-b border-border/50 pb-2.5">
-              <h2 className="text-base font-semibold">
-                {selectedRoundIndex !== null && rounds[selectedRoundIndex]
-                  ? `Editing: ${
-                      rounds[selectedRoundIndex].name ||
-                      `Round ${selectedRoundIndex + 1}`
-                    }`
-                  : "Select a Round"}
-              </h2>
-              {rounds.length > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  {rounds.length}
-                </Badge>
+              <div className="flex items-center gap-2 border-b border-border/50 pb-2.5">
+                <h2 className="text-base font-semibold">
+                  {selectedRoundIndex !== null && rounds[selectedRoundIndex]
+                    ? `Editing: ${
+                        rounds[selectedRoundIndex].name ||
+                        `Round ${selectedRoundIndex + 1}`
+                      }`
+                    : "Select a Round"}
+                </h2>
+                {rounds.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    {rounds.length}
+                  </Badge>
                 )}
               </div>
               {/* Summary badges */}
               {selectedRoundIndex !== null && rounds[selectedRoundIndex] && (
                 <div className="flex items-center gap-4 flex-wrap">
-                  {validations[selectedRoundIndex] && (() => {
-                    const round = rounds[selectedRoundIndex];
-                    const regularInstruments = round.instruments.filter(
-                      (inst) => !("pro_rata_type" in inst)
-                    );
-                    const proRataInstruments = round.instruments.filter(
-                      (inst) => "pro_rata_type" in inst
-                    );
-                    const hasInstrumentsOrProRata = regularInstruments.length > 0 || proRataInstruments.length > 0;
-                    const isValid = validations[selectedRoundIndex].isValid;
-                    const isComplete = isValid && hasInstrumentsOrProRata;
-                    
-                    // Determine what's missing
-                    let tooltipMessage = "";
-                    if (!isComplete) {
-                      if (!hasInstrumentsOrProRata) {
-                        tooltipMessage = "Add at least one instrument or pro-rata allocation to complete this round.";
-                      } else if (!isValid) {
-                        const errors = validations[selectedRoundIndex].errors;
-                        const errorFields = errors.map(e => e.field).filter(f => f !== "instruments");
-                        if (errorFields.length > 0) {
-                          const fieldNames = errorFields.map(f => {
-                            if (f === "name") return "Round Name";
-                            if (f === "round_date") return "Round Date";
-                            if (f === "calculation_type") return "Round Type";
-                            if (f === "valuation") return "Valuation";
-                            if (f === "valuation_basis") return "Valuation Basis";
-                            return f;
-                          });
-                          tooltipMessage = `Please fix: ${fieldNames.join(", ")}`;
-                        } else {
-                          tooltipMessage = "Please fix the validation errors to complete this round.";
+                  {validations[selectedRoundIndex] &&
+                    (() => {
+                      const round = rounds[selectedRoundIndex];
+                      const regularInstruments = round.instruments.filter(
+                        (inst) => !("pro_rata_type" in inst)
+                      );
+                      const proRataInstruments = round.instruments.filter(
+                        (inst) => "pro_rata_type" in inst
+                      );
+                      const hasInstrumentsOrProRata =
+                        regularInstruments.length > 0 ||
+                        proRataInstruments.length > 0;
+                      const isValid = validations[selectedRoundIndex].isValid;
+                      const isComplete = isValid && hasInstrumentsOrProRata;
+
+                      // Determine what's missing
+                      let tooltipMessage = "";
+                      if (!isComplete) {
+                        if (!hasInstrumentsOrProRata) {
+                          tooltipMessage =
+                            "Add at least one instrument or pro-rata allocation to complete this round.";
+                        } else if (!isValid) {
+                          const errors = validations[selectedRoundIndex].errors;
+                          const errorFields = errors
+                            .map((e) => e.field)
+                            .filter((f) => f !== "instruments");
+                          if (errorFields.length > 0) {
+                            const fieldNames = errorFields.map((f) => {
+                              if (f === "name") return "Round Name";
+                              if (f === "round_date") return "Round Date";
+                              if (f === "calculation_type") return "Round Type";
+                              if (f === "valuation") return "Valuation";
+                              if (f === "valuation_basis")
+                                return "Valuation Basis";
+                              return f;
+                            });
+                            tooltipMessage = `Please fix: ${fieldNames.join(
+                              ", "
+                            )}`;
+                          } else {
+                            tooltipMessage =
+                              "Please fix the validation errors to complete this round.";
+                          }
                         }
                       }
-                    }
-                    
-                    const statusElement = (
-                      <div className="flex items-center gap-2">
-                        {isComplete ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                        )}
-                        <span className="text-sm text-muted-foreground">
-                          {isComplete ? "Complete" : "Incomplete"}
-                        </span>
-                      </div>
-                    );
-                    
-                    if (!isComplete && tooltipMessage) {
-                      return (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              {statusElement}
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{tooltipMessage}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+
+                      const statusElement = (
+                        <div className="flex items-center gap-2">
+                          {isComplete ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                          )}
+                          <span className="text-sm text-muted-foreground">
+                            {isComplete ? "Complete" : "Incomplete"}
+                          </span>
+                        </div>
                       );
-                    }
-                    
-                    return statusElement;
-                  })()}
+
+                      if (!isComplete && tooltipMessage) {
+                        return (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                {statusElement}
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{tooltipMessage}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      }
+
+                      return statusElement;
+                    })()}
                   {rounds[selectedRoundIndex].round_date && (
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <span>

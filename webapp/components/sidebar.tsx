@@ -12,6 +12,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Users,
   TrendingUp,
   Pencil,
@@ -829,7 +835,25 @@ function DraggableRoundSidebar({
                   {round.name || `Round ${index + 1}`}
                 </div>
                 {isIncomplete ? (
-                  <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="space-y-1">
+                          {!hasInstrumentsOrProRata && (
+                            <p>Add at least one instrument or pro-rata allocation</p>
+                          )}
+                          {hasValidationErrors && (
+                            <p>
+                              {!hasInstrumentsOrProRata ? "and fix validation errors" : "Fix validation errors"}
+                            </p>
+                          )}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 ) : (
                   <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />
                 )}

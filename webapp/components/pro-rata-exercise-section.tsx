@@ -360,7 +360,7 @@ export function ProRataExerciseSection({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-start">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
@@ -372,16 +372,27 @@ export function ProRataExerciseSection({
               .getAllColumns()
               .filter((column) => column.getCanHide())
               .map((column) => {
+                // Map column IDs to their header display names
+                const headerNameMap: Record<string, string> = {
+                  holder_name: "Holder",
+                  class_name: "Class",
+                  pro_rata_type: "Pro-Rata Type",
+                  pro_rata_percentage: "Pro-Rata Percentage",
+                  isExercised: "Status",
+                };
+                const displayName = headerNameMap[column.id] || column.id
+                  .split("_")
+                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(" ");
                 return (
                   <DropdownMenuCheckboxItem
                     key={column.id}
-                    className="capitalize"
                     checked={column.getIsVisible()}
                     onCheckedChange={(value) =>
                       column.toggleVisibility(!!value)
                     }
                   >
-                    {column.id}
+                    {displayName}
                   </DropdownMenuCheckboxItem>
                 );
               })}
@@ -390,11 +401,7 @@ export function ProRataExerciseSection({
       </div>
       <div
         ref={tableContainerRef}
-        className={`rounded-md border border-border/50 overflow-x-auto w-full relative ${
-          isScrollable
-            ? "shadow-[inset_-8px_0_8px_-8px_rgba(0,0,0,0.1)] dark:shadow-[inset_-8px_0_8px_-8px_rgba(0,0,0,0.3)]"
-            : ""
-        }`}
+        className={`rounded-md border border-border/50 overflow-x-auto w-full relative`}
       >
         {isScrollable && (
           <div className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none bg-gradient-to-l from-background to-transparent z-10" />
@@ -402,7 +409,7 @@ export function ProRataExerciseSection({
         <Table className="min-w-full">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="group">
                 {headerGroup.headers.map((header) => {
                   const isSticky = header.column.columnDef.meta?.sticky;
                   return (
@@ -410,10 +417,18 @@ export function ProRataExerciseSection({
                       key={header.id}
                       className={`min-w-[120px] whitespace-nowrap ${
                         isSticky
-                          ? "sticky right-0 bg-background z-20 border-l border-border/50 shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.1)] dark:shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.3)]"
+                          ? "sticky right-0 bg-background group-hover:bg-muted z-20"
                           : ""
                       }`}
-                      style={isSticky ? { minWidth: "100px" } : undefined}
+                      style={
+                        isSticky
+                          ? {
+                              minWidth: "100px",
+                              borderLeft: "1px solid hsl(var(--border) / 0.5)",
+                              boxShadow: "inset 1px 0 0 0 hsl(var(--border) / 0.5)",
+                            }
+                          : undefined
+                      }
                     >
                       {header.isPlaceholder
                         ? null
@@ -459,18 +474,24 @@ export function ProRataExerciseSection({
                         row.original.originalData.type === "super";
                       const bgClass = isExercised
                         ? isSuper
-                          ? "bg-primary/5 group-hover:bg-primary/10"
-                          : "bg-green-500/5 group-hover:bg-green-500/10"
-                        : "bg-background group-hover:bg-muted/50";
+                          ? "bg-background group-hover:!bg-primary-50 dark:group-hover:!bg-primary-950"
+                          : "bg-background group-hover:!bg-green-50 dark:group-hover:!bg-green-950"
+                        : "bg-background group-hover:!bg-muted";
                       return (
                         <TableCell
                           key={cell.id}
                           className={`min-w-[120px] whitespace-nowrap ${
-                            isSticky
-                              ? `sticky right-0 z-20 border-l border-border/50 shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.1)] dark:shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.3)] ${bgClass}`
-                              : ""
+                            isSticky ? `sticky right-0 z-20 ${bgClass}` : ""
                           }`}
-                          style={isSticky ? { minWidth: "100px" } : undefined}
+                          style={
+                            isSticky
+                              ? {
+                                  minWidth: "100px",
+                                  borderLeft: "1px solid hsl(var(--border) / 0.5)",
+                                  boxShadow: "inset 1px 0 0 0 hsl(var(--border) / 0.5)",
+                                }
+                              : undefined
+                          }
                         >
                           {flexRender(
                             cell.column.columnDef.cell,

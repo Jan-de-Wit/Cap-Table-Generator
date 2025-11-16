@@ -821,16 +821,44 @@ export function RoundInstrumentsSection({
                     .getAllColumns()
                     .filter((column) => column.getCanHide())
                     .map((column) => {
+                      // Map column IDs to their header display names
+                      const headerNameMap: Record<string, string> = {
+                        holder_name: "Holder",
+                        class_name: "Class",
+                        initial_quantity: "Shares",
+                        target_percentage: "Target %",
+                        investment_amount: "Investment",
+                        interest_rate: "Interest Rate",
+                        payment_date: "Payment Date",
+                        expected_conversion_date: "Conversion Date",
+                        interest_type: "Interest Type",
+                        discount_rate: "Discount",
+                        valuation_cap: "Valuation Cap",
+                        valuation_cap_type: "Cap Type",
+                        pro_rata_rights: "Pro-Rata Rights",
+                        pro_rata_percentage:
+                          calculationType === "fixed_shares"
+                            ? "Pro-Rata"
+                            : "Pro-Rata %",
+                      };
+                      const displayName =
+                        headerNameMap[column.id] ||
+                        column.id
+                          .split("_")
+                          .map(
+                            (word) =>
+                              word.charAt(0).toUpperCase() + word.slice(1)
+                          )
+                          .join(" ");
                       return (
                         <DropdownMenuCheckboxItem
                           key={column.id}
-                          className="capitalize"
                           checked={column.getIsVisible()}
                           onCheckedChange={(value) =>
                             column.toggleVisibility(!!value)
                           }
                         >
-                          {column.id}
+                          {displayName}
                         </DropdownMenuCheckboxItem>
                       );
                     })}
@@ -840,11 +868,7 @@ export function RoundInstrumentsSection({
           </div>
           <div
             ref={tableContainerRef}
-            className={`rounded-md border border-border/50 overflow-x-auto w-full relative ${
-              isScrollable
-                ? "shadow-[inset_-8px_0_8px_-8px_rgba(0,0,0,0.1)] dark:shadow-[inset_-8px_0_8px_-8px_rgba(0,0,0,0.3)]"
-                : ""
-            }`}
+            className={`rounded-md border border-border/50 overflow-x-auto w-full relative`}
           >
             {isScrollable && (
               <div className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none bg-gradient-to-l from-background to-transparent z-10" />
@@ -852,7 +876,7 @@ export function RoundInstrumentsSection({
             <Table className="min-w-full">
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
+                  <TableRow key={headerGroup.id} className="group">
                     {headerGroup.headers.map((header) => {
                       const isSticky = header.column.columnDef.meta?.sticky;
                       return (
@@ -860,10 +884,16 @@ export function RoundInstrumentsSection({
                           key={header.id}
                           className={`min-w-[120px] whitespace-nowrap ${
                             isSticky
-                              ? "sticky right-0 bg-background z-20 border-l border-border/50 shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.1)] dark:shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.3)]"
+                              ? "sticky right-0 bg-background group-hover:bg-muted z-20 border-l border-border/50"
                               : ""
                           }`}
-                          style={isSticky ? { minWidth: "100px" } : undefined}
+                          style={
+                            isSticky
+                              ? {
+                                  minWidth: "100px",
+                                }
+                              : undefined
+                          }
                         >
                           {header.isPlaceholder
                             ? null
@@ -896,14 +926,20 @@ export function RoundInstrumentsSection({
                           key={cell.id}
                           className={`min-w-[120px] whitespace-nowrap ${
                             isSticky
-                              ? `sticky right-0 z-20 border-l border-border/50 shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.1)] dark:shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.3)] ${
+                              ? `sticky right-0 z-20 bg-background border-l border-border/50 ${
                                   rowHasError
-                                    ? "bg-destructive/5 group-hover:bg-destructive/10"
-                                    : "bg-background group-hover:bg-muted/50"
+                                    ? "group-hover:!bg-destructive-50 dark:group-hover:!bg-destructive-950"
+                                    : "group-hover:!bg-muted"
                                 }`
                               : ""
                           }`}
-                          style={isSticky ? { minWidth: "100px" } : undefined}
+                          style={
+                            isSticky
+                              ? {
+                                  minWidth: "100px",
+                                }
+                              : undefined
+                          }
                         >
                           {flexRender(
                             cell.column.columnDef.cell,
