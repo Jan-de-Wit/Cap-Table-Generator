@@ -123,6 +123,7 @@ export function HolderSelector({
           <Button
             type="button"
             variant="outline"
+            className="h-10"
             onClick={(e) => {
               e.stopPropagation();
               handleEdit(selectedHolder.name);
@@ -136,6 +137,7 @@ export function HolderSelector({
           <Button
             type="button"
             variant="outline"
+            className="h-10"
             onClick={(e) => {
               e.stopPropagation();
               handleCreateNew();

@@ -1,26 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   Trash2,
-  ChevronDown,
-  ChevronRight,
-  Copy,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
+  FileText,
+  Users,
+  Plus,
 } from "lucide-react";
+import { toast } from "sonner";
 import { InstrumentDialog } from "@/components/instrument-dialog";
 import { RoundParametersSection } from "@/components/round-parameters-section";
 import { RoundInstrumentsSection } from "@/components/round-instruments-section";
 import { ProRataExerciseSection } from "@/components/pro-rata-exercise-section";
-import type {
-  Round,
-  Holder,
-  Instrument,
-} from "@/types/cap-table";
+import type { Round, Holder, Instrument } from "@/types/cap-table";
 import type { RoundValidation } from "@/lib/validation";
 
 interface RoundFormProps {
@@ -35,9 +33,6 @@ interface RoundFormProps {
   roundIndex?: number;
   onUpdateRound?: (roundIndex: number, round: Round) => void;
   onDelete?: () => void;
-  onDuplicate?: () => void;
-  isExpanded?: boolean;
-  onToggleExpand?: () => void;
   validation?: RoundValidation;
 }
 
@@ -53,9 +48,6 @@ export function RoundForm({
   roundIndex,
   onUpdateRound,
   onDelete,
-  onDuplicate,
-  isExpanded = true,
-  onToggleExpand,
   validation,
 }: RoundFormProps) {
   const [touchedFields, setTouchedFields] = React.useState<Set<string>>(
@@ -160,29 +152,54 @@ export function RoundForm({
         });
 
         // Also update the pro-rata allocation in the current round if it exists
-        const proRataIndex = round.instruments.findIndex(
-          (inst) =>
-            "pro_rata_type" in inst &&
-            "holder_name" in inst &&
-            inst.holder_name === (instrument as any).holder_name
-        );
-        if (proRataIndex !== -1) {
-          const updatedProRata: Instrument = {
-            holder_name: (instrument as any).holder_name,
-            class_name: (instrument as any).class_name,
-            pro_rata_type:
-              (instrument as any).pro_rata_rights === "super"
-                ? "super"
-                : "standard",
-            ...((instrument as any).pro_rata_rights === "super" &&
-            (instrument as any).pro_rata_percentage
-              ? { pro_rata_percentage: (instrument as any).pro_rata_percentage }
-              : {}),
-          };
-          const updated = round.instruments.map((inst, i) =>
-            i === proRataIndex ? updatedProRata : inst
+        // Find the pro-rata allocation by matching holder_name
+        const holderName = "holder_name" in instrument && instrument.holder_name
+          ? instrument.holder_name
+          : null;
+        
+        if (holderName) {
+          const proRataIndex = round.instruments.findIndex(
+            (inst) =>
+              "pro_rata_type" in inst &&
+              "holder_name" in inst &&
+              inst.holder_name === holderName
           );
-          updateRound({ instruments: updated });
+          
+          if (proRataIndex !== -1) {
+            // Get the existing pro-rata allocation to preserve its data
+            const existingProRata = round.instruments[proRataIndex];
+            const existingProRataType = "pro_rata_type" in existingProRata 
+              ? existingProRata.pro_rata_type 
+              : "standard";
+            const existingPercentage = "pro_rata_percentage" in existingProRata
+              ? existingProRata.pro_rata_percentage
+              : undefined;
+            
+            // Determine the new pro-rata type from the updated original instrument
+            const newProRataType = "pro_rata_rights" in instrument && instrument.pro_rata_rights === "super"
+              ? "super"
+              : "standard";
+            
+            // Get the new percentage if it's a super pro-rata
+            const newPercentage = newProRataType === "super" && "pro_rata_percentage" in instrument
+              ? instrument.pro_rata_percentage
+              : existingPercentage;
+            
+            // Update the pro-rata allocation with the new data
+            const updatedProRata: Instrument = {
+              holder_name: holderName,
+              class_name: "class_name" in instrument ? instrument.class_name : "",
+              pro_rata_type: newProRataType,
+              ...(newProRataType === "super" && newPercentage
+                ? { pro_rata_percentage: newPercentage }
+                : {}),
+            };
+            
+            const updated = round.instruments.map((inst, i) =>
+              i === proRataIndex ? updatedProRata : inst
+            );
+            updateRound({ instruments: updated });
+          }
         }
       } else if (editingInstrument.instrument) {
         // Update existing instrument in current round
@@ -193,6 +210,17 @@ export function RoundForm({
       } else {
         // Add new instrument
         addInstrument(instrument);
+        const holderName =
+          "holder_name" in instrument && instrument.holder_name
+            ? instrument.holder_name
+            : "Unknown";
+        const className =
+          "class_name" in instrument && instrument.class_name
+            ? instrument.class_name
+            : "Unknown class";
+        toast.success("Instrument added", {
+          description: `"${holderName}" - ${className} has been added.`,
+        });
       }
     }
     setInstrumentDialogOpen(false);
@@ -200,8 +228,36 @@ export function RoundForm({
   };
 
   const removeInstrument = (index: number) => {
+    const deletedInstrument = round.instruments[index];
+    const holderName =
+      "holder_name" in deletedInstrument && deletedInstrument.holder_name
+        ? deletedInstrument.holder_name
+        : "Unknown";
+    const className =
+      "class_name" in deletedInstrument && deletedInstrument.class_name
+        ? deletedInstrument.class_name
+        : "Unknown class";
+
+    // Store state for undo
+    const previousInstruments = [...round.instruments];
+
+    // Perform deletion
     updateRound({
       instruments: round.instruments.filter((_, i) => i !== index),
+    });
+
+    // Show toast with undo
+    toast(`"${holderName}" - ${className} has been removed.`, {
+      description: 'Accident? Hit "Undo" to restore.',
+      action: {
+        label: "Undo",
+        onClick: () => {
+          updateRound({ instruments: previousInstruments });
+          toast.success("Instrument restored", {
+            description: `"${holderName}" - ${className} has been restored.`,
+          });
+        },
+      },
     });
   };
 
@@ -340,8 +396,8 @@ export function RoundForm({
   // Get round number and display name
   const roundNumber = roundIndex !== undefined ? roundIndex + 1 : 1;
   const displayName = round.name || `Round ${roundNumber}`;
-  const roundType = round.name ? round.name.split(' ')[0] : '';
-  
+  const roundType = round.name ? round.name.split(" ")[0] : "";
+
   // Get contextual info
   const instrumentsCount = regularInstruments.length;
   const holdersCount = new Set(
@@ -350,139 +406,217 @@ export function RoundForm({
       .map((inst) => ("holder_name" in inst ? inst.holder_name : ""))
   ).size;
 
+  const hasValidationErrors = validation && !validation.isValid;
+  const issuesCount = validation?.errors.length ?? 0;
+  const [issuesExpanded, setIssuesExpanded] = React.useState(false);
+
+  // Get field IDs for navigation
+  const getFieldId = (field: string) => {
+    if (roundIndex === undefined) return undefined;
+    const fieldMap: Record<string, string> = {
+      name: `round-${roundIndex}-name`,
+      round_date: `round-${roundIndex}-round_date`,
+      calculation_type: `round-${roundIndex}-calculation-type`,
+      valuation: `round-${roundIndex}-valuation`,
+      valuation_basis: `round-${roundIndex}-valuation-basis`,
+    };
+    return fieldMap[field] || undefined;
+  };
+
   return (
-    <Card
-      className={`border-border/50 shadow-none transition-all ${
-        isComplete 
-          ? "border-green-200/50 dark:border-green-800/50 bg-green-50/20 dark:bg-green-950/10 hover:shadow-sm hover:border-green-300/50 dark:hover:border-green-700/50" 
-          : "hover:shadow-sm hover:border-border"
-      }`}
-    >
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-1">
-            {onToggleExpand && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onToggleExpand}
-                className="h-6 w-6 p-0"
-              >
-                {isExpanded ? (
-                  <ChevronDown className="h-3.5 w-3.5" />
+    <div className="relative">
+      {/* Round Header */}
+      <div className={`pb-6 ${
+        isComplete
+          ? "border-b border-green-200/50 dark:border-green-800/50"
+          : "border-b border-border/50"
+      }`}>
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2.5 mb-2">
+                {isComplete ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
                 ) : (
-                  <ChevronRight className="h-3.5 w-3.5" />
+                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
                 )}
-              </Button>
-            )}
-            <div className="flex items-center gap-2 flex-1">
-              {isComplete ? (
-                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
-              ) : (
-                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-              )}
-              <div className="flex-1 min-w-0">
-                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                  <span className="text-primary">Round {roundNumber}</span>
-                  {round.name && (
-                    <>
-                      <span className="text-muted-foreground">—</span>
-                      <span>{round.name}</span>
-                    </>
-                  )}
-                {!isComplete && validation && (
-                    <Badge variant="destructive" className="text-xs font-medium ml-1.5">
-                      {validation.errors.length} issue{validation.errors.length !== 1 ? "s" : ""}
-                  </Badge>
-                )}
-              </CardTitle>
-                {isExpanded && (
-                  <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-                    <span className="font-medium">{instrumentsCount} instrument{instrumentsCount !== 1 ? "s" : ""}</span>
-                    <span>•</span>
-                    <span className="font-medium">{holdersCount} holder{holdersCount !== 1 ? "s" : ""}</span>
-                    {round.round_date && (
-                      <>
-                        <span>•</span>
-                        <span>{new Date(round.round_date).toLocaleDateString()}</span>
-                      </>
-                    )}
+                <h2 className="text-lg font-semibold text-foreground">
+                  {round.name || `Round ${roundNumber}`}
+                </h2>
+              </div>
+              <div className="flex items-center gap-4 flex-wrap">
+                {round.round_date && (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <span>{new Date(round.round_date).toLocaleDateString()}</span>
                   </div>
                 )}
+                <Badge variant="secondary" className="text-xs font-medium">
+                  <FileText className="h-3 w-3 mr-1" />
+                  {instrumentsCount} {instrumentsCount === 1 ? "instrument" : "instruments"}
+                </Badge>
+                <Badge variant="secondary" className="text-xs font-medium">
+                  <Users className="h-3 w-3 mr-1" />
+                  {holdersCount} {holdersCount === 1 ? "holder" : "holders"}
+                </Badge>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            {onDuplicate && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onDuplicate}
-                className="h-5 w-5 p-0"
-                title="Duplicate round"
-              >
-                <Copy className="h-2.5 w-2.5" />
-              </Button>
-            )}
+          <div className="flex items-center gap-1 shrink-0">
             {onDelete && (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={onDelete}
-                className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                 title="Delete round"
               >
-                <Trash2 className="h-2.5 w-2.5" />
+                <Trash2 className="h-4 w-4" />
               </Button>
             )}
           </div>
         </div>
-      </CardHeader>
-      {isExpanded && (
-        <CardContent className="space-y-5 pt-2">
-          <div className="border-b border-border/50 pb-4">
-          <RoundParametersSection
-            round={round}
-            touchedFields={touchedFields}
-            validation={validation}
-            onUpdate={updateRound}
-            onFieldTouched={(field) =>
-              setTouchedFields((prev) => new Set([...prev, field]))
-            }
-          />
-          </div>
+      </div>
 
-          <div className="space-y-4">
-            <RoundInstrumentsSection
-              round={round}
-              calculationType={round.calculation_type}
-              regularInstruments={regularInstruments}
-              validation={validation}
-              onAddInstrument={() => handleOpenInstrumentDialog(null, -1, false)}
-              onEditInstrument={(instrument, index) =>
-                handleOpenInstrumentDialog(instrument, index, false)
-              }
-              onDeleteInstrument={removeInstrument}
-            />
-
-            {hasPreviousRounds && holdersWithProRataRights.length > 0 && (
-              <ProRataExerciseSection
-                round={round}
-                holdersWithProRataRights={holdersWithProRataRights}
-                exercisedProRataRights={exercisedProRataRights}
-                proRataInstruments={proRataInstruments}
-                onToggleExercise={handleToggleProRataExercise}
-                onEditProRata={(instrument, index) =>
-                  handleOpenInstrumentDialog(instrument, index, true)
-                }
-              />
-            )}
+      {/* Issues Panel */}
+      {hasValidationErrors && issuesCount > 0 && (
+        <div className="mt-6 mb-6 rounded-md bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 p-4">
+          <div className="flex items-center gap-2.5 mb-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="text-sm font-semibold text-foreground">
+              Issues found
+            </span>
           </div>
-        </CardContent>
+          <div className="space-y-2">
+            {validation?.errors.map((error, idx) => {
+              const fieldId = getFieldId(error.field);
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    if (fieldId) {
+                      const element = document.getElementById(fieldId);
+                      if (element) {
+                        element.scrollIntoView({ behavior: "smooth", block: "center" });
+                        element.focus();
+                      }
+                    }
+                  }}
+                  className="w-full text-left p-2.5 rounded-md hover:bg-amber-100 dark:hover:bg-amber-950/40 transition-colors border border-amber-200/50 dark:border-amber-800/50"
+                >
+                  <div className="text-xs font-medium text-foreground">
+                    {error.field === "name" ? "Round Name" :
+                     error.field === "round_date" ? "Round Date" :
+                     error.field === "calculation_type" ? "Calculation Type" :
+                     error.field === "valuation" ? "Valuation" :
+                     error.field === "valuation_basis" ? "Valuation Basis" :
+                     error.field === "instruments" ? "Instruments" :
+                     error.field}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {error.message}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
+
+      {/* Main Content Sections */}
+      <div className="pt-6 space-y-8">
+              {/* Round Details Section */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground mb-1">
+                    Round Details
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Configure the basic information and calculation method for this round.
+                  </p>
+                </div>
+                <RoundParametersSection
+                  round={round}
+                  touchedFields={touchedFields}
+                  validation={validation}
+                  onUpdate={updateRound}
+                  onFieldTouched={(field) =>
+                    setTouchedFields((prev) => new Set([...prev, field]))
+                  }
+                  roundIndex={roundIndex}
+                />
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-border/50" />
+
+              {/* Instruments Section */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground mb-1">
+                    Instruments
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Define the instruments and share allocations for this round.
+                  </p>
+                </div>
+                <RoundInstrumentsSection
+                  round={round}
+                  calculationType={round.calculation_type}
+                  regularInstruments={regularInstruments}
+                  validation={validation}
+                  onAddInstrument={() =>
+                    handleOpenInstrumentDialog(null, -1, false)
+                  }
+                  onEditInstrument={(instrument, index) =>
+                    handleOpenInstrumentDialog(instrument, index, false)
+                  }
+                  onDeleteInstrument={removeInstrument}
+                />
+              </div>
+
+              {/* Pro-Rata Section */}
+              {hasPreviousRounds && holdersWithProRataRights.length > 0 && (
+                <>
+                  <div className="border-t border-border/50" />
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-base font-semibold text-foreground mb-1">
+                        Pro-Rata Rights
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-6">
+                        Exercise pro-rata rights from previous rounds.
+                      </p>
+                    </div>
+                    <ProRataExerciseSection
+                      round={round}
+                      holdersWithProRataRights={holdersWithProRataRights}
+                      exercisedProRataRights={exercisedProRataRights}
+                      proRataInstruments={proRataInstruments}
+                      onToggleExercise={handleToggleProRataExercise}
+                      onEditProRata={(instrument, index) =>
+                        handleOpenInstrumentDialog(instrument, index, true)
+                      }
+                    />
+                  </div>
+                </>
+              )}
+        </div>
+
+        {/* Action Bar */}
+        <div className="mt-6 flex items-center justify-end gap-3">
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={() => handleOpenInstrumentDialog(null, -1, false)}
+            className="font-medium"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Instrument
+          </Button>
+        </div>
       {editingInstrument && (
         <InstrumentDialog
           open={instrumentDialogOpen}
@@ -503,6 +637,6 @@ export function RoundForm({
           isProRata={editingInstrument.isProRata}
         />
       )}
-    </Card>
+    </div>
   );
 }

@@ -28,11 +28,11 @@ export function FieldWithHelp({
   htmlFor,
 }: FieldWithHelpProps) {
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-1.5">
       <div className="flex items-center gap-2">
         <Label 
           htmlFor={htmlFor} 
-          className={`text-sm font-semibold ${error ? "text-destructive" : required ? "text-foreground" : ""}`}
+          className={`text-xs font-medium ${error ? "text-destructive" : required ? "text-foreground" : ""}`}
         >
           {label}
           {required && <span className="text-destructive ml-1.5 font-bold">*</span>}

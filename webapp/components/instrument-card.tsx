@@ -150,33 +150,33 @@ export function InstrumentCard({
 
   return (
     <Card
-      className={`group hover:shadow-md transition-all ${
-        hasError ? "border-destructive bg-destructive/5" : "border-border hover:border-primary/50"
+      className={`group hover:shadow-md transition-all border-border/50 ${
+        hasError ? "border-destructive/50 bg-destructive/5" : "hover:border-primary/30"
       }`}
     >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-3">
-              <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary/10 text-primary font-bold text-xs shrink-0">
+              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary font-semibold text-xs shrink-0">
                 {displayIndex + 1}
               </div>
               <div className="flex items-center gap-2 flex-1">
-                <h4 className="font-semibold text-sm">Instrument {displayIndex + 1}</h4>
-                  {hasError && (
-                  <Badge variant="destructive" className="text-xs font-semibold">
-                      Error
-                    </Badge>
-                  )}
+                <h4 className="font-semibold text-sm text-foreground">Instrument {displayIndex + 1}</h4>
+                {hasError && (
+                  <Badge variant="destructive" className="text-xs font-medium">
+                    Error
+                  </Badge>
+                )}
               </div>
             </div>
             {details.length > 0 && (
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 pl-10">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 pl-11">
                 {details.map((detail, idx) => (
                   <div key={idx} className="flex items-center gap-2 text-sm">
                     <div className="text-muted-foreground flex items-center gap-1.5 shrink-0">
                       <span className="text-muted-foreground/70">{detail.icon}</span>
-                      <span className="text-xs">{detail.label}:</span>
+                      <span className="text-xs font-medium">{detail.label}:</span>
                     </div>
                     <span className="font-semibold text-foreground">{detail.value}</span>
                   </div>

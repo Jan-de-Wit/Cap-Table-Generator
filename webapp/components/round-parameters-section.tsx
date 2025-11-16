@@ -10,6 +10,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FieldWithHelp } from "@/components/field-with-help";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Round, CalculationType, ValuationBasis } from "@/types/cap-table";
 import type { RoundValidation } from "@/lib/validation";
 import { getFieldError } from "@/lib/validation";
@@ -21,6 +29,7 @@ interface RoundParametersSectionProps {
   validation?: RoundValidation;
   onUpdate: (updates: Partial<Round>) => void;
   onFieldTouched: (field: string) => void;
+  roundIndex?: number;
 }
 
 export function RoundParametersSection({
@@ -29,6 +38,7 @@ export function RoundParametersSection({
   validation,
   onUpdate,
   onFieldTouched,
+  roundIndex,
 }: RoundParametersSectionProps) {
   const needsValuationBasis = [
     "valuation_based",
@@ -36,8 +46,25 @@ export function RoundParametersSection({
     "safe",
   ].includes(round.calculation_type);
 
+  const calculationTypeOptions = [
+    { value: "fixed_shares", label: "Fixed Shares" },
+    { value: "valuation_based", label: "Valuation-Based" },
+    { value: "target_percentage", label: "Target %" },
+    { value: "convertible", label: "Convertible" },
+    { value: "safe", label: "SAFE" },
+  ];
+
+  const calculationTypeHelpText = {
+    fixed_shares: "Shares are allocated directly with a fixed number of shares per instrument.",
+    target_percentage: "Shares are calculated to achieve a target diluted ownership percentage.",
+    valuation_based: "Shares are calculated based on investment amount and valuation.",
+    convertible: "Convertible instruments that convert to equity at a future date with interest and discounts.",
+    safe: "Simple Agreement for Future Equity - converts to equity at a future financing round.",
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Round Name and Date in 2-column grid */}
       <div className="grid grid-cols-2 gap-6">
         <FieldWithHelp
           label="Round Name"
@@ -51,7 +78,7 @@ export function RoundParametersSection({
           htmlFor="round-name"
         >
           <Input
-            id="round-name"
+            id={roundIndex !== undefined ? `round-${roundIndex}-name` : "round-name"}
             value={round.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
             onBlur={() => onFieldTouched("name")}
@@ -76,7 +103,7 @@ export function RoundParametersSection({
           htmlFor="round-date"
         >
           <Input
-            id="round-date"
+            id={roundIndex !== undefined ? `round-${roundIndex}-round_date` : "round-date"}
             type="date"
             value={round.round_date}
             onChange={(e) => onUpdate({ round_date: e.target.value })}
@@ -91,47 +118,67 @@ export function RoundParametersSection({
         </FieldWithHelp>
       </div>
 
-      <FieldWithHelp
-        label="Calculation Type"
-        helpText="Determines how share quantities are calculated for instruments in this round"
-        required
-        htmlFor="calculation-type"
-      >
-        <Select
-          value={round.calculation_type}
-          onValueChange={(value: CalculationType) => {
-            const updates: Partial<Round> = { calculation_type: value };
-            // Clear instruments when changing calculation type
-            if (round.calculation_type !== value) {
-              updates.instruments = [];
-            }
-            // Clear valuation fields if not needed
-            if (!["valuation_based", "convertible", "safe"].includes(value)) {
-              updates.valuation_basis = undefined;
-              updates.valuation = undefined;
-            }
-            onUpdate(updates);
-            onFieldTouched("calculation_type");
-          }}
-        >
-          <SelectTrigger
-            id="calculation-type"
-            className="focus:ring-primary/20"
+      {/* Calculation Type as Segmented Control */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="calculation-type"
+            className="text-sm font-medium text-foreground"
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="fixed_shares">Fixed Shares</SelectItem>
-            <SelectItem value="target_percentage">Target Percentage</SelectItem>
-            <SelectItem value="valuation_based">Valuation Based</SelectItem>
-            <SelectItem value="convertible">Convertible</SelectItem>
-            <SelectItem value="safe">SAFE</SelectItem>
-          </SelectContent>
-        </Select>
-      </FieldWithHelp>
+            Calculation Type
+            <span className="text-destructive ml-1.5 font-bold">*</span>
+          </label>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-4 w-4 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm">
+                <p className="font-medium mb-1.5">How share quantities are calculated</p>
+                <p className="text-sm">
+                  {calculationTypeHelpText[round.calculation_type] || 
+                   "Determines how share quantities are calculated for instruments in this round."}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        <div id={roundIndex !== undefined ? `round-${roundIndex}-calculation-type` : undefined}>
+          <SegmentedControl
+            value={round.calculation_type}
+            onValueChange={(value: string) => {
+              const updates: Partial<Round> = { calculation_type: value as CalculationType };
+              // Clear instruments when changing calculation type
+              if (round.calculation_type !== value) {
+                updates.instruments = [];
+              }
+              // Clear valuation fields if not needed
+              if (!["valuation_based", "convertible", "safe"].includes(value)) {
+                updates.valuation_basis = undefined;
+                updates.valuation = undefined;
+              } else {
+                // Set default valuation_basis to pre_money if not already set
+                if (!round.valuation_basis) {
+                  updates.valuation_basis = "pre_money";
+                }
+              }
+              onUpdate(updates);
+              onFieldTouched("calculation_type");
+            }}
+            options={calculationTypeOptions}
+            className="w-full"
+          />
+        </div>
+        {touchedFields.has("calculation_type") &&
+          getFieldError(validation?.errors ?? [], "calculation_type") && (
+            <p className="text-sm font-medium text-destructive">
+              {getFieldError(validation?.errors ?? [], "calculation_type")}
+            </p>
+          )}
+      </div>
 
       {needsValuationBasis && (
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 gap-6 pt-2">
           <FieldWithHelp
             label="Valuation"
             helpText="The company valuation amount in dollars"
@@ -144,7 +191,7 @@ export function RoundParametersSection({
             htmlFor="valuation"
           >
             <Input
-              id="valuation"
+              id={roundIndex !== undefined ? `round-${roundIndex}-valuation` : "valuation"}
               type="text"
               value={round.valuation ? formatCurrency(round.valuation) : ""}
               onChange={(e) => {
@@ -182,7 +229,7 @@ export function RoundParametersSection({
               }}
             >
               <SelectTrigger
-                id="valuation-basis"
+                id={roundIndex !== undefined ? `round-${roundIndex}-valuation-basis` : "valuation-basis"}
                 className="focus:ring-primary/20"
               >
                 <SelectValue />

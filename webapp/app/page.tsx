@@ -4,37 +4,19 @@ import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { RoundForm } from "@/components/round-form";
 import { Sidebar } from "@/components/sidebar";
 import { HolderDialog } from "@/components/holder-dialog";
-import { Plus, Sparkles, GripVertical } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { Round, Holder, CapTableData } from "@/types/cap-table";
 import { validateRound } from "@/lib/validation";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 
 export default function Home() {
   const [rounds, setRounds] = React.useState<Round[]>([]);
   const [holders, setHolders] = React.useState<Holder[]>([]);
   const [isGenerating, setIsGenerating] = React.useState(false);
-  const [expandedRounds, setExpandedRounds] = React.useState<Set<number>>(
-    new Set([0])
-  );
   const [editingHolder, setEditingHolder] = React.useState<Holder | null>(null);
   const [holderDialogOpen, setHolderDialogOpen] = React.useState(false);
 
@@ -70,7 +52,10 @@ export default function Home() {
     };
     const newIndex = rounds.length;
     setRounds([...rounds, newRound]);
-    setExpandedRounds(new Set([...expandedRounds, newIndex]));
+    
+    toast.success("Round added", {
+      description: `Round ${newIndex + 1} has been created.`,
+    });
   };
 
   const updateRound = (index: number, round: Round) => {
@@ -85,19 +70,9 @@ export default function Home() {
 
     // Store state for undo
     const previousRounds = [...rounds];
-    const previousExpanded = new Set(expandedRounds);
 
     // Perform deletion
     setRounds(rounds.filter((_, i) => i !== index));
-    const newExpanded = new Set(expandedRounds);
-    newExpanded.delete(index);
-    // Adjust indices
-    const adjusted = new Set<number>();
-    newExpanded.forEach((idx) => {
-      if (idx < index) adjusted.add(idx);
-      else if (idx > index) adjusted.add(idx - 1);
-    });
-    setExpandedRounds(adjusted);
 
     // Show toast with undo
     toast(`"${roundName}" has been removed.`, {
@@ -106,7 +81,6 @@ export default function Home() {
         label: "Undo",
         onClick: () => {
           setRounds(previousRounds);
-          setExpandedRounds(previousExpanded);
           toast.success("Round restored", {
             description: `"${roundName}" has been restored.`,
           });
@@ -156,26 +130,6 @@ export default function Home() {
     });
   };
 
-  const duplicateRound = (index: number) => {
-    const roundToDuplicate = rounds[index];
-    const newRound: Round = {
-      ...roundToDuplicate,
-      name: `${roundToDuplicate.name} (Copy)`,
-    };
-    const newIndex = rounds.length;
-    setRounds([...rounds, newRound]);
-    setExpandedRounds(new Set([...expandedRounds, newIndex]));
-  };
-
-  const toggleRound = (index: number) => {
-    const newExpanded = new Set(expandedRounds);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
-    } else {
-      newExpanded.add(index);
-    }
-    setExpandedRounds(newExpanded);
-  };
 
   const reorderRounds = (startIndex: number, endIndex: number) => {
     if (startIndex === endIndex) return;
@@ -184,29 +138,6 @@ export default function Home() {
     const [removed] = newRounds.splice(startIndex, 1);
     newRounds.splice(endIndex, 0, removed);
     setRounds(newRounds);
-
-    // Update expanded rounds indices
-    const newExpanded = new Set<number>();
-    expandedRounds.forEach((idx) => {
-      if (idx === startIndex) {
-        newExpanded.add(endIndex);
-      } else if (startIndex < endIndex) {
-        // Moving down
-        if (idx > startIndex && idx <= endIndex) {
-          newExpanded.add(idx - 1);
-        } else {
-          newExpanded.add(idx);
-        }
-      } else {
-        // Moving up
-        if (idx >= endIndex && idx < startIndex) {
-          newExpanded.add(idx + 1);
-        } else {
-          newExpanded.add(idx);
-        }
-      }
-    });
-    setExpandedRounds(newExpanded);
   };
 
   const moveHolderToGroup = (
@@ -222,6 +153,9 @@ export default function Home() {
   const addHolder = (holder: Holder) => {
     if (!holders.find((h) => h.name === holder.name)) {
       setHolders([...holders, holder]);
+      toast.success("Holder added", {
+        description: `"${holder.name}" has been created.`,
+      });
     }
   };
 
@@ -275,12 +209,39 @@ export default function Home() {
   };
 
   const handleEditRound = (index: number) => {
-    // Expand the round
-    setExpandedRounds(new Set([index]));
     // Scroll to the round after a short delay
     setTimeout(() => {
       const element = document.getElementById(`round-${index}`);
       element?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  };
+
+  const handleNavigateToError = (roundIndex: number, field?: string) => {
+    // Scroll to the round after a short delay
+    setTimeout(() => {
+      const element = document.getElementById(`round-${roundIndex}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        
+        // If a specific field is provided, try to focus on it
+        if (field) {
+          // Try to find the field input by ID or data attribute
+          setTimeout(() => {
+            // Field names might be like "name", "round_date", "instruments[0].holder_name", etc.
+            const fieldId = field.includes("[") 
+              ? undefined // Complex nested fields are harder to target
+              : `round-${roundIndex}-${field}`;
+            
+            if (fieldId) {
+              const fieldElement = document.getElementById(fieldId);
+              if (fieldElement) {
+                fieldElement.focus();
+                fieldElement.scrollIntoView({ behavior: "smooth", block: "center" });
+              }
+            }
+          }, 300);
+        }
+      }
     }, 100);
   };
 
@@ -353,9 +314,6 @@ export default function Home() {
   );
 
   const canDownload = rounds.length > 0 && validations.every((v) => v.isValid);
-  const completedCount = validations.filter((v) => v.isValid).length;
-  const progressPercentage =
-    rounds.length > 0 ? (completedCount / rounds.length) * 100 : 0;
 
   const handleCopyJson = () => {
     const data = buildCapTableData();
@@ -396,8 +354,8 @@ export default function Home() {
     <div className="min-h-screen bg-background flex">
       <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto p-3 sm:p-5 lg:p-6">
-          {/* Header with Progress Bar */}
-          <div className="mb-6 space-y-4 pt-4">
+          {/* Header */}
+          <div className="mb-6 pt-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
                 Cap Table Generator
@@ -407,27 +365,6 @@ export default function Home() {
                 instruments
               </p>
             </div>
-
-            {/* Progress Bar - Refined */}
-            {rounds.length > 0 && (
-              <Card className="border-border/50 shadow-none p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-foreground">
-                    Progress: {completedCount} of {rounds.length} rounds
-                    complete
-                  </span>
-                  <span className="text-sm font-semibold text-primary">
-                    {Math.round(progressPercentage)}%
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-500 rounded-full"
-                    style={{ width: `${progressPercentage}%` }}
-                  />
-                </div>
-              </Card>
-            )}
           </div>
 
           {/* Rounds Section */}
@@ -460,20 +397,16 @@ export default function Home() {
                 </CardContent>
               </Card>
             ) : (
-              <DraggableRoundsList
+              <RoundsList
                 rounds={rounds}
                 holders={holders}
-                expandedRounds={expandedRounds}
                 validations={validations}
                 usedGroups={usedGroups}
                 usedClassNames={usedClassNames}
-                onReorder={reorderRounds}
                 onUpdate={updateRound}
                 onAddHolder={addHolder}
                 onUpdateHolder={updateHolder}
                 onDelete={deleteRound}
-                onDuplicate={duplicateRound}
-                onToggleExpand={toggleRound}
               />
             )}
 
@@ -505,6 +438,7 @@ export default function Home() {
       <Sidebar
         holders={holders}
         rounds={rounds}
+        validations={validations}
         onEditHolder={handleEditHolder}
         onEditRound={handleEditRound}
         onDeleteHolder={deleteHolder}
@@ -517,6 +451,7 @@ export default function Home() {
         canDownload={canDownload}
         onReorderRounds={reorderRounds}
         onMoveHolderToGroup={moveHolderToGroup}
+        onNavigateToError={handleNavigateToError}
       />
       <HolderDialog
         open={holderDialogOpen}
@@ -535,154 +470,33 @@ export default function Home() {
   );
 }
 
-// Draggable Rounds List Component
-function DraggableRoundsList({
+// Rounds List Component
+function RoundsList({
   rounds,
   holders,
-  expandedRounds,
   validations,
   usedGroups,
   usedClassNames,
-  onReorder,
   onUpdate,
   onAddHolder,
   onUpdateHolder,
   onDelete,
-  onDuplicate,
-  onToggleExpand,
 }: {
   rounds: Round[];
   holders: Holder[];
-  expandedRounds: Set<number>;
   validations: ReturnType<typeof validateRound>[];
   usedGroups: string[];
   usedClassNames: string[];
-  onReorder: (startIndex: number, endIndex: number) => void;
   onUpdate: (index: number, round: Round) => void;
   onAddHolder: (holder: Holder) => void;
   onUpdateHolder: (oldName: string, holder: Holder) => void;
   onDelete: (index: number) => void;
-  onDuplicate: (index: number) => void;
-  onToggleExpand: (index: number) => void;
 }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = rounds.findIndex((_, i) => `round-${i}` === active.id);
-      const newIndex = rounds.findIndex((_, i) => `round-${i}` === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        onReorder(oldIndex, newIndex);
-      }
-    }
-  };
-
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext
-        items={rounds.map((_, i) => `round-${i}`)}
-        strategy={verticalListSortingStrategy}
-      >
-        <div className="space-y-3">
-          {rounds.map((round, index) => (
-            <DraggableRoundItem
-              key={`round-${index}`}
-              id={`round-${index}`}
-              round={round}
-              index={index}
-              holders={holders}
-              isExpanded={expandedRounds.has(index)}
-              validation={validations[index]}
-              usedGroups={usedGroups}
-              usedClassNames={usedClassNames}
-              allRounds={rounds}
-              onUpdate={onUpdate}
-              onUpdateRound={onUpdate}
-              onAddHolder={onAddHolder}
-              onUpdateHolder={onUpdateHolder}
-              onDelete={rounds.length > 1 ? onDelete : undefined}
-              onDuplicate={onDuplicate}
-              onToggleExpand={onToggleExpand}
-            />
-          ))}
-        </div>
-      </SortableContext>
-    </DndContext>
-  );
-}
-
-// Draggable Round Item Component
-function DraggableRoundItem({
-  id,
-  round,
-  index,
-  holders,
-  isExpanded,
-  validation,
-  usedGroups,
-  usedClassNames,
-  allRounds,
-  onUpdate,
-  onUpdateRound,
-  onAddHolder,
-  onUpdateHolder,
-  onDelete,
-  onDuplicate,
-  onToggleExpand,
-}: {
-  id: string;
-  round: Round;
-  index: number;
-  holders: Holder[];
-  isExpanded: boolean;
-  validation?: ReturnType<typeof validateRound>;
-  usedGroups: string[];
-  usedClassNames: string[];
-  allRounds: Round[];
-  onUpdate: (index: number, round: Round) => void;
-  onUpdateRound: (index: number, round: Round) => void;
-  onAddHolder: (holder: Holder) => void;
-  onUpdateHolder: (oldName: string, holder: Holder) => void;
-  onDelete?: (index: number) => void;
-  onDuplicate: (index: number) => void;
-  onToggleExpand: (index: number) => void;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} id={`round-${index}`}>
-      <div className="flex items-start gap-2">
-        <div
-          {...attributes}
-          {...listeners}
-          className="mt-2 cursor-grab active:cursor-grabbing p-0.5 text-muted-foreground hover:text-foreground touch-none"
-        >
-          <GripVertical className="h-4 w-4" />
-        </div>
-        <div className="flex-1">
+    <div className="space-y-0">
+      {rounds.map((round, index) => (
+        <div key={`round-${index}`} id={`round-${index}`}>
+          {index > 0 && <Separator className="my-8" />}
           <RoundForm
             round={round}
             holders={holders}
@@ -691,17 +505,14 @@ function DraggableRoundItem({
             onUpdateHolder={onUpdateHolder}
             usedGroups={usedGroups}
             usedClassNames={usedClassNames}
-            allRounds={allRounds}
+            allRounds={rounds}
             roundIndex={index}
-            onUpdateRound={onUpdateRound}
-            onDelete={onDelete ? () => onDelete(index) : undefined}
-            onDuplicate={() => onDuplicate(index)}
-            isExpanded={isExpanded}
-            onToggleExpand={() => onToggleExpand(index)}
-            validation={validation}
+            onUpdateRound={onUpdate}
+            onDelete={() => onDelete(index)}
+            validation={validations[index]}
           />
         </div>
-      </div>
+      ))}
     </div>
   );
 }

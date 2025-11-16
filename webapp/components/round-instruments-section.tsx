@@ -3,11 +3,57 @@
 import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import { InstrumentCard } from "@/components/instrument-card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  User,
+  Building2,
+  DollarSign,
+  Percent,
+  Calendar,
+  TrendingUp,
+  FileText,
+  Clock,
+  Shield,
+  Target,
+  ArrowUpDown,
+  ChevronDown,
+} from "lucide-react";
 import type { Round, Instrument, CalculationType } from "@/types/cap-table";
 import type { RoundValidation } from "@/lib/validation";
 import { getFieldError } from "@/lib/validation";
+import {
+  formatCurrency,
+  formatNumber,
+  decimalToPercentage,
+} from "@/lib/formatters";
+import {
+  ColumnDef,
+  ColumnFiltersState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+  VisibilityState,
+} from "@tanstack/react-table";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface RoundInstrumentsSectionProps {
   round: Round;
@@ -19,6 +65,12 @@ interface RoundInstrumentsSectionProps {
   onDeleteInstrument: (index: number) => void;
 }
 
+type InstrumentRow = Instrument & {
+  displayIndex: number;
+  actualIndex: number;
+  hasError: boolean;
+};
+
 export function RoundInstrumentsSection({
   round,
   calculationType,
@@ -28,66 +80,780 @@ export function RoundInstrumentsSection({
   onEditInstrument,
   onDeleteInstrument,
 }: RoundInstrumentsSectionProps) {
-  const instrumentsError = getFieldError(validation?.errors ?? [], "instruments");
+  const instrumentsError = getFieldError(
+    validation?.errors ?? [],
+    "instruments"
+  );
   const proRataInstruments = round.instruments.filter(
     (inst) => "pro_rata_type" in inst
   );
-  const hasAnyInstruments = regularInstruments.length > 0 || proRataInstruments.length > 0;
+  const hasAnyInstruments =
+    regularInstruments.length > 0 || proRataInstruments.length > 0;
+
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+
+  const getInstrumentFieldValue = (
+    instrument: Instrument,
+    field: string
+  ): string | React.ReactNode => {
+    if (field === "holder_name") {
+      return "holder_name" in instrument ? instrument.holder_name : "—";
+    }
+    if (field === "class_name") {
+      return "class_name" in instrument ? instrument.class_name : "—";
+    }
+    if (field === "initial_quantity") {
+      return "initial_quantity" in instrument
+        ? formatNumber(instrument.initial_quantity)
+        : "—";
+    }
+    if (field === "target_percentage") {
+      return "target_percentage" in instrument
+        ? `${decimalToPercentage(instrument.target_percentage).toFixed(2)}%`
+        : "—";
+    }
+    if (field === "investment_amount") {
+      return "investment_amount" in instrument
+        ? formatCurrency(instrument.investment_amount)
+        : "—";
+    }
+    if (field === "interest_rate") {
+      return "interest_rate" in instrument
+        ? `${decimalToPercentage(instrument.interest_rate).toFixed(2)}%`
+        : "—";
+    }
+    if (field === "payment_date") {
+      return "payment_date" in instrument && instrument.payment_date
+        ? new Date(instrument.payment_date).toLocaleDateString()
+        : "—";
+    }
+    if (field === "expected_conversion_date") {
+      return "expected_conversion_date" in instrument &&
+        instrument.expected_conversion_date
+        ? new Date(instrument.expected_conversion_date).toLocaleDateString()
+        : "—";
+    }
+    if (field === "interest_type") {
+      if ("interest_type" in instrument) {
+        const type = instrument.interest_type;
+        const labels: Record<string, string> = {
+          simple: "Simple",
+          compound_yearly: "Compound Yearly",
+          compound_monthly: "Compound Monthly",
+          compound_daily: "Compound Daily",
+          no_interest: "No Interest",
+        };
+        return labels[type] || type;
+      }
+      return "—";
+    }
+    if (field === "discount_rate") {
+      return "discount_rate" in instrument
+        ? `${decimalToPercentage(instrument.discount_rate).toFixed(2)}%`
+        : "—";
+    }
+    if (field === "valuation_cap") {
+      return "valuation_cap" in instrument && instrument.valuation_cap
+        ? formatCurrency(instrument.valuation_cap)
+        : "—";
+    }
+    if (field === "valuation_cap_type") {
+      if ("valuation_cap_type" in instrument && instrument.valuation_cap_type) {
+        const type = instrument.valuation_cap_type;
+        const labels: Record<string, string> = {
+          default: "Default",
+          pre_conversion: "Pre-Conversion",
+          post_conversion_own: "Post-Conversion (Own)",
+          post_conversion_total: "Post-Conversion (Total)",
+        };
+        return labels[type] || type;
+      }
+      return "—";
+    }
+    if (field === "pro_rata_rights") {
+      if ("pro_rata_rights" in instrument && instrument.pro_rata_rights) {
+        const rights = instrument.pro_rata_rights;
+        return (
+          <Badge variant={rights === "super" ? "default" : "secondary"} className="text-xs">
+            {rights === "super" ? "Super" : "Standard"}
+          </Badge>
+        );
+      }
+      return <span className="text-muted-foreground text-sm">None</span>;
+    }
+    if (field === "pro_rata_percentage") {
+      return "pro_rata_percentage" in instrument &&
+        instrument.pro_rata_percentage !== undefined
+        ? `${decimalToPercentage(instrument.pro_rata_percentage).toFixed(2)}%`
+        : "—";
+    }
+    return "—";
+  };
+
+  // Prepare data for table
+  const tableData: InstrumentRow[] = React.useMemo(() => {
+    return regularInstruments.map((instrument, displayIndex) => {
+      const actualIndex = round.instruments.findIndex(
+        (inst) => inst === instrument
+      );
+      const hasError = !!getFieldError(
+        validation?.errors ?? [],
+        `instruments[${actualIndex}]`
+      );
+      return {
+        ...instrument,
+        displayIndex,
+        actualIndex,
+        hasError,
+      };
+    });
+  }, [regularInstruments, round.instruments, validation?.errors]);
+
+  // Define columns based on calculation type
+  const columns = React.useMemo<ColumnDef<InstrumentRow>[]>(() => {
+    const baseColumns: ColumnDef<InstrumentRow>[] = [
+      {
+        id: "index",
+        header: "#",
+        cell: ({ row }) => (
+          <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary/10 text-primary font-semibold text-xs">
+            {row.original.displayIndex + 1}
+          </div>
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      },
+      {
+        accessorKey: "holder_name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-auto p-0 hover:bg-transparent"
+            >
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <User className="h-3.5 w-3.5 text-muted-foreground" />
+                Holder
+                <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
+              </div>
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const holderName = "holder_name" in row.original ? row.original.holder_name : "—";
+          return (
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{holderName}</span>
+              {row.original.hasError && (
+                <Badge variant="destructive" className="text-xs">
+                  Error
+                </Badge>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "class_name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="h-auto p-0 hover:bg-transparent"
+            >
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                Class
+                <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
+              </div>
+            </Button>
+          );
+        },
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {getInstrumentFieldValue(row.original, "class_name") as string}
+          </span>
+        ),
+      },
+    ];
+
+    switch (calculationType) {
+      case "fixed_shares":
+        return [
+          ...baseColumns,
+          {
+            accessorKey: "initial_quantity",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                Shares
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "initial_quantity")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "pro_rata_rights",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                Pro-Rata Rights
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "pro_rata_rights")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "pro_rata_percentage",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
+                Pro-Rata %
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "pro_rata_percentage")}
+              </span>
+            ),
+          },
+        ];
+      case "target_percentage":
+        return [
+          ...baseColumns,
+          {
+            accessorKey: "target_percentage",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Target className="h-3.5 w-3.5 text-muted-foreground" />
+                Target %
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "target_percentage")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "pro_rata_rights",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                Pro-Rata Rights
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "pro_rata_rights")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "pro_rata_percentage",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
+                Pro-Rata %
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "pro_rata_percentage")}
+              </span>
+            ),
+          },
+        ];
+      case "valuation_based":
+        return [
+          ...baseColumns,
+          {
+            accessorKey: "investment_amount",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                Investment
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "investment_amount")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "pro_rata_rights",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                Pro-Rata Rights
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "pro_rata_rights")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "pro_rata_percentage",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
+                Pro-Rata %
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "pro_rata_percentage")}
+              </span>
+            ),
+          },
+        ];
+      case "convertible":
+        return [
+          ...baseColumns,
+          {
+            accessorKey: "investment_amount",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                Investment
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "investment_amount")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "interest_rate",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
+                Interest Rate
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "interest_rate")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "payment_date",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                Payment Date
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "payment_date")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "expected_conversion_date",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                Conversion Date
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "expected_conversion_date")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "interest_type",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                Interest Type
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "interest_type")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "discount_rate",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                Discount
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "discount_rate")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "valuation_cap",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                Valuation Cap
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "valuation_cap")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "valuation_cap_type",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                Cap Type
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "valuation_cap_type")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "pro_rata_rights",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                Pro-Rata Rights
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "pro_rata_rights")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "pro_rata_percentage",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
+                Pro-Rata %
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "pro_rata_percentage")}
+              </span>
+            ),
+          },
+        ];
+      case "safe":
+        return [
+          ...baseColumns,
+          {
+            accessorKey: "investment_amount",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                Investment
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "investment_amount")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "expected_conversion_date",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                Conversion Date
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "expected_conversion_date")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "discount_rate",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                Discount
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "discount_rate")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "valuation_cap",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                Valuation Cap
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "valuation_cap")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "valuation_cap_type",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                Cap Type
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "valuation_cap_type")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "pro_rata_rights",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                Pro-Rata Rights
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "pro_rata_rights")}
+              </span>
+            ),
+          },
+          {
+            accessorKey: "pro_rata_percentage",
+            header: () => (
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
+                Pro-Rata %
+              </div>
+            ),
+            cell: ({ row }) => (
+              <span className="text-sm">
+                {getInstrumentFieldValue(row.original, "pro_rata_percentage")}
+              </span>
+            ),
+          },
+        ];
+      default:
+        return baseColumns;
+    }
+  }, [calculationType]);
+
+  // Add actions column
+  const columnsWithActions: ColumnDef<InstrumentRow>[] = React.useMemo(() => {
+    return [
+      ...columns,
+      {
+        id: "actions",
+        header: () => <div className="text-right">Actions</div>,
+        cell: ({ row }) => {
+          return (
+            <div className="flex items-center justify-end gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  onEditInstrument(row.original, row.original.actualIndex)
+                }
+                className="h-8 w-8 p-0"
+                title="Edit instrument"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onDeleteInstrument(row.original.actualIndex)}
+                className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                title="Delete instrument"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        },
+        enableSorting: false,
+        enableHiding: false,
+      },
+    ];
+  }, [columns, onEditInstrument, onDeleteInstrument]);
+
+  const table = useReactTable({
+    data: tableData,
+    columns: columnsWithActions,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+    },
+  });
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between border-b pb-3">
-        <h3 className="text-xl font-bold">
-          Round Instruments
-          <span className="ml-2 text-base font-semibold text-muted-foreground">
-            ({regularInstruments.length})
-          </span>
-        </h3>
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          onClick={onAddInstrument}
-          className="shadow-sm hover:shadow-md transition-shadow"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Instrument
-        </Button>
-      </div>
+    <div className="space-y-4">
       {instrumentsError && !hasAnyInstruments && (
-        <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
-          <p className="text-sm font-medium text-destructive">{instrumentsError}</p>
+        <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 p-4">
+          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+            {instrumentsError}
+          </p>
         </div>
       )}
-      <div className="space-y-3">
-        {regularInstruments.map((instrument, displayIndex) => {
-          const actualIndex = round.instruments.findIndex(
-            (inst) => inst === instrument
-          );
-          return (
-            <InstrumentCard
-              key={actualIndex}
-              instrument={instrument}
-              calculationType={calculationType}
-              displayIndex={displayIndex}
-              actualIndex={actualIndex}
-              validation={validation}
-              onEdit={() => onEditInstrument(instrument, actualIndex)}
-              onDelete={() => onDeleteInstrument(actualIndex)}
-            />
-          );
-        })}
-        {regularInstruments.length === 0 && (
-          <Card className={`border-dashed ${instrumentsError && !hasAnyInstruments ? "border-destructive/50" : ""}`}>
-            <CardContent className="pt-6 pb-6">
-              <p className="text-center text-sm text-muted-foreground">
-                No instruments yet. Click "Add Instrument" to get started.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+
+      {regularInstruments.length === 0 ? (
+        <Card className="border-dashed border-border/50 shadow-sm bg-muted/20">
+          <CardContent className="pt-16 pb-16">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="rounded-full bg-primary/10 p-4">
+                <Plus className="h-8 w-8 text-primary" />
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-base font-semibold text-foreground">
+                  No instruments yet
+                </h4>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Add instruments to define how shares are allocated in this
+                  round. Each instrument represents a holder's stake.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={onAddInstrument}
+                className="mt-2"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Instrument
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Columns <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide())
+                  .map((column) => {
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        className="capitalize"
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) =>
+                          column.toggleVisibility(!!value)
+                        }
+                      >
+                        {column.id}
+                      </DropdownMenuCheckboxItem>
+                    );
+                  })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <div className="rounded-md border border-border/50 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => {
+                      return (
+                        <TableHead key={header.id}>
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                        </TableHead>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows?.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      data-state={row.getIsSelected() && "selected"}
+                      className={
+                        row.original.hasError
+                          ? "bg-destructive/5 hover:bg-destructive/10"
+                          : ""
+                      }
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columnsWithActions.length}
+                      className="h-24 text-center"
+                    >
+                      No results.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

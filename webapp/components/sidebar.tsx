@@ -18,6 +18,7 @@ import {
   ChevronUp,
   ChevronDown,
   Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import type { Holder, Round } from "@/types/cap-table";
 import {
@@ -40,9 +41,12 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+import type { RoundValidation } from "@/lib/validation";
+
 interface SidebarProps {
   holders: Holder[];
   rounds: Round[];
+  validations?: RoundValidation[];
   onEditHolder?: (holder: Holder) => void;
   onEditRound?: (index: number) => void;
   onDeleteHolder?: (holderName: string) => void;
@@ -58,11 +62,13 @@ interface SidebarProps {
     holderName: string,
     newGroup: string | undefined
   ) => void;
+  onNavigateToError?: (roundIndex: number, field?: string) => void;
 }
 
 export function Sidebar({
   holders,
   rounds,
+  validations,
   onEditHolder,
   onEditRound,
   onDeleteHolder,
@@ -75,6 +81,7 @@ export function Sidebar({
   canDownload = false,
   onReorderRounds,
   onMoveHolderToGroup,
+  onNavigateToError,
 }: SidebarProps) {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [overId, setOverId] = React.useState<string | null>(null);
@@ -347,6 +354,7 @@ export function Sidebar({
                     {rounds.map((round, index) => {
                       const roundHolders = getRoundHolders(round);
                       const proRataHolders = getProRataHolders(round);
+                      const validation = validations?.[index];
                       return (
                         <DraggableRoundSidebar
                           key={index}
@@ -355,6 +363,7 @@ export function Sidebar({
                           index={index}
                           roundHolders={roundHolders}
                           proRataHolders={proRataHolders}
+                          validation={validation}
                           onEdit={onEditRound}
                           onDelete={onDeleteRound}
                           isDragging={activeId === `sidebar-round-${index}`}
@@ -379,6 +388,15 @@ export function Sidebar({
               )}
             </div>
           </div>
+
+          {/* Error Summary */}
+          {validations && validations.length > 0 && (
+            <ErrorSummary
+              rounds={rounds}
+              validations={validations}
+              onNavigateToError={onNavigateToError}
+            />
+          )}
 
           {/* Bottom Action Buttons */}
           {(onDownloadExcel || onCopyJson || onDownloadJson) && (
@@ -655,6 +673,7 @@ function DraggableRoundSidebar({
   index,
   roundHolders,
   proRataHolders,
+  validation,
   onEdit,
   onDelete,
   isDragging: externalIsDragging,
@@ -664,6 +683,7 @@ function DraggableRoundSidebar({
   index: number;
   roundHolders: Holder[];
   proRataHolders: Holder[];
+  validation?: RoundValidation;
   onEdit?: (index: number) => void;
   onDelete?: (index: number) => void;
   isDragging?: boolean;
@@ -686,12 +706,16 @@ function DraggableRoundSidebar({
     zIndex: isDragging ? 50 : 1,
   };
 
+  const hasValidationErrors = validation && !validation.isValid;
+
   return (
     <div ref={setNodeRef} style={style}>
       <Card
         className={`p-3 border-border/50 shadow-none transition-all ${
           isDragging
             ? "shadow-lg border-primary/50 scale-105"
+            : hasValidationErrors
+            ? "border-amber-500/50 dark:border-amber-500/50 hover:border-amber-500/70 dark:hover:border-amber-500/70"
             : "hover:shadow-sm hover:border-border"
         }`}
       >
@@ -784,6 +808,118 @@ function DraggableRoundSidebar({
           </div>
         </div>
       </Card>
+    </div>
+  );
+}
+
+// Error Summary Component
+function ErrorSummary({
+  rounds,
+  validations,
+  onNavigateToError,
+}: {
+  rounds: Round[];
+  validations: RoundValidation[];
+  onNavigateToError?: (roundIndex: number, field?: string) => void;
+}) {
+  const [isHovered, setIsHovered] = React.useState(false);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = React.useState(0);
+
+  // Collect all errors from all rounds
+  const allErrors = React.useMemo(() => {
+    const errors: Array<{
+      roundIndex: number;
+      roundName: string;
+      field: string;
+      message: string;
+    }> = [];
+
+    validations.forEach((validation, roundIndex) => {
+      if (!validation.isValid && validation.errors.length > 0) {
+        const round = rounds[roundIndex];
+        const roundName = round?.name || `Round ${roundIndex + 1}`;
+        validation.errors.forEach((error) => {
+          errors.push({
+            roundIndex,
+            roundName,
+            field: error.field,
+            message: error.message,
+          });
+        });
+      }
+    });
+
+    return errors;
+  }, [rounds, validations]);
+
+  // Measure content height when it changes
+  React.useEffect(() => {
+    if (contentRef.current) {
+      setContentHeight(contentRef.current.scrollHeight);
+    }
+  }, [allErrors, isHovered]);
+
+  if (allErrors.length === 0) {
+    return null;
+  }
+
+  const handleErrorClick = (roundIndex: number, field?: string) => {
+    if (onNavigateToError) {
+      onNavigateToError(roundIndex, field);
+    }
+  };
+
+  return (
+    <div
+      className="border-t border-border/50 bg-amber-50/30 dark:bg-amber-950/10 transition-all duration-300 ease-in-out"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="p-3">
+        <div className="flex items-center gap-2 cursor-pointer">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 transition-transform duration-300 ease-in-out" />
+          <span className="text-xs font-semibold text-foreground">
+            {allErrors.length} error{allErrors.length !== 1 ? "s" : ""}
+          </span>
+          <ChevronDown
+            className={`h-3 w-3 text-muted-foreground ml-auto transition-transform duration-300 ease-in-out ${
+              isHovered ? "rotate-180" : ""
+            }`}
+          />
+        </div>
+        <div
+          ref={contentRef}
+          className="overflow-hidden transition-all duration-300 ease-in-out"
+          style={{
+            maxHeight: isHovered ? `${contentHeight}px` : "0px",
+            opacity: isHovered ? 1 : 0,
+            transform: isHovered ? "translateY(0)" : "translateY(-8px)",
+            marginTop: isHovered ? "0.5rem" : "0",
+          }}
+        >
+          <div className="space-y-1.5 pt-2">
+            {allErrors.map((error, index) => (
+              <button
+                key={`${error.roundIndex}-${error.field}-${index}`}
+                type="button"
+                onClick={() => handleErrorClick(error.roundIndex, error.field)}
+                className="w-full text-left p-2 rounded-md hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-all duration-200 border border-amber-200/50 dark:border-amber-800/50 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-sm"
+                style={{
+                  animationDelay: isHovered ? `${index * 30}ms` : "0ms",
+                }}
+              >
+                <div className="text-xs font-medium text-foreground">
+                  {error.roundName}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {error.message}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
