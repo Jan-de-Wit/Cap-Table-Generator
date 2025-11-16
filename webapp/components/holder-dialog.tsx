@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { FieldWithHelp } from "@/components/field-with-help";
 import type { Holder } from "@/types/cap-table";
+import { sortGroups } from "@/lib/utils";
 
 interface HolderDialogProps {
   open: boolean;
@@ -26,7 +27,7 @@ interface HolderDialogProps {
   usedGroups: string[];
 }
 
-const COMMON_GROUPS = ["Founders", "ESOP", "Investors", "Noteholders"];
+const COMMON_GROUPS = ["Founders", "ESOP", "Noteholders", "Investors"];
 
 export function HolderDialog({
   open,
@@ -99,7 +100,8 @@ export function HolderDialog({
     if (group.trim() && !allGroups.has(group.trim())) {
       allGroups.add(group.trim());
     }
-    return Array.from(allGroups).sort();
+    // Sort groups in the specified order: Founders, ESOP, Noteholders, Investors, then custom groups alphabetically
+    return sortGroups(Array.from(allGroups));
   }, [usedGroups, existingHolders, group]);
 
   const handleSave = () => {

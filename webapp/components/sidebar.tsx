@@ -1,10 +1,16 @@
 "use client";
 
 import * as React from "react";
+import { useEffect, useRef } from "react";
+import Lenis from "lenis";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Users,
   TrendingUp,
@@ -42,11 +48,14 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import type { RoundValidation } from "@/lib/validation";
+import { sortGroups } from "@/lib/utils";
 
 interface SidebarProps {
   holders: Holder[];
   rounds: Round[];
   validations?: RoundValidation[];
+  selectedRoundIndex?: number | null;
+  onSelectRound?: (index: number) => void;
   onEditHolder?: (holder: Holder) => void;
   onEditRound?: (index: number) => void;
   onDeleteHolder?: (holderName: string) => void;
@@ -69,6 +78,8 @@ export function Sidebar({
   holders,
   rounds,
   validations,
+  selectedRoundIndex,
+  onSelectRound,
   onEditHolder,
   onEditRound,
   onDeleteHolder,
@@ -85,6 +96,8 @@ export function Sidebar({
 }: SidebarProps) {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [overId, setOverId] = React.useState<string | null>(null);
+  const sidebarWrapperRef = useRef<HTMLDivElement>(null);
+  const sidebarContentRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -182,7 +195,17 @@ export function Sidebar({
     // Sort ungrouped holders alphabetically
     ungrouped.sort((a, b) => a.name.localeCompare(b.name));
 
-    return { groups: Array.from(groups.entries()), ungrouped };
+    // Sort groups in the specified order: Founders, ESOP, Noteholders, Investors, then custom groups alphabetically
+    const groupEntries = Array.from(groups.entries());
+    const sortedGroupNames = sortGroups(groupEntries.map(([name]) => name));
+    const sortedGroups = sortedGroupNames
+      .map((name) => {
+        const entry = groupEntries.find(([entryName]) => entryName === name);
+        return entry ? [entry[0], entry[1]] : null;
+      })
+      .filter((entry): entry is [string, Holder[]] => entry !== null);
+
+    return { groups: sortedGroups, ungrouped };
   }, [holders]);
 
   // Get holders involved in each round (from regular instruments only)
@@ -217,6 +240,39 @@ export function Sidebar({
     return holders.filter((h) => holderNames.has(h.name));
   };
 
+  // Initialize Lenis for sidebar smooth scrolling
+  useEffect(() => {
+    if (!sidebarWrapperRef.current || !sidebarContentRef.current) return;
+
+    const lenis = new Lenis({
+      wrapper: sidebarWrapperRef.current,
+      content: sidebarContentRef.current,
+      lerp: 0.05,
+      duration: 1.2,
+      smoothWheel: true,
+      syncTouch: false,
+      touchMultiplier: 2,
+      wheelMultiplier: 1,
+      infinite: false,
+      autoResize: true,
+      orientation: "vertical",
+      gestureOrientation: "vertical",
+      anchors: true,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+    });
+
+    function raf(time: number) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+
+    requestAnimationFrame(raf);
+
+    return () => {
+      lenis.destroy();
+    };
+  }, []);
+
   return (
     <DndContext
       sensors={sensors}
@@ -227,9 +283,72 @@ export function Sidebar({
     >
       <div className="hidden lg:block w-80 border-l bg-muted/20 flex flex-col h-screen sticky top-0">
         <div className="flex flex-col h-full">
-          <div className="flex-1 overflow-y-auto p-3 space-y-5">
+          <div ref={sidebarWrapperRef} className="flex-1 overflow-hidden">
+            <div ref={sidebarContentRef} className="p-3 space-y-5">
+            {/* Rounds Section */}
+            <div className="space-y-3 pt-5">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-base font-semibold">Rounds</h2>
+                <Badge variant="secondary" className="ml-auto text-xs">
+                  {rounds.length}
+                </Badge>
+              </div>
+
+              {rounds.length === 0 ? (
+                <Card className="p-2.5 border-border/50 shadow-none transition-all hover:shadow-sm hover:border-border">
+                  <p className="text-xs text-muted-foreground text-center">
+                    No rounds yet
+                  </p>
+                </Card>
+              ) : (
+                <SortableContext
+                  items={rounds.map((_, i) => `sidebar-round-${i}`)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {rounds.map((round, index) => {
+                      const roundHolders = getRoundHolders(round);
+                      const proRataHolders = getProRataHolders(round);
+                      const validation = validations?.[index];
+                      const isSelected = selectedRoundIndex === index;
+                      return (
+                        <DraggableRoundSidebar
+                          key={index}
+                          id={`sidebar-round-${index}`}
+                          round={round}
+                          index={index}
+                          roundHolders={roundHolders}
+                          proRataHolders={proRataHolders}
+                          validation={validation}
+                          isSelected={isSelected}
+                          onSelect={onSelectRound}
+                          onEdit={onEditRound}
+                          onDelete={onDeleteRound}
+                          isDragging={activeId === `sidebar-round-${index}`}
+                        />
+                      );
+                    })}
+                  </div>
+                </SortableContext>
+              )}
+
+              {onAddRound && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full text-xs"
+                  size="sm"
+                  onClick={onAddRound}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Add Round
+                </Button>
+              )}
+            </div>
+
             {/* Holders Section */}
-            <div className="space-y-3 pt-4">
+            <div className="space-y-3 border-t pt-5">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
                 <h2 className="text-base font-semibold">Holders</h2>
@@ -328,68 +447,10 @@ export function Sidebar({
                 </Button>
               )}
             </div>
-
-            {/* Rounds Section */}
-            <div className="space-y-3 border-t pt-5">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-base font-semibold">Rounds</h2>
-                <Badge variant="secondary" className="ml-auto text-xs">
-                  {rounds.length}
-                </Badge>
-              </div>
-
-              {rounds.length === 0 ? (
-                <Card className="p-2.5 border-border/50 shadow-none transition-all hover:shadow-sm hover:border-border">
-                  <p className="text-xs text-muted-foreground text-center">
-                    No rounds yet
-                  </p>
-                </Card>
-              ) : (
-                <SortableContext
-                  items={rounds.map((_, i) => `sidebar-round-${i}`)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-3">
-                    {rounds.map((round, index) => {
-                      const roundHolders = getRoundHolders(round);
-                      const proRataHolders = getProRataHolders(round);
-                      const validation = validations?.[index];
-                      return (
-                        <DraggableRoundSidebar
-                          key={index}
-                          id={`sidebar-round-${index}`}
-                          round={round}
-                          index={index}
-                          roundHolders={roundHolders}
-                          proRataHolders={proRataHolders}
-                          validation={validation}
-                          onEdit={onEditRound}
-                          onDelete={onDeleteRound}
-                          isDragging={activeId === `sidebar-round-${index}`}
-                        />
-                      );
-                    })}
-                  </div>
-                </SortableContext>
-              )}
-
-              {onAddRound && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full text-xs"
-                  size="sm"
-                  onClick={onAddRound}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  Add Round
-                </Button>
-              )}
             </div>
           </div>
 
-          {/* Error Summary */}
+          {/* Error Summary - Always at bottom */}
           {validations && validations.length > 0 && (
             <ErrorSummary
               rounds={rounds}
@@ -398,9 +459,9 @@ export function Sidebar({
             />
           )}
 
-          {/* Bottom Action Buttons */}
+          {/* Bottom Action Buttons - Always at bottom */}
           {(onDownloadExcel || onCopyJson || onDownloadJson) && (
-            <div className="border-t p-4">
+            <div className="border-t p-2">
               <div className="flex gap-2">
                 {onDownloadExcel && (
                   <Button
@@ -674,6 +735,8 @@ function DraggableRoundSidebar({
   roundHolders,
   proRataHolders,
   validation,
+  isSelected,
+  onSelect,
   onEdit,
   onDelete,
   isDragging: externalIsDragging,
@@ -684,6 +747,8 @@ function DraggableRoundSidebar({
   roundHolders: Holder[];
   proRataHolders: Holder[];
   validation?: RoundValidation;
+  isSelected?: boolean;
+  onSelect?: (index: number) => void;
   onEdit?: (index: number) => void;
   onDelete?: (index: number) => void;
   isDragging?: boolean;
@@ -708,16 +773,32 @@ function DraggableRoundSidebar({
 
   const hasValidationErrors = validation && !validation.isValid;
 
+  const handleClick = (e: React.MouseEvent) => {
+    // Don't trigger selection if clicking on action buttons
+    const target = e.target as HTMLElement;
+    if (
+      target.closest("button") ||
+      target.closest("[role='button']") ||
+      target.closest(".cursor-grab")
+    ) {
+      return;
+    }
+    onSelect?.(index);
+  };
+
   return (
     <div ref={setNodeRef} style={style}>
       <Card
-        className={`p-3 border-border/50 shadow-none transition-all ${
+        className={`p-3 border-border/50 shadow-none transition-all cursor-pointer ${
           isDragging
             ? "shadow-lg border-primary/50 scale-105"
+            : isSelected
+            ? "border-primary bg-primary/5 shadow-sm"
             : hasValidationErrors
             ? "border-amber-500/50 dark:border-amber-500/50 hover:border-amber-500/70 dark:hover:border-amber-500/70"
             : "hover:shadow-sm hover:border-border"
         }`}
+        onClick={handleClick}
       >
         <div className="space-y-2.5">
           <div className="flex items-start justify-between gap-2">
@@ -876,8 +957,8 @@ function ErrorSummary({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="p-3">
-        <div className="flex items-center gap-2 cursor-pointer">
+      <div className="p-2">
+        <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 transition-transform duration-300 ease-in-out" />
           <span className="text-xs font-semibold text-foreground">
             {allErrors.length} error{allErrors.length !== 1 ? "s" : ""}
@@ -907,6 +988,7 @@ function ErrorSummary({
                 className="w-full text-left p-2 rounded-md hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-all duration-200 border border-amber-200/50 dark:border-amber-800/50 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-sm"
                 style={{
                   animationDelay: isHovered ? `${index * 30}ms` : "0ms",
+                  cursor: "pointer",
                 }}
               >
                 <div className="text-xs font-medium text-foreground">

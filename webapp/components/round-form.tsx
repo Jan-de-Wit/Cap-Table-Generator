@@ -5,10 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  Trash2,
   CheckCircle2,
   AlertCircle,
-  AlertTriangle,
   FileText,
   Users,
   Plus,
@@ -406,22 +404,6 @@ export function RoundForm({
       .map((inst) => ("holder_name" in inst ? inst.holder_name : ""))
   ).size;
 
-  const hasValidationErrors = validation && !validation.isValid;
-  const issuesCount = validation?.errors.length ?? 0;
-  const [issuesExpanded, setIssuesExpanded] = React.useState(false);
-
-  // Get field IDs for navigation
-  const getFieldId = (field: string) => {
-    if (roundIndex === undefined) return undefined;
-    const fieldMap: Record<string, string> = {
-      name: `round-${roundIndex}-name`,
-      round_date: `round-${roundIndex}-round_date`,
-      calculation_type: `round-${roundIndex}-calculation-type`,
-      valuation: `round-${roundIndex}-valuation`,
-      valuation_basis: `round-${roundIndex}-valuation-basis`,
-    };
-    return fieldMap[field] || undefined;
-  };
 
   return (
     <div className="relative">
@@ -461,68 +443,8 @@ export function RoundForm({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {onDelete && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onDelete}
-                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                title="Delete round"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
         </div>
       </div>
-
-      {/* Issues Panel */}
-      {hasValidationErrors && issuesCount > 0 && (
-        <div className="mt-6 mb-6 rounded-md bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 p-4">
-          <div className="flex items-center gap-2.5 mb-3">
-            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="text-sm font-semibold text-foreground">
-              Issues found
-            </span>
-          </div>
-          <div className="space-y-2">
-            {validation?.errors.map((error, idx) => {
-              const fieldId = getFieldId(error.field);
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => {
-                    if (fieldId) {
-                      const element = document.getElementById(fieldId);
-                      if (element) {
-                        element.scrollIntoView({ behavior: "smooth", block: "center" });
-                        element.focus();
-                      }
-                    }
-                  }}
-                  className="w-full text-left p-2.5 rounded-md hover:bg-amber-100 dark:hover:bg-amber-950/40 transition-colors border border-amber-200/50 dark:border-amber-800/50"
-                >
-                  <div className="text-xs font-medium text-foreground">
-                    {error.field === "name" ? "Round Name" :
-                     error.field === "round_date" ? "Round Date" :
-                     error.field === "calculation_type" ? "Calculation Type" :
-                     error.field === "valuation" ? "Valuation" :
-                     error.field === "valuation_basis" ? "Valuation Basis" :
-                     error.field === "instruments" ? "Instruments" :
-                     error.field}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {error.message}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Main Content Sections */}
       <div className="pt-6 space-y-8">
@@ -604,19 +526,21 @@ export function RoundForm({
               )}
         </div>
 
-        {/* Action Bar */}
-        <div className="mt-6 flex items-center justify-end gap-3">
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            onClick={() => handleOpenInstrumentDialog(null, -1, false)}
-            className="font-medium"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Instrument
-          </Button>
-        </div>
+        {/* Action Bar - Only show when there are instruments (to avoid duplicate with empty state) */}
+        {regularInstruments.length > 0 && (
+          <div className="mt-6 flex items-center justify-end gap-3">
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={() => handleOpenInstrumentDialog(null, -1, false)}
+              className="font-medium"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Instrument
+            </Button>
+          </div>
+        )}
       {editingInstrument && (
         <InstrumentDialog
           open={instrumentDialogOpen}

@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { RoundForm } from "@/components/round-form";
 import { Sidebar } from "@/components/sidebar";
 import { HolderDialog } from "@/components/holder-dialog";
-import { Plus, Sparkles } from "lucide-react";
+import { Plus, Sparkles, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import type { Round, Holder, CapTableData } from "@/types/cap-table";
 import { validateRound } from "@/lib/validation";
@@ -19,6 +19,9 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [editingHolder, setEditingHolder] = React.useState<Holder | null>(null);
   const [holderDialogOpen, setHolderDialogOpen] = React.useState(false);
+  const [selectedRoundIndex, setSelectedRoundIndex] = React.useState<
+    number | null
+  >(null);
 
   // Infer new holders from rounds (only add if they don't exist)
   React.useEffect(() => {
@@ -52,7 +55,8 @@ export default function Home() {
     };
     const newIndex = rounds.length;
     setRounds([...rounds, newRound]);
-    
+    setSelectedRoundIndex(newIndex);
+
     toast.success("Round added", {
       description: `Round ${newIndex + 1} has been created.`,
     });
@@ -70,9 +74,23 @@ export default function Home() {
 
     // Store state for undo
     const previousRounds = [...rounds];
+    const previousSelectedIndex = selectedRoundIndex;
 
     // Perform deletion
     setRounds(rounds.filter((_, i) => i !== index));
+
+    // Update selected round index
+    if (selectedRoundIndex === index) {
+      // If we deleted the selected round, select the previous one or first one
+      if (rounds.length > 1) {
+        setSelectedRoundIndex(index > 0 ? index - 1 : 0);
+      } else {
+        setSelectedRoundIndex(null);
+      }
+    } else if (selectedRoundIndex !== null && selectedRoundIndex > index) {
+      // If we deleted a round before the selected one, adjust the index
+      setSelectedRoundIndex(selectedRoundIndex - 1);
+    }
 
     // Show toast with undo
     toast(`"${roundName}" has been removed.`, {
@@ -81,6 +99,7 @@ export default function Home() {
         label: "Undo",
         onClick: () => {
           setRounds(previousRounds);
+          setSelectedRoundIndex(previousSelectedIndex);
           toast.success("Round restored", {
             description: `"${roundName}" has been restored.`,
           });
@@ -130,7 +149,6 @@ export default function Home() {
     });
   };
 
-
   const reorderRounds = (startIndex: number, endIndex: number) => {
     if (startIndex === endIndex) return;
 
@@ -138,6 +156,21 @@ export default function Home() {
     const [removed] = newRounds.splice(startIndex, 1);
     newRounds.splice(endIndex, 0, removed);
     setRounds(newRounds);
+
+    // Update selected round index after reordering
+    if (selectedRoundIndex === startIndex) {
+      setSelectedRoundIndex(endIndex);
+    } else if (selectedRoundIndex !== null) {
+      // Adjust selected index if it's affected by the reorder
+      if (startIndex < selectedRoundIndex && endIndex >= selectedRoundIndex) {
+        setSelectedRoundIndex(selectedRoundIndex - 1);
+      } else if (
+        startIndex > selectedRoundIndex &&
+        endIndex <= selectedRoundIndex
+      ) {
+        setSelectedRoundIndex(selectedRoundIndex + 1);
+      }
+    }
   };
 
   const moveHolderToGroup = (
@@ -209,6 +242,8 @@ export default function Home() {
   };
 
   const handleEditRound = (index: number) => {
+    // Select the round first
+    setSelectedRoundIndex(index);
     // Scroll to the round after a short delay
     setTimeout(() => {
       const element = document.getElementById(`round-${index}`);
@@ -217,26 +252,31 @@ export default function Home() {
   };
 
   const handleNavigateToError = (roundIndex: number, field?: string) => {
+    // Select the round first
+    setSelectedRoundIndex(roundIndex);
     // Scroll to the round after a short delay
     setTimeout(() => {
       const element = document.getElementById(`round-${roundIndex}`);
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "center" });
-        
+
         // If a specific field is provided, try to focus on it
         if (field) {
           // Try to find the field input by ID or data attribute
           setTimeout(() => {
             // Field names might be like "name", "round_date", "instruments[0].holder_name", etc.
-            const fieldId = field.includes("[") 
+            const fieldId = field.includes("[")
               ? undefined // Complex nested fields are harder to target
               : `round-${roundIndex}-${field}`;
-            
+
             if (fieldId) {
               const fieldElement = document.getElementById(fieldId);
               if (fieldElement) {
                 fieldElement.focus();
-                fieldElement.scrollIntoView({ behavior: "smooth", block: "center" });
+                fieldElement.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
               }
             }
           }, 300);
@@ -353,7 +393,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background flex">
       <div className="flex-1 overflow-auto">
-        <div className="max-w-7xl mx-auto p-3 sm:p-5 lg:p-6">
+        <div className="w-full max-w-3xl mx-auto p-3 sm:p-5 lg:p-6">
           {/* Header */}
           <div className="mb-6 pt-4">
             <div>
@@ -361,8 +401,9 @@ export default function Home() {
                 Cap Table Generator
               </h1>
               <p className="text-muted-foreground mt-1.5 text-sm">
-                Create your capitalization table by adding rounds and
-                instruments
+                {selectedRoundIndex !== null && rounds[selectedRoundIndex]
+                  ? `Editing: ${rounds[selectedRoundIndex].name || `Round ${selectedRoundIndex + 1}`}`
+                  : "Select a round from the sidebar to edit"}
               </p>
             </div>
           </div>
@@ -370,7 +411,11 @@ export default function Home() {
           {/* Rounds Section */}
           <div className="space-y-5">
             <div className="flex items-center gap-2 border-b border-border/50 pb-2.5">
-              <h2 className="text-base font-semibold">Rounds</h2>
+              <h2 className="text-base font-semibold">
+                {selectedRoundIndex !== null && rounds[selectedRoundIndex]
+                  ? `Editing: ${rounds[selectedRoundIndex].name || `Round ${selectedRoundIndex + 1}`}`
+                  : "Select a Round"}
+              </h2>
               {rounds.length > 0 && (
                 <Badge variant="secondary" className="text-xs">
                   {rounds.length}
@@ -396,6 +441,23 @@ export default function Home() {
                   </div>
                 </CardContent>
               </Card>
+            ) : selectedRoundIndex === null ? (
+              <Card className="border-border/50 border-dashed shadow-none">
+                <CardContent className="pt-12 pb-12">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="rounded-full bg-primary/10 p-4">
+                      <TrendingUp className="h-8 w-8 text-primary" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h3 className="text-lg font-semibold">Select a Round</h3>
+                      <p className="text-muted-foreground max-w-md text-sm">
+                        Select a round from the sidebar on the right to view and edit its
+                        details.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             ) : (
               <RoundsList
                 rounds={rounds}
@@ -407,20 +469,9 @@ export default function Home() {
                 onAddHolder={addHolder}
                 onUpdateHolder={updateHolder}
                 onDelete={deleteRound}
+                selectedRoundIndex={selectedRoundIndex}
               />
             )}
-
-            <div className="flex justify-end pt-2">
-              <Button
-                onClick={addRound}
-                size="sm"
-                variant="outline"
-                className="text-xs"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                Add Round
-              </Button>
-            </div>
           </div>
 
           {isGenerating && (
@@ -439,6 +490,8 @@ export default function Home() {
         holders={holders}
         rounds={rounds}
         validations={validations}
+        selectedRoundIndex={selectedRoundIndex}
+        onSelectRound={setSelectedRoundIndex}
         onEditHolder={handleEditHolder}
         onEditRound={handleEditRound}
         onDeleteHolder={deleteHolder}
@@ -481,6 +534,7 @@ function RoundsList({
   onAddHolder,
   onUpdateHolder,
   onDelete,
+  selectedRoundIndex,
 }: {
   rounds: Round[];
   holders: Holder[];
@@ -491,28 +545,38 @@ function RoundsList({
   onAddHolder: (holder: Holder) => void;
   onUpdateHolder: (oldName: string, holder: Holder) => void;
   onDelete: (index: number) => void;
+  selectedRoundIndex: number | null;
 }) {
+  if (selectedRoundIndex === null || selectedRoundIndex >= rounds.length) {
+    return null;
+  }
+
+  const round = rounds[selectedRoundIndex];
+  const validation = validations[selectedRoundIndex];
+
   return (
     <div className="space-y-0">
-      {rounds.map((round, index) => (
-        <div key={`round-${index}`} id={`round-${index}`}>
-          {index > 0 && <Separator className="my-8" />}
-          <RoundForm
-            round={round}
-            holders={holders}
-            onUpdate={(updatedRound) => onUpdate(index, updatedRound)}
-            onAddHolder={onAddHolder}
-            onUpdateHolder={onUpdateHolder}
-            usedGroups={usedGroups}
-            usedClassNames={usedClassNames}
-            allRounds={rounds}
-            roundIndex={index}
-            onUpdateRound={onUpdate}
-            onDelete={() => onDelete(index)}
-            validation={validations[index]}
-          />
-        </div>
-      ))}
+      <div
+        key={`round-${selectedRoundIndex}`}
+        id={`round-${selectedRoundIndex}`}
+      >
+        <RoundForm
+          round={round}
+          holders={holders}
+          onUpdate={(updatedRound) =>
+            onUpdate(selectedRoundIndex, updatedRound)
+          }
+          onAddHolder={onAddHolder}
+          onUpdateHolder={onUpdateHolder}
+          usedGroups={usedGroups}
+          usedClassNames={usedClassNames}
+          allRounds={rounds}
+          roundIndex={selectedRoundIndex}
+          onUpdateRound={onUpdate}
+          onDelete={() => onDelete(selectedRoundIndex)}
+          validation={validation}
+        />
+      </div>
     </div>
   );
 }
