@@ -34,7 +34,7 @@
     "ProRataAllocation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["holder_name", "class_name", "pro_rata_type"],
+      "required": ["holder_name", "class_name", "pro_rata_type", "exercise_type"],
       "properties": {
         "holder_name": {
           "type": "string",
@@ -54,6 +54,22 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Target ownership percentage for super pro rata rights (required when pro_rata_type is 'super')"
+        },
+        "exercise_type": {
+          "type": "string",
+          "enum": ["full", "partial"],
+          "description": "Exercise type: full (exercise full rights), partial (exercise rights up to a specified amount or percentage)"
+        },
+        "partial_exercise_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum investment amount for partial exercise (required when exercise_type is 'partial' and partial_exercise_percentage is not provided)"
+        },
+        "partial_exercise_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Maximum ownership percentage for partial exercise (required when exercise_type is 'partial' and partial_exercise_amount is not provided)"
         }
       },
       "allOf": [
@@ -63,6 +79,17 @@
           },
           "then": {
             "required": ["pro_rata_percentage"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "exercise_type": { "const": "partial" } }
+          },
+          "then": {
+            "anyOf": [
+              { "required": ["partial_exercise_amount"] },
+              { "required": ["partial_exercise_percentage"] }
+            ]
           }
         }
       ]

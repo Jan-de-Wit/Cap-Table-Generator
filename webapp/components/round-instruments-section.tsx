@@ -50,7 +50,7 @@ import {
 // Extend ColumnMeta to include sticky property
 declare module "@tanstack/react-table" {
   interface ColumnMeta<TData, TValue> {
-    sticky?: boolean;
+    sticky?: boolean | "left" | "right";
   }
 }
 import {
@@ -699,10 +699,10 @@ export function RoundInstrumentsSection({
       ...columns,
       {
         id: "actions",
-        header: () => <div className="text-right">Actions</div>,
+        header: () => <div className="text-left">Actions</div>,
         cell: ({ row }) => {
           return (
-            <div className="flex items-center justify-end gap-1">
+            <div className="flex items-center justify-start">
               <Button
                 type="button"
                 variant="ghost"
@@ -775,14 +775,6 @@ export function RoundInstrumentsSection({
 
   return (
     <div className="space-y-4">
-      {instrumentsError && !hasAnyInstruments && (
-        <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 p-4">
-          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
-            {instrumentsError}
-          </p>
-        </div>
-      )}
-
       {regularInstruments.length === 0 ? (
         <div className="flex items-center justify-start">
           <Button
@@ -884,11 +876,12 @@ export function RoundInstrumentsSection({
                     {headerGroup.headers.map((header) => {
                       const isSticky = header.column.columnDef.meta?.sticky;
                       const isActions = header.column.id === "actions";
+                      const isIndex = header.column.id === "index";
                       return (
                         <TableHead
                           key={header.id}
                           className={`${
-                            isActions ? "" : "min-w-[120px]"
+                            isActions || isIndex ? "" : "min-w-[120px]"
                           } whitespace-nowrap ${
                             isSticky ? "sticky right-0 z-20 p-0 m-0" : ""
                           }`}
@@ -904,7 +897,9 @@ export function RoundInstrumentsSection({
                             className={`h-full flex items-center relative ${
                               isSticky
                                 ? `border-l border-border/50 ${
-                                    isActions ? "pl-6 pr-4 justify-end" : "px-4"
+                                    isActions
+                                      ? "pl-4 justify-start"
+                                      : "px-4"
                                   }`
                                 : ""
                             }`}
@@ -957,11 +952,12 @@ export function RoundInstrumentsSection({
                       {row.getVisibleCells().map((cell) => {
                         const isSticky = cell.column.columnDef.meta?.sticky;
                         const isActions = cell.column.id === "actions";
+                        const isIndex = cell.column.id === "index";
                         return (
                           <TableCell
                             key={cell.id}
                             className={`${
-                              isActions ? "" : "min-w-[120px]"
+                              isActions || isIndex ? "" : "min-w-[120px]"
                             } whitespace-nowrap ${
                               isSticky ? "sticky right-0 z-20 p-0 m-0" : "py-3"
                             }`}
@@ -978,7 +974,7 @@ export function RoundInstrumentsSection({
                                 isSticky
                                   ? `border-l border-border/50 py-3 relative ${
                                       isActions
-                                        ? "pl-6 pr-4 justify-end"
+                                        ? "pl-2 pr-2 justify-start"
                                         : "px-4"
                                     }`
                                   : ""

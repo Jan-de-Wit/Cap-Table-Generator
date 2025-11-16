@@ -102,6 +102,23 @@ export function HolderSelector({
     return [...sortedGroupedHolders, ...ungrouped];
   }, [holders]);
 
+  // Format holder options for Combobox
+  const holderOptions = React.useMemo(() => {
+    return sortedHolders.map((holder) => {
+      const displayName = holder.group
+        ? `${holder.name} (${holder.group})`
+        : holder.name;
+      return displayName;
+    });
+  }, [sortedHolders]);
+
+  // Get the display value for the combobox
+  const displayValue = React.useMemo(() => {
+    const holder = sortedHolders.find((h) => h.name === value);
+    if (!holder) return "";
+    return holder.group ? `${holder.name} (${holder.group})` : holder.name;
+  }, [value, sortedHolders]);
+
   // If no holders exist, show a bigger "Add holder" button
   if (holders.length === 0 && allowCreate) {
     return (
@@ -130,23 +147,6 @@ export function HolderSelector({
     );
   }
 
-  // Format holder options for Combobox
-  const holderOptions = React.useMemo(() => {
-    return sortedHolders.map((holder) => {
-      const displayName = holder.group
-        ? `${holder.name} (${holder.group})`
-        : holder.name;
-      return displayName;
-    });
-  }, [sortedHolders]);
-
-  // Get the display value for the combobox
-  const displayValue = React.useMemo(() => {
-    const holder = sortedHolders.find((h) => h.name === value);
-    if (!holder) return "";
-    return holder.group ? `${holder.name} (${holder.group})` : holder.name;
-  }, [value, sortedHolders]);
-
   const handleValueChange = (selectedDisplayValue: string) => {
     // Extract the holder name from the display value (remove group if present)
     const holderName = selectedDisplayValue.split(" (")[0];
@@ -156,20 +156,22 @@ export function HolderSelector({
   return (
     <>
       <div className="flex gap-2">
-        <Combobox
-          options={holderOptions}
-          value={displayValue}
-          onValueChange={handleValueChange}
-          placeholder={placeholder}
-          searchPlaceholder="Search holders..."
-          emptyText="No holder found."
-          allowCustom={false}
-        />
+        <div className="flex-1 min-w-0">
+          <Combobox
+            options={holderOptions}
+            value={displayValue}
+            onValueChange={handleValueChange}
+            placeholder={placeholder}
+            searchPlaceholder="Search holders..."
+            emptyText="No holder found."
+            allowCustom={false}
+          />
+        </div>
         {selectedHolder && (
           <Button
             type="button"
             variant="outline"
-            className="h-10 cursor-pointer"
+            className="h-10 cursor-pointer shrink-0"
             onClick={(e) => {
               e.stopPropagation();
               handleEdit(selectedHolder.name);
@@ -183,7 +185,7 @@ export function HolderSelector({
           <Button
             type="button"
             variant="outline"
-            className="h-10 cursor-pointer"
+            className="h-10 cursor-pointer shrink-0"
             onClick={(e) => {
               e.stopPropagation();
               handleCreateNew();

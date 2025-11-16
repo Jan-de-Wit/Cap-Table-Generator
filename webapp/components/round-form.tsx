@@ -47,6 +47,7 @@ export function RoundForm({
     index: number;
     isProRata: boolean;
     originalRoundIndex?: number;
+    editProRataOnly?: boolean;
   } | null>(null);
 
   const updateRound = (updates: Partial<Round>) => {
@@ -95,23 +96,35 @@ export function RoundForm({
     index: number,
     isProRata: boolean
   ) => {
-    // If editing a pro-rata allocation, find and edit the original instrument instead
+    // If editing a pro-rata allocation from the pro-rata exercise section,
+    // edit the pro-rata allocation directly in the current round
+    // (not the original instrument in a previous round)
+    if (isProRata && instrument && "pro_rata_type" in instrument) {
+      // This is a pro-rata allocation in the current round - edit it directly
+      setEditingInstrument({ instrument, index, isProRata });
+      setInstrumentDialogOpen(true);
+      return;
+    }
+
+    // If editing pro-rata rights (not an allocation), find and edit the original instrument
     if (
       isProRata &&
       instrument &&
       "holder_name" in instrument &&
-      instrument.holder_name
+      instrument.holder_name &&
+      !("pro_rata_type" in instrument)
     ) {
       const original = findOriginalProRataRightsInstrument(
         instrument.holder_name
       );
       if (original && onUpdateRound) {
-        // Edit the original instrument in the previous round
+        // Edit the original instrument in the previous round, but only show pro-rata fields
         setEditingInstrument({
           instrument: original.instrument,
           index: original.instrumentIndex,
           isProRata: false,
           originalRoundIndex: original.roundIndex,
+          editProRataOnly: true,
         });
         setInstrumentDialogOpen(true);
         return;
@@ -180,13 +193,31 @@ export function RoundForm({
                 : existingPercentage;
 
             // Update the pro-rata allocation with the new data
+            // Preserve exercise_type and partial exercise fields if they exist
+            const existingExerciseType =
+              "exercise_type" in existingProRata
+                ? (existingProRata as any).exercise_type
+                : "full";
             const updatedProRata: Instrument = {
               holder_name: holderName,
               class_name:
                 "class_name" in instrument ? instrument.class_name : "",
               pro_rata_type: newProRataType,
+              exercise_type: existingExerciseType,
               ...(newProRataType === "super" && newPercentage
                 ? { pro_rata_percentage: newPercentage }
+                : {}),
+              ...("partial_exercise_amount" in existingProRata
+                ? {
+                    partial_exercise_amount: (existingProRata as any)
+                      .partial_exercise_amount,
+                  }
+                : {}),
+              ...("partial_exercise_percentage" in existingProRata
+                ? {
+                    partial_exercise_percentage: (existingProRata as any)
+                      .partial_exercise_percentage,
+                  }
                 : {}),
             };
 
@@ -243,7 +274,7 @@ export function RoundForm({
 
     // Show toast with undo
     toast(`"${holderName}" - ${className} has been removed.`, {
-      description: 'Accident? Hit "Undo" to restore.',
+      description: "Accident? Hit undo to restore.",
       action: {
         label: "Undo",
         onClick: () => {
@@ -378,6 +409,7 @@ export function RoundForm({
         holder_name: holderName,
         class_name: class_name,
         pro_rata_type: proRataType,
+        exercise_type: "full",
         ...(proRataType === "super" && percentage
           ? { pro_rata_percentage: percentage }
           : {}),
@@ -473,6 +505,14 @@ export function RoundForm({
 
       {editingInstrument && (
         <InstrumentDialog
+          key={
+            editingInstrument.instrument &&
+            "holder_name" in editingInstrument.instrument
+              ? `${editingInstrument.instrument.holder_name}-${
+                  editingInstrument.index
+                }-${JSON.stringify(editingInstrument.instrument)}`
+              : `instrument-${editingInstrument.index}`
+          }
           open={instrumentDialogOpen}
           onOpenChange={(open) => {
             setInstrumentDialogOpen(open);
@@ -489,6 +529,66 @@ export function RoundForm({
           usedGroups={usedGroups}
           usedClassNames={usedClassNames}
           isProRata={editingInstrument.isProRata}
+          editProRataOnly={editingInstrument.editProRataOnly}
+          originalProRataInstrument={
+            editingInstrument.isProRata &&
+            editingInstrument.instrument &&
+            "holder_name" in editingInstrument.instrument &&
+            editingInstrument.instrument.holder_name
+              ? (() => {
+                  const original = findOriginalProRataRightsInstrument(
+                    editingInstrument.instrument &&
+                      "holder_name" in editingInstrument.instrument
+                      ? editingInstrument.instrument.holder_name
+                      : ""
+                  );
+                  // Always fetch the latest instrument from allRounds
+                  if (original && allRounds) {
+                    return (
+                      allRounds[original.roundIndex]?.instruments?.[
+                        original.instrumentIndex
+                      ] || original.instrument
+                    );
+                  }
+                  return null;
+                })()
+              : null
+          }
+          originalProRataRoundIndex={
+            editingInstrument.isProRata &&
+            editingInstrument.instrument &&
+            "holder_name" in editingInstrument.instrument &&
+            editingInstrument.instrument.holder_name
+              ? (() => {
+                  const original = findOriginalProRataRightsInstrument(
+                    editingInstrument.instrument &&
+                      "holder_name" in editingInstrument.instrument
+                      ? editingInstrument.instrument.holder_name
+                      : ""
+                  );
+                  return original?.roundIndex ?? null;
+                })()
+              : null
+          }
+          originalProRataRoundName={
+            editingInstrument.isProRata &&
+            editingInstrument.instrument &&
+            "holder_name" in editingInstrument.instrument &&
+            editingInstrument.instrument.holder_name
+              ? (() => {
+                  const original = findOriginalProRataRightsInstrument(
+                    editingInstrument.instrument &&
+                      "holder_name" in editingInstrument.instrument
+                      ? editingInstrument.instrument.holder_name
+                      : ""
+                  );
+                  if (original && allRounds) {
+                    return allRounds[original.roundIndex]?.name ?? null;
+                  }
+                  return null;
+                })()
+              : null
+          }
         />
       )}
     </div>

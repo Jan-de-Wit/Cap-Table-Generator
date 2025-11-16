@@ -78,6 +78,9 @@ export interface ProRataAllocation {
   class_name: string;
   pro_rata_type: ProRataType;
   pro_rata_percentage?: number;
+  exercise_type: "full" | "partial";
+  partial_exercise_amount?: number;
+  partial_exercise_percentage?: number;
 }
 
 export type Instrument = 

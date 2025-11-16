@@ -23,6 +23,13 @@ import { HolderSelector } from "@/components/holder-selector";
 import { FieldWithHelp } from "@/components/field-with-help";
 import { Combobox } from "@/components/ui/combobox";
 import { Separator } from "@/components/ui/separator";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Info } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type {
   Instrument,
   Holder,
@@ -50,6 +57,10 @@ interface InstrumentDialogProps {
   usedGroups: string[];
   usedClassNames: string[];
   isProRata?: boolean;
+  editProRataOnly?: boolean;
+  originalProRataInstrument?: Instrument | null;
+  originalProRataRoundIndex?: number | null;
+  originalProRataRoundName?: string | null;
 }
 
 export function InstrumentDialog({
@@ -64,6 +75,10 @@ export function InstrumentDialog({
   usedGroups,
   usedClassNames,
   isProRata = false,
+  editProRataOnly = false,
+  originalProRataInstrument,
+  originalProRataRoundIndex,
+  originalProRataRoundName,
 }: InstrumentDialogProps) {
   const [formData, setFormData] = React.useState<Partial<Instrument>>({});
   const [touchedFields, setTouchedFields] = React.useState<Set<string>>(
@@ -71,6 +86,7 @@ export function InstrumentDialog({
   );
   const [className, setClassName] = React.useState<string>("");
   const classNameInputRef = React.useRef<HTMLInputElement>(null);
+  const previousInstrumentRef = React.useRef<Instrument | null>(null);
 
   // Helper function to validate percentage
   const validatePercentage = (percentage: number, fieldName: string): string | undefined => {
@@ -83,19 +99,43 @@ export function InstrumentDialog({
     return undefined;
   };
 
-  // Initialize form when dialog opens
+  // Initialize form when dialog opens or instrument changes
   React.useEffect(() => {
     if (open) {
+      // Check if instrument has changed by comparing JSON stringified versions
+      // This handles deep equality checks for nested objects
+      const currentInstrumentStr = instrument ? JSON.stringify(instrument) : null;
+      const previousInstrumentStr = previousInstrumentRef.current
+        ? JSON.stringify(previousInstrumentRef.current)
+        : null;
+      const instrumentChanged = currentInstrumentStr !== previousInstrumentStr;
+      
+      // Always update form data when instrument changes, even if dialog is already open
       if (instrument) {
-        setFormData(instrument);
+        // Only update if instrument actually changed to avoid unnecessary re-renders
+        if (instrumentChanged) {
+        previousInstrumentRef.current = instrument;
+        const initialData: Partial<Instrument> = { ...instrument };
+        // Ensure exercise_type defaults to "full" for pro-rata allocations
+        if (isProRata && !("exercise_type" in initialData)) {
+          (initialData as any).exercise_type = "full";
+        }
+        setFormData(initialData);
         setClassName(instrument.class_name || "");
+          // Reset touched fields when instrument changes
+          setTouchedFields(new Set());
+        }
       } else {
+        // Only reset if we don't have a previous instrument (i.e., dialog just opened)
+        if (!previousInstrumentRef.current) {
+        previousInstrumentRef.current = null;
         // Create empty instrument based on type
         if (isProRata) {
           setFormData({
             holder_name: "",
             class_name: "",
             pro_rata_type: "standard",
+            exercise_type: "full",
           });
         } else {
           setClassName("");
@@ -135,7 +175,10 @@ export function InstrumentDialog({
           }
         }
       }
-      setTouchedFields(new Set());
+      }
+    } else {
+      // Reset ref when dialog closes
+      previousInstrumentRef.current = null;
     }
   }, [open, instrument, calculationType, isProRata]);
 
@@ -187,6 +230,55 @@ export function InstrumentDialog({
           );
           if (percentageError) {
             errors.push(percentageError);
+          }
+        }
+      }
+
+      // Validate exercise_type
+      const exerciseType = (formData as any).exercise_type;
+      if (!exerciseType || (exerciseType !== "full" && exerciseType !== "partial")) {
+        errors.push("Exercise type is required and must be 'full' or 'partial'");
+      }
+
+      // Validate partial exercise fields
+      if (exerciseType === "partial") {
+        const partialAmount = (formData as any).partial_exercise_amount;
+        const partialPercentage = (formData as any).partial_exercise_percentage;
+
+        if (!partialAmount && !partialPercentage) {
+          errors.push(
+            "Either partial exercise amount or partial exercise percentage must be provided for partial exercise"
+          );
+        }
+
+        if (partialAmount !== undefined && partialAmount <= 0) {
+          errors.push("Partial exercise amount must be greater than 0");
+        }
+
+        if (
+          partialPercentage !== undefined &&
+          (partialPercentage <= 0 || partialPercentage >= 1)
+        ) {
+          const percentageError = validatePercentage(
+            decimalToPercentage(partialPercentage),
+            "Partial exercise percentage"
+          );
+          if (percentageError) {
+            errors.push(percentageError);
+          }
+        }
+
+        // Validate that partial exercise percentage is lower than super pro-rata percentage
+        if (
+          partialPercentage !== undefined &&
+          proRataType === "super" &&
+          (formData as any).pro_rata_percentage !== undefined
+        ) {
+          const proRataPercentage = (formData as any).pro_rata_percentage;
+          if (partialPercentage >= proRataPercentage) {
+            errors.push(
+              "Partial exercise percentage must be lower than super pro-rata percentage"
+            );
           }
         }
       }
@@ -337,7 +429,9 @@ export function InstrumentDialog({
         <DialogHeader>
           <DialogTitle>
             {isEditMode
-              ? isProRata
+              ? editProRataOnly
+                ? "Edit Pro-Rata Rights"
+                : isProRata
                 ? "Edit Pro-Rata Allocation"
                 : "Edit Instrument"
               : isProRata
@@ -346,140 +440,259 @@ export function InstrumentDialog({
           </DialogTitle>
           <DialogDescription>
             {isEditMode
-              ? "Update instrument details"
+              ? editProRataOnly
+                ? "Update pro-rata rights allocation settings"
+                : "Update instrument details"
               : "Add a new instrument to this round"}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-6 py-4">
-          {/* Basic Information Section */}
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-1">
-                Basic Information
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Essential details about the instrument
-              </p>
-            </div>
+          {/* Basic Information Section - Only show if not editing pro-rata allocation or pro-rata only */}
+          {!isProRata && !editProRataOnly && (
             <div className="space-y-4">
-              <FieldWithHelp
-                label="Holder"
-                helpText={
-                  isProRata
-                    ? "Select a holder who has shares in previous rounds"
-                    : "Select an existing holder or create a new one"
-                }
-                required
-                htmlFor="instrument-holder"
-              >
-                <HolderSelector
-                  value={formData.holder_name || ""}
-                  onChange={(name) => updateField("holder_name", name)}
-                  holders={holders}
-                  onAddHolder={onAddHolder}
-                  onUpdateHolder={onUpdateHolder}
-                  usedGroups={usedGroups}
-                  allowCreate={!isProRata}
-                />
-              </FieldWithHelp>
-              <FieldWithHelp
-                label="Class Name"
-                helpText="The security class name (e.g., 'Series A Preferred', 'Common Stock')"
-                required
-                htmlFor="instrument-class"
-              >
-                {usedClassNames.length === 0 ? (
-                  <>
-                    <Input
-                      ref={classNameInputRef}
-                      id="instrument-class"
-                      type="text"
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-1">
+                  Basic Information
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Essential details about the instrument
+                </p>
+              </div>
+              <div className="space-y-4">
+                <FieldWithHelp
+                  label="Holder"
+                  helpText="Select an existing holder or create a new one"
+                  required
+                  htmlFor="instrument-holder"
+                >
+                  <HolderSelector
+                    value={formData.holder_name || ""}
+                    onChange={(name) => updateField("holder_name", name)}
+                    holders={holders}
+                    onAddHolder={onAddHolder}
+                    onUpdateHolder={onUpdateHolder}
+                    usedGroups={usedGroups}
+                    allowCreate={true}
+                  />
+                </FieldWithHelp>
+                <FieldWithHelp
+                  label="Class Name"
+                  helpText="The security class name (e.g., 'Series A Preferred', 'Common Stock')"
+                  required
+                  htmlFor="instrument-class"
+                >
+                  {usedClassNames.length === 0 ? (
+                    <>
+                      <Input
+                        ref={classNameInputRef}
+                        id="instrument-class"
+                        type="text"
+                        value={className}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setClassName(value);
+                          updateField("class_name", value);
+                        }}
+                        placeholder="Type a class name (e.g., 'Series A Preferred')"
+                        onBlur={() =>
+                          setTouchedFields(
+                            (prev) => new Set([...prev, "class_name"])
+                          )
+                        }
+                      />
+                    </>
+                  ) : (
+                    <Combobox
+                      options={classNameOptions}
                       value={className}
-                      onChange={(e) => {
-                        const value = e.target.value;
+                      onValueChange={(value) => {
                         setClassName(value);
                         updateField("class_name", value);
                       }}
-                      placeholder="Type a class name (e.g., 'Series A Preferred')"
-                      onBlur={() =>
-                        setTouchedFields(
-                          (prev) => new Set([...prev, "class_name"])
-                        )
-                      }
+                      placeholder="Select or type a class name..."
+                      searchPlaceholder="Search class names..."
+                      emptyText="No class name found. Type to create a new one."
+                      allowCustom={true}
                     />
-                  </>
-                ) : (
-                  <Combobox
-                    options={classNameOptions}
-                    value={className}
-                    onValueChange={(value) => {
-                      setClassName(value);
-                      updateField("class_name", value);
-                    }}
-                    placeholder="Select or type a class name..."
-                    searchPlaceholder="Search class names..."
-                    emptyText="No class name found. Type to create a new one."
-                    allowCustom={true}
-                  />
-                )}
-              </FieldWithHelp>
+                  )}
+                </FieldWithHelp>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Show read-only holder and class info when editing pro-rata rights only (not allocations) */}
+          {editProRataOnly && !isProRata && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-1">
+                  Basic Information
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Holder and class information cannot be changed when editing pro-rata rights
+                </p>
+              </div>
+              <div className="space-y-4">
+                <FieldWithHelp
+                  label="Holder"
+                  helpText="Holder name (read-only)"
+                  htmlFor="instrument-holder-readonly"
+                >
+                  <Input
+                    id="instrument-holder-readonly"
+                    type="text"
+                    value={formData.holder_name || ""}
+                    disabled
+                    className="bg-muted cursor-not-allowed"
+                  />
+                </FieldWithHelp>
+                <FieldWithHelp
+                  label="Class Name"
+                  helpText="Class name (read-only)"
+                  htmlFor="instrument-class-readonly"
+                >
+                  <Input
+                    id="instrument-class-readonly"
+                    type="text"
+                    value={formData.class_name || ""}
+                    disabled
+                    className="bg-muted cursor-not-allowed"
+                  />
+                </FieldWithHelp>
+              </div>
+            </div>
+          )}
 
           {isProRata ? (
             <>
               <Separator />
+              {/* Pro-Rata Rights Section */}
               <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground mb-1">
                     Pro-Rata Rights
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Configure pro-rata allocation settings
+                    Pro-rata rights are defined in the original instrument
                   </p>
                 </div>
                 <FieldWithHelp
                   label="Pro-Rata Type"
                   helpText="Standard: maintain ownership. Super: can exceed ownership up to specified percentage."
-                  required
                   htmlFor="pro-rata-type"
                 >
-                  <Select
-                    value={(formData as any).pro_rata_type || "standard"}
-                    onValueChange={(value: ProRataType) => {
-                      const updates: any = { pro_rata_type: value };
-                      if (value !== "super") {
-                        updates.pro_rata_percentage = undefined;
-                      }
-                      setFormData((prev) => ({ ...prev, ...updates }));
-                      setTouchedFields(
-                        (prev) => new Set([...prev, "pro_rata_type"])
-                      );
-                    }}
-                  >
-                    <SelectTrigger id="pro-rata-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="standard">Standard</SelectItem>
-                      <SelectItem value="super">Super</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={(formData as any).pro_rata_type || "standard"}
+                      disabled
+                    >
+                      <SelectTrigger id="pro-rata-type" className="flex-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="super">Super</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {originalProRataInstrument && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                            className="h-10 cursor-pointer"
+                            title="View original pro-rata settings"
+                      >
+                            <Info className="h-4 w-4 mr-1.5" />
+                            View Original
+                      </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80" align="end">
+                          <div className="space-y-3">
+                            <div>
+                              <h4 className="font-semibold text-sm mb-2">
+                                Original Pro-Rata Rights
+                              </h4>
+                              <p className="text-xs text-muted-foreground mb-3">
+                                These settings are defined in the original instrument and cannot be changed here.
+                              </p>
+                            </div>
+                            <div className="space-y-2 text-sm">
+                              {(originalProRataRoundName !== null && originalProRataRoundName !== undefined) ||
+                              (originalProRataRoundIndex !== null && originalProRataRoundIndex !== undefined) ? (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">
+                                    Round:
+                                  </span>
+                                  <span className="font-medium">
+                                    {originalProRataRoundName ||
+                                      (originalProRataRoundIndex !== null &&
+                                        originalProRataRoundIndex !== undefined
+                                        ? `Round ${originalProRataRoundIndex + 1}`
+                                        : "—")}
+                                  </span>
+                                </div>
+                              ) : null}
+                              {originalProRataInstrument &&
+                                "holder_name" in originalProRataInstrument &&
+                                originalProRataInstrument.holder_name && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">
+                                      Holder:
+                                    </span>
+                                    <span className="font-medium">
+                                      {originalProRataInstrument.holder_name}
+                                    </span>
+                                  </div>
+                                )}
+                              {originalProRataInstrument &&
+                                "pro_rata_rights" in originalProRataInstrument && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">
+                                      Pro-Rata Type:
+                                    </span>
+                                    <span className="font-medium capitalize">
+                                      {originalProRataInstrument.pro_rata_rights ===
+                                      "super"
+                                        ? "Super"
+                                        : originalProRataInstrument.pro_rata_rights ===
+                                          "standard"
+                                        ? "Standard"
+                                        : "None"}
+                                    </span>
+                                  </div>
+                                )}
+                              {originalProRataInstrument &&
+                                "pro_rata_rights" in originalProRataInstrument &&
+                                originalProRataInstrument.pro_rata_rights ===
+                                  "super" &&
+                                "pro_rata_percentage" in
+                                  originalProRataInstrument &&
+                                originalProRataInstrument.pro_rata_percentage !==
+                                  undefined && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">
+                                      Max Percentage:
+                                    </span>
+                                    <span className="font-medium">
+                                      {decimalToPercentage(
+                                        originalProRataInstrument.pro_rata_percentage
+                                      ).toFixed(2)}
+                                      %
+                                    </span>
+                                  </div>
+                                )}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
                 </FieldWithHelp>
                 {(formData as any).pro_rata_type === "super" && (
                   <FieldWithHelp
                     label="Pro-Rata Percentage"
                     helpText="Maximum ownership percentage for super pro-rata (0-100%)"
-                    required
-                    error={
-                      touchedFields.has("pro_rata_percentage") &&
-                      (formData as any).pro_rata_percentage !== undefined
-                        ? validatePercentage(
-                            decimalToPercentage((formData as any).pro_rata_percentage),
-                            "Pro-rata percentage"
-                          )
-                        : undefined
-                    }
                     htmlFor="pro-rata-percentage"
                   >
                     <div className="flex items-center gap-2">
@@ -496,30 +709,8 @@ export function InstrumentDialog({
                               )
                             : ""
                         }
-                        onChange={(e) => {
-                          const percentage = e.target.value
-                            ? parseFloat(e.target.value)
-                            : 0;
-                          updateField(
-                            "pro_rata_percentage",
-                            percentageToDecimal(percentage)
-                          );
-                        }}
-                        onBlur={() =>
-                          setTouchedFields(
-                            (prev) => new Set([...prev, "pro_rata_percentage"])
-                          )
-                        }
-                        className={
-                          touchedFields.has("pro_rata_percentage") &&
-                          (formData as any).pro_rata_percentage !== undefined &&
-                          validatePercentage(
-                            decimalToPercentage((formData as any).pro_rata_percentage),
-                            "Pro-rata percentage"
-                          )
-                            ? "border-destructive ring-destructive/20"
-                            : ""
-                        }
+                        disabled
+                        className="flex-1"
                         placeholder="e.g., 15 for 15%"
                       />
                       <span className="text-muted-foreground">%</span>
@@ -527,10 +718,200 @@ export function InstrumentDialog({
                   </FieldWithHelp>
                 )}
               </div>
+
+              <Separator />
+              {/* Exercise Section */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-1">
+                    Exercise
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Configure how pro-rata rights are exercised
+                  </p>
+                </div>
+                <FieldWithHelp
+                  label="Exercise Type"
+                  helpText="Full: exercise full rights. Partial: exercise rights up to a specified amount or percentage."
+                  required
+                  htmlFor="exercise-type"
+                >
+                  <SegmentedControl
+                    value={(formData as any).exercise_type || "full"}
+                    onValueChange={(value: string) => {
+                      const updates: any = { exercise_type: value };
+                      if (value === "full") {
+                        updates.partial_exercise_amount = undefined;
+                        updates.partial_exercise_percentage = undefined;
+                      }
+                      setFormData((prev) => ({ ...prev, ...updates }));
+                      setTouchedFields(
+                        (prev) => new Set([...prev, "exercise_type"])
+                      );
+                    }}
+                    options={[
+                      { value: "full", label: "Full" },
+                      { value: "partial", label: "Partial" },
+                    ]}
+                    className="w-full"
+                  />
+                </FieldWithHelp>
+                {(formData as any).exercise_type === "partial" && (
+                  <>
+                    <FieldWithHelp
+                      label="Partial Exercise Amount"
+                      helpText="Maximum investment amount for partial exercise (optional if percentage is provided)"
+                      htmlFor="partial-exercise-amount"
+                      error={
+                        touchedFields.has("partial_exercise_amount") &&
+                        (formData as any).partial_exercise_amount !== undefined &&
+                        (formData as any).partial_exercise_amount <= 0
+                          ? "Partial exercise amount must be greater than 0"
+                          : undefined
+                      }
+                    >
+                      <Input
+                        id="partial-exercise-amount"
+                        type="text"
+                        value={
+                          (formData as any).partial_exercise_amount
+                            ? formatCurrency(
+                                (formData as any).partial_exercise_amount
+                              )
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const parsed = parseFormattedNumber(e.target.value);
+                          updateField(
+                            "partial_exercise_amount",
+                            parsed > 0 ? parsed : undefined
+                          );
+                        }}
+                        onBlur={() =>
+                          setTouchedFields(
+                            (prev) =>
+                              new Set([...prev, "partial_exercise_amount"])
+                          )
+                        }
+                        placeholder="e.g., $50,000"
+                        className={
+                          touchedFields.has("partial_exercise_amount") &&
+                          (formData as any).partial_exercise_amount !== undefined &&
+                          (formData as any).partial_exercise_amount <= 0
+                            ? "border-destructive ring-destructive/20"
+                            : ""
+                        }
+                      />
+                    </FieldWithHelp>
+                    <FieldWithHelp
+                      label="Partial Exercise Percentage"
+                      helpText="Maximum ownership percentage for partial exercise (optional if amount is provided, 0-100%). Must be lower than super pro-rata percentage if set."
+                      htmlFor="partial-exercise-percentage"
+                      error={
+                        touchedFields.has("partial_exercise_percentage") &&
+                        (formData as any).partial_exercise_percentage !== undefined
+                          ? (() => {
+                              const percentageError = validatePercentage(
+                                decimalToPercentage(
+                                  (formData as any).partial_exercise_percentage
+                                ),
+                                "Partial exercise percentage"
+                              );
+                              if (percentageError) return percentageError;
+                              
+                              // Check if partial exercise percentage is lower than super pro-rata percentage
+                              const proRataType = (formData as any).pro_rata_type;
+                              if (
+                                proRataType === "super" &&
+                                (formData as any).pro_rata_percentage !== undefined
+                              ) {
+                                const partialPercentage = (formData as any).partial_exercise_percentage;
+                                const proRataPercentage = (formData as any).pro_rata_percentage;
+                                if (partialPercentage >= proRataPercentage) {
+                                  return "Partial exercise percentage must be lower than super pro-rata percentage";
+                                }
+                              }
+                              return undefined;
+                            })()
+                          : undefined
+                      }
+                    >
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="partial-exercise-percentage"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={
+                            (formData as any).partial_exercise_percentage
+                              ? decimalToPercentage(
+                                  (formData as any).partial_exercise_percentage
+                                )
+                              : ""
+                          }
+                          onChange={(e) => {
+                            const percentage = e.target.value
+                              ? parseFloat(e.target.value)
+                              : 0;
+                            updateField(
+                              "partial_exercise_percentage",
+                              percentage > 0
+                                ? percentageToDecimal(percentage)
+                                : undefined
+                            );
+                          }}
+                          onBlur={() =>
+                            setTouchedFields(
+                              (prev) =>
+                                new Set([
+                                  ...prev,
+                                  "partial_exercise_percentage",
+                                ])
+                            )
+                          }
+                          className={
+                            touchedFields.has("partial_exercise_percentage") &&
+                            (formData as any).partial_exercise_percentage !==
+                              undefined &&
+                            (() => {
+                              const percentageError = validatePercentage(
+                                decimalToPercentage(
+                                  (formData as any).partial_exercise_percentage
+                                ),
+                                "Partial exercise percentage"
+                              );
+                              if (percentageError) return true;
+                              
+                              // Check if partial exercise percentage is lower than super pro-rata percentage
+                              const proRataType = (formData as any).pro_rata_type;
+                              if (
+                                proRataType === "super" &&
+                                (formData as any).pro_rata_percentage !== undefined
+                              ) {
+                                const partialPercentage = (formData as any).partial_exercise_percentage;
+                                const proRataPercentage = (formData as any).pro_rata_percentage;
+                                if (partialPercentage >= proRataPercentage) {
+                                  return true;
+                                }
+                              }
+                              return false;
+                            })()
+                              ? "border-destructive ring-destructive/20"
+                              : ""
+                          }
+                          placeholder="e.g., 10 for 10%"
+                        />
+                        <span className="text-muted-foreground">%</span>
+                      </div>
+                    </FieldWithHelp>
+                  </>
+                )}
+              </div>
             </>
           ) : (
             <>
-              {(calculationType === "fixed_shares" ||
+              {!editProRataOnly && (calculationType === "fixed_shares" ||
                 calculationType === "target_percentage" ||
                 calculationType === "valuation_based") && (
                 <>
@@ -680,7 +1061,7 @@ export function InstrumentDialog({
                 </>
               )}
 
-              {calculationType === "convertible" && (
+              {!editProRataOnly && calculationType === "convertible" && (
                 <>
                   <Separator />
                   <div className="space-y-4">
@@ -1015,7 +1396,7 @@ export function InstrumentDialog({
                 </>
               )}
 
-              {calculationType === "safe" && (
+              {!editProRataOnly && calculationType === "safe" && (
                 <>
                   <Separator />
                   <div className="space-y-4">
@@ -1200,8 +1581,8 @@ export function InstrumentDialog({
                 </>
               )}
 
-              {/* Pro-Rata Rights Field (for non-pro-rata instruments) */}
-              {!isProRata && (
+              {/* Pro-Rata Rights Field (for non-pro-rata instruments or when editing pro-rata only) */}
+              {(editProRataOnly || !isProRata) && (
                 <>
                   <Separator />
                   <div className="space-y-4">
@@ -1210,7 +1591,9 @@ export function InstrumentDialog({
                         Pro-Rata Rights
                       </h3>
                       <p className="text-xs text-muted-foreground">
-                        Optional: Grant pro-rata rights for future rounds
+                        {editProRataOnly
+                          ? "Update pro-rata rights allocation settings"
+                          : "Optional: Grant pro-rata rights for future rounds"}
                       </p>
                     </div>
                     <FieldWithHelp

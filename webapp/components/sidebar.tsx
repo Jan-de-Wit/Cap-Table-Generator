@@ -53,7 +53,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import type { RoundValidation } from "@/lib/validation";
+import type { RoundValidation, FieldError } from "@/lib/validation";
 import { sortGroups } from "@/lib/utils";
 
 interface SidebarProps {
@@ -790,8 +790,6 @@ function DraggableRoundSidebar({
     zIndex: isDragging ? 50 : 1,
   };
 
-  const hasValidationErrors = validation && !validation.isValid;
-
   // Check if round is incomplete (no instruments/pro-rata or validation errors)
   const regularInstruments = round.instruments.filter(
     (inst) => !("pro_rata_type" in inst)
@@ -803,6 +801,46 @@ function DraggableRoundSidebar({
     regularInstruments.length > 0 || proRataInstruments.length > 0;
   const isValid = validation?.isValid ?? false;
   const isIncomplete = !isValid || !hasInstrumentsOrProRata;
+
+  // Organize validation errors by category
+  const organizedErrors = React.useMemo(() => {
+    if (!validation || validation.isValid) {
+      return {
+        instruments: null,
+        roundFields: [],
+        other: [],
+      };
+    }
+
+    const errors = {
+      instruments: null as FieldError | null,
+      roundFields: [] as FieldError[],
+      other: [] as FieldError[],
+    };
+
+    validation.errors.forEach((error) => {
+      // Check for instruments field error (no instruments/pro-rata)
+      if (error.field === "instruments") {
+        errors.instruments = error;
+      }
+      // Round-level field errors (name, date, calculation_type, etc.)
+      else if (
+        error.field === "name" ||
+        error.field === "round_date" ||
+        error.field === "calculation_type" ||
+        error.field === "valuation_basis" ||
+        error.field === "valuation"
+      ) {
+        errors.roundFields.push(error);
+      }
+      // Other errors (shouldn't happen, but handle gracefully)
+      else {
+        errors.other.push(error);
+      }
+    });
+
+    return errors;
+  }, [validation]);
 
   const handleClick = (e: React.MouseEvent) => {
     // Don't trigger selection if clicking on action buttons
@@ -855,17 +893,22 @@ function DraggableRoundSidebar({
                       </TooltipTrigger>
                       <TooltipContent>
                         <div className="space-y-1">
-                          {!hasInstrumentsOrProRata && (
-                            <p>
-                              Add at least one instrument or pro-rata allocation
-                            </p>
+                          {organizedErrors.instruments && (
+                            <p>{organizedErrors.instruments.message}</p>
                           )}
-                          {hasValidationErrors && (
-                            <p>
-                              {!hasInstrumentsOrProRata
-                                ? "and fix validation errors"
-                                : "Fix validation errors"}
-                            </p>
+                          {organizedErrors.roundFields.length > 0 && (
+                            <div>
+                              {organizedErrors.roundFields.map((error, idx) => (
+                                <p key={idx}>{error.message}</p>
+                              ))}
+                            </div>
+                          )}
+                          {organizedErrors.other.length > 0 && (
+                            <div>
+                              {organizedErrors.other.map((error, idx) => (
+                                <p key={idx}>{error.message}</p>
+                              ))}
+                            </div>
                           )}
                         </div>
                       </TooltipContent>
@@ -880,7 +923,28 @@ function DraggableRoundSidebar({
                   ? new Date(round.round_date).toLocaleDateString()
                   : "No date"}
               </div>
-              {roundHolders.length > 0 ? (
+              {/* Display validation errors */}
+              {validation && !validation.isValid && (
+                <div className="space-y-1 mt-1.5 mb-3 ">
+                  {organizedErrors.instruments && (
+                    <div className="text-xs text-muted-foreground">
+                      {organizedErrors.instruments.message}
+                    </div>
+                  )}
+                  {organizedErrors.roundFields.map((error, idx) => (
+                    <div key={idx} className="text-xs text-muted-foreground">
+                      {error.message}
+                    </div>
+                  ))}
+                  {organizedErrors.other.map((error, idx) => (
+                    <div key={idx} className="text-xs text-muted-foreground">
+                      {error.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {roundHolders.length > 0 && (
                 <div className="space-y-1.5">
                   <div className="text-xs font-medium text-muted-foreground">
                     Holders ({roundHolders.length})
@@ -896,10 +960,6 @@ function DraggableRoundSidebar({
                       </Badge>
                     ))}
                   </div>
-                </div>
-              ) : (
-                <div className="text-xs text-muted-foreground">
-                  No instruments yet
                 </div>
               )}
 
@@ -972,15 +1032,17 @@ function ErrorSummary({
         const round = rounds[roundIndex];
         const roundName = round?.name || `Round ${roundIndex + 1}`;
         validation.errors.forEach((error) => {
-          // Filter out instrument and pro-rata allocation errors
+          // Filter out individual instrument and pro-rata allocation field errors
+          // But keep the "instruments" field error (which indicates no instruments/pro-rata)
           const field = error.field;
-          const isInstrumentError = field.startsWith("instruments");
+          const isIndividualInstrumentError = field.startsWith("instruments[");
           const isProRataError =
             field.includes("pro_rata") ||
             field.includes("proRata") ||
             field.includes("pro-rata");
 
-          if (!isInstrumentError && !isProRataError) {
+          // Allow "instruments" field error (no instruments/pro-rata) but filter out individual instrument errors
+          if (!isIndividualInstrumentError && !isProRataError) {
             errors.push({
               roundIndex,
               roundName,
@@ -1014,7 +1076,7 @@ function ErrorSummary({
 
   return (
     <div
-      className="border-t border-border/50 bg-amber-50/30 dark:bg-amber-950/10 transition-all duration-300 ease-in-out"
+      className="border-t border-border/50 bg-amber-50 dark:bg-amber-950/30 transition-all duration-300 ease-in-out"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -1022,7 +1084,7 @@ function ErrorSummary({
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 transition-transform duration-300 ease-in-out" />
           <span className="text-xs font-semibold text-foreground">
-            {allErrors.length} error{allErrors.length !== 1 ? "s" : ""}
+            {allErrors.length} Error{allErrors.length !== 1 ? "s" : ""}
           </span>
           <ChevronDown
             className={`h-3 w-3 text-muted-foreground ml-auto transition-transform duration-300 ease-in-out ${

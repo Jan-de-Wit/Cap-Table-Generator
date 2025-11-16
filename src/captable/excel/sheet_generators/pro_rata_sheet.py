@@ -499,9 +499,15 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         # Get pro rata data from instrument if it exists
         pro_rata_type = 'none'
         pro_rata_pct = None
+        exercise_type = 'full'
+        partial_exercise_amount = None
+        partial_exercise_percentage = None
         if holder_instrument:
             pro_rata_type = holder_instrument.get('pro_rata_type', 'none')
             pro_rata_pct = holder_instrument.get('pro_rata_percentage')
+            exercise_type = holder_instrument.get('exercise_type', 'full')
+            partial_exercise_amount = holder_instrument.get('partial_exercise_amount')
+            partial_exercise_percentage = holder_instrument.get('partial_exercise_percentage')
 
         # Check if holder has shares in previous rounds from JSON data
         has_previous_shares = self._has_shares_in_previous_rounds(
@@ -582,7 +588,8 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
         # Create formulas for each pro rata type
         pro_rata_formula = self._create_pro_rata_formula(
-            round_idx, holder_name, rounds, row, pct_col, first_holder_row, last_holder_row
+            round_idx, holder_name, rounds, row, pct_col, first_holder_row, last_holder_row,
+            exercise_type, partial_exercise_amount, partial_exercise_percentage, pps_col
         ).lstrip('=')
 
         # Dynamic formula using nested IF to check pro_rata_type cell
@@ -626,9 +633,16 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         row: int,
         pct_col: int,
         first_holder_row: int,
-        last_holder_row: int
+        last_holder_row: int,
+        exercise_type: str = 'full',
+        partial_exercise_amount: Optional[float] = None,
+        partial_exercise_percentage: Optional[float] = None,
+        pps_col: Optional[int] = None
     ) -> str:
-        """Create formula for pro rata shares (standard uses Pro Rata % cell as target)."""
+        """Create formula for pro rata shares (standard uses Pro Rata % cell as target).
+        
+        For partial exercises, applies caps based on partial_exercise_amount or partial_exercise_percentage.
+        """
         round_data = rounds[round_idx]
         round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
         pre_round_shares_ref = f"{round_name_key}_PreRoundShares"
@@ -670,14 +684,51 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             round_idx, rounds, first_holder_row, last_holder_row)
 
         # Standard pro rata formula using unified form
-        formula = ownership.create_pro_rata_shares_formula(
+        full_shares_formula = ownership.create_pro_rata_shares_formula(
             holder_target_pct_ref,
             pre_round_shares_ref,
             shares_issued_ref,
             holder_shares_start_ref,
             sum_pro_rata_pct_ref,
             sum_current_shares_ref
-        )
+        ).lstrip('=')
+        
+        # Apply partial exercise caps if needed
+        if exercise_type == 'partial':
+            caps = []
+            
+            # Cap based on partial_exercise_amount (investment amount)
+            if partial_exercise_amount is not None and pps_col is not None:
+                pps_col_letter = self._col_letter(pps_col)
+                pps_cell_ref = f"{pps_col_letter}{row + 1}"
+                # Shares = investment_amount / price_per_share
+                amount_cap = f"IFERROR({partial_exercise_amount} / {pps_cell_ref}, 0)"
+                caps.append(amount_cap)
+            
+            # Cap based on partial_exercise_percentage (ownership percentage)
+            if partial_exercise_percentage is not None:
+                # Calculate total shares after pro-rata
+                numerator = f"({pre_round_shares_ref} + {shares_issued_ref} - {sum_current_shares_ref})"
+                denominator = f"(1 - {sum_pro_rata_pct_ref})"
+                total_shares = f"({numerator} * IFERROR(1 / {denominator}, 0))"
+                # Target shares for partial percentage
+                target_shares = f"({partial_exercise_percentage} * {total_shares})"
+                # Additional shares needed = target_shares - current_shares
+                percentage_cap = f"MAX(0, {target_shares} - {holder_shares_start_ref})"
+                caps.append(percentage_cap)
+            
+            # Apply MIN() to cap the shares if any caps are defined
+            if caps:
+                # Use MIN of full shares and all caps
+                all_caps = [full_shares_formula] + caps
+                formula = f"=MIN({', '.join(all_caps)})"
+            else:
+                # No caps defined, use full shares
+                formula = f"={full_shares_formula}"
+        else:
+            # Full exercise, no caps
+            formula = f"={full_shares_formula}"
+        
         return formula
 
     def _get_sum_pro_rata_pct_ref(
