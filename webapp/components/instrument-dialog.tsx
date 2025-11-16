@@ -72,6 +72,17 @@ export function InstrumentDialog({
   const [className, setClassName] = React.useState<string>("");
   const classNameInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Helper function to validate percentage
+  const validatePercentage = (percentage: number, fieldName: string): string | undefined => {
+    if (percentage >= 100) {
+      return `${fieldName} must be less than 100%`;
+    }
+    if (percentage < 0) {
+      return `${fieldName} must be greater than or equal to 0%`;
+    }
+    return undefined;
+  };
+
   // Initialize form when dialog opens
   React.useEffect(() => {
     if (open) {
@@ -296,6 +307,15 @@ export function InstrumentDialog({
                     label="Pro-Rata Percentage"
                     helpText="Maximum ownership percentage for super pro-rata (0-100%)"
                     required
+                    error={
+                      touchedFields.has("pro_rata_percentage") &&
+                      (formData as any).pro_rata_percentage !== undefined
+                        ? validatePercentage(
+                            decimalToPercentage((formData as any).pro_rata_percentage),
+                            "Pro-rata percentage"
+                          )
+                        : undefined
+                    }
                     htmlFor="pro-rata-percentage"
                   >
                     <div className="flex items-center gap-2">
@@ -325,6 +345,16 @@ export function InstrumentDialog({
                           setTouchedFields(
                             (prev) => new Set([...prev, "pro_rata_percentage"])
                           )
+                        }
+                        className={
+                          touchedFields.has("pro_rata_percentage") &&
+                          (formData as any).pro_rata_percentage !== undefined &&
+                          validatePercentage(
+                            decimalToPercentage((formData as any).pro_rata_percentage),
+                            "Pro-rata percentage"
+                          )
+                            ? "border-destructive ring-destructive/20"
+                            : ""
                         }
                         placeholder="e.g., 15 for 15%"
                       />
@@ -392,6 +422,15 @@ export function InstrumentDialog({
                         label="Target Percentage"
                         helpText="Target ownership percentage (0-100%)"
                         required
+                        error={
+                          touchedFields.has("target_percentage") &&
+                          (formData as any).target_percentage !== undefined
+                            ? validatePercentage(
+                                decimalToPercentage((formData as any).target_percentage),
+                                "Target percentage"
+                              )
+                            : undefined
+                        }
                         htmlFor="target-percentage"
                       >
                         <div className="flex items-center gap-2">
@@ -422,6 +461,16 @@ export function InstrumentDialog({
                                 (prev) =>
                                   new Set([...prev, "target_percentage"])
                               )
+                            }
+                            className={
+                              touchedFields.has("target_percentage") &&
+                              (formData as any).target_percentage !== undefined &&
+                              validatePercentage(
+                                decimalToPercentage((formData as any).target_percentage),
+                                "Target percentage"
+                              )
+                                ? "border-destructive ring-destructive/20"
+                                : ""
                             }
                             placeholder="e.g., 20 for 20%"
                           />
@@ -548,6 +597,15 @@ export function InstrumentDialog({
                         label="Interest Rate"
                         helpText="Annual interest rate as percentage (0-100%)"
                         required
+                        error={
+                          touchedFields.has("interest_rate") &&
+                          (formData as any).interest_rate !== undefined
+                            ? validatePercentage(
+                                decimalToPercentage((formData as any).interest_rate),
+                                "Interest rate"
+                              )
+                            : undefined
+                        }
                         htmlFor="interest-rate"
                       >
                         <div className="flex items-center gap-2">
@@ -577,6 +635,16 @@ export function InstrumentDialog({
                               setTouchedFields(
                                 (prev) => new Set([...prev, "interest_rate"])
                               )
+                            }
+                            className={
+                              touchedFields.has("interest_rate") &&
+                              (formData as any).interest_rate !== undefined &&
+                              validatePercentage(
+                                decimalToPercentage((formData as any).interest_rate),
+                                "Interest rate"
+                              )
+                                ? "border-destructive ring-destructive/20"
+                                : ""
                             }
                             placeholder="e.g., 8 for 8%"
                           />
@@ -664,6 +732,15 @@ export function InstrumentDialog({
                         label="Discount Rate"
                         helpText="Discount percentage applied at conversion (0-100%)"
                         required
+                        error={
+                          touchedFields.has("discount_rate") &&
+                          (formData as any).discount_rate !== undefined
+                            ? validatePercentage(
+                                decimalToPercentage((formData as any).discount_rate),
+                                "Discount rate"
+                              )
+                            : undefined
+                        }
                         htmlFor="discount-rate"
                       >
                         <div className="flex items-center gap-2">
@@ -693,6 +770,16 @@ export function InstrumentDialog({
                               setTouchedFields(
                                 (prev) => new Set([...prev, "discount_rate"])
                               )
+                            }
+                            className={
+                              touchedFields.has("discount_rate") &&
+                              (formData as any).discount_rate !== undefined &&
+                              validatePercentage(
+                                decimalToPercentage((formData as any).discount_rate),
+                                "Discount rate"
+                              )
+                                ? "border-destructive ring-destructive/20"
+                                : ""
                             }
                             placeholder="e.g., 20 for 20%"
                           />
@@ -1001,6 +1088,15 @@ export function InstrumentDialog({
                         label="Super Pro-Rata Percentage"
                         helpText="Maximum ownership percentage for super pro-rata (0-100%)"
                         required
+                        error={
+                          touchedFields.has("pro_rata_percentage") &&
+                          (formData as any).pro_rata_percentage !== undefined
+                            ? validatePercentage(
+                                decimalToPercentage((formData as any).pro_rata_percentage),
+                                "Super pro-rata percentage"
+                              )
+                            : undefined
+                        }
                         htmlFor="super-pro-rata-percentage"
                       >
                         <div className="flex items-center gap-2">
@@ -1031,6 +1127,16 @@ export function InstrumentDialog({
                                 (prev) =>
                                   new Set([...prev, "pro_rata_percentage"])
                               )
+                            }
+                            className={
+                              touchedFields.has("pro_rata_percentage") &&
+                              (formData as any).pro_rata_percentage !== undefined &&
+                              validatePercentage(
+                                decimalToPercentage((formData as any).pro_rata_percentage),
+                                "Super pro-rata percentage"
+                              )
+                                ? "border-destructive ring-destructive/20"
+                                : ""
                             }
                             placeholder="e.g., 15 for 15%"
                           />

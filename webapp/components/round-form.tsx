@@ -1,16 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  Users,
-  Plus,
-} from "lucide-react";
 import { toast } from "sonner";
 import { InstrumentDialog } from "@/components/instrument-dialog";
 import { RoundParametersSection } from "@/components/round-parameters-section";
@@ -407,57 +397,9 @@ export function RoundForm({
 
   return (
     <div className="relative">
-      {/* Round Header */}
-      <div className={`pb-6 ${
-        isComplete
-          ? "border-b border-green-200/50 dark:border-green-800/50"
-          : "border-b border-border/50"
-      }`}>
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <div className="flex items-start gap-3 flex-1 min-w-0">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2.5 mb-2">
-                {isComplete ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
-                ) : (
-                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
-                )}
-                <h2 className="text-lg font-semibold text-foreground">
-                  {round.name || `Round ${roundNumber}`}
-                </h2>
-              </div>
-              <div className="flex items-center gap-4 flex-wrap">
-                {round.round_date && (
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <span>{new Date(round.round_date).toLocaleDateString()}</span>
-                  </div>
-                )}
-                <Badge variant="secondary" className="text-xs font-medium">
-                  <FileText className="h-3 w-3 mr-1" />
-                  {instrumentsCount} {instrumentsCount === 1 ? "instrument" : "instruments"}
-                </Badge>
-                <Badge variant="secondary" className="text-xs font-medium">
-                  <Users className="h-3 w-3 mr-1" />
-                  {holdersCount} {holdersCount === 1 ? "holder" : "holders"}
-                </Badge>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content Sections */}
-      <div className="pt-6 space-y-8">
-              {/* Round Details Section */}
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-foreground mb-1">
-                    Round Details
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-6">
-                    Configure the basic information and calculation method for this round.
-                  </p>
-                </div>
+      <div className="space-y-8">
+        {/* Round Parameters - Merged with round name editing */}
                 <RoundParametersSection
                   round={round}
                   touchedFields={touchedFields}
@@ -468,18 +410,17 @@ export function RoundForm({
                   }
                   roundIndex={roundIndex}
                 />
-              </div>
 
               {/* Divider */}
               <div className="border-t border-border/50" />
 
               {/* Instruments Section */}
-              <div className="space-y-6">
+        <div className="space-y-4">
                 <div>
                   <h3 className="text-base font-semibold text-foreground mb-1">
                     Instruments
                   </h3>
-                  <p className="text-sm text-muted-foreground mb-6">
+            <p className="text-sm text-muted-foreground">
                     Define the instruments and share allocations for this round.
                   </p>
                 </div>
@@ -502,12 +443,12 @@ export function RoundForm({
               {hasPreviousRounds && holdersWithProRataRights.length > 0 && (
                 <>
                   <div className="border-t border-border/50" />
-                  <div className="space-y-6">
+            <div className="space-y-4">
                     <div>
                       <h3 className="text-base font-semibold text-foreground mb-1">
-                        Pro-Rata Rights
+                  Pro-Rata Allocations
                       </h3>
-                      <p className="text-sm text-muted-foreground mb-6">
+                <p className="text-sm text-muted-foreground">
                         Exercise pro-rata rights from previous rounds.
                       </p>
                     </div>
@@ -526,21 +467,6 @@ export function RoundForm({
               )}
         </div>
 
-        {/* Action Bar - Only show when there are instruments (to avoid duplicate with empty state) */}
-        {regularInstruments.length > 0 && (
-          <div className="mt-6 flex items-center justify-end gap-3">
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              onClick={() => handleOpenInstrumentDialog(null, -1, false)}
-              className="font-medium"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Instrument
-            </Button>
-          </div>
-        )}
       {editingInstrument && (
         <InstrumentDialog
           open={instrumentDialogOpen}

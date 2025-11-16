@@ -55,16 +55,20 @@ export function RoundParametersSection({
   ];
 
   const calculationTypeHelpText = {
-    fixed_shares: "Shares are allocated directly with a fixed number of shares per instrument.",
-    target_percentage: "Shares are calculated to achieve a target diluted ownership percentage.",
-    valuation_based: "Shares are calculated based on investment amount and valuation.",
-    convertible: "Convertible instruments that convert to equity at a future date with interest and discounts.",
+    fixed_shares:
+      "Shares are allocated directly with a fixed number of shares per instrument.",
+    target_percentage:
+      "Shares are calculated to achieve a target diluted ownership percentage.",
+    valuation_based:
+      "Shares are calculated based on investment amount and valuation.",
+    convertible:
+      "Convertible instruments that convert to equity at a future date with interest and discounts.",
     safe: "Simple Agreement for Future Equity - converts to equity at a future financing round.",
   };
 
   return (
     <div className="space-y-8">
-      {/* Round Name and Date in 2-column grid */}
+      {/* Round Name and Date */}
       <div className="grid grid-cols-2 gap-6">
         <FieldWithHelp
           label="Round Name"
@@ -78,7 +82,11 @@ export function RoundParametersSection({
           htmlFor="round-name"
         >
           <Input
-            id={roundIndex !== undefined ? `round-${roundIndex}-name` : "round-name"}
+            id={
+              roundIndex !== undefined
+                ? `round-${roundIndex}-name`
+                : "round-name"
+            }
             value={round.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
             onBlur={() => onFieldTouched("name")}
@@ -103,7 +111,11 @@ export function RoundParametersSection({
           htmlFor="round-date"
         >
           <Input
-            id={roundIndex !== undefined ? `round-${roundIndex}-round_date` : "round-date"}
+            id={
+              roundIndex !== undefined
+                ? `round-${roundIndex}-round_date`
+                : "round-date"
+            }
             type="date"
             value={round.round_date}
             onChange={(e) => onUpdate({ round_date: e.target.value })}
@@ -119,13 +131,13 @@ export function RoundParametersSection({
       </div>
 
       {/* Calculation Type as Segmented Control */}
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         <div className="flex items-center gap-2">
           <label
             htmlFor="calculation-type"
-            className="text-sm font-medium text-foreground"
+            className="text-xs font-medium text-foreground"
           >
-            Calculation Type
+            Round Type
             <span className="text-destructive ml-1.5 font-bold">*</span>
           </label>
           <TooltipProvider>
@@ -134,20 +146,30 @@ export function RoundParametersSection({
                 <Info className="h-4 w-4 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
               </TooltipTrigger>
               <TooltipContent className="max-w-sm">
-                <p className="font-medium mb-1.5">How share quantities are calculated</p>
+                <p className="font-medium mb-1.5">
+                  How share quantities are calculated
+                </p>
                 <p className="text-sm">
-                  {calculationTypeHelpText[round.calculation_type] || 
-                   "Determines how share quantities are calculated for instruments in this round."}
+                  {calculationTypeHelpText[round.calculation_type] ||
+                    "Determines how share quantities are calculated for instruments in this round."}
                 </p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
-        <div id={roundIndex !== undefined ? `round-${roundIndex}-calculation-type` : undefined}>
+        <div
+          id={
+            roundIndex !== undefined
+              ? `round-${roundIndex}-calculation-type`
+              : undefined
+          }
+        >
           <SegmentedControl
             value={round.calculation_type}
             onValueChange={(value: string) => {
-              const updates: Partial<Round> = { calculation_type: value as CalculationType };
+              const updates: Partial<Round> = {
+                calculation_type: value as CalculationType,
+              };
               // Clear instruments when changing calculation type
               if (round.calculation_type !== value) {
                 updates.instruments = [];
@@ -178,38 +200,45 @@ export function RoundParametersSection({
       </div>
 
       {needsValuationBasis && (
-        <div className="grid grid-cols-2 gap-6 pt-2">
-          <FieldWithHelp
-            label="Valuation"
-            helpText="The company valuation amount in dollars"
-            required
-            error={
-              touchedFields.has("valuation")
-                ? getFieldError(validation?.errors ?? [], "valuation")
-                : undefined
-            }
-            htmlFor="valuation"
-          >
-            <Input
-              id={roundIndex !== undefined ? `round-${roundIndex}-valuation` : "valuation"}
-              type="text"
-              value={round.valuation ? formatCurrency(round.valuation) : ""}
-              onChange={(e) => {
-                const parsed = parseFormattedNumber(e.target.value);
-                onUpdate({
-                  valuation: parsed > 0 ? parsed : undefined,
-                });
-              }}
-              onBlur={() => onFieldTouched("valuation")}
-              placeholder="e.g., $10,000,000"
-              className={`font-semibold ${
-                touchedFields.has("valuation") &&
-                getFieldError(validation?.errors ?? [], "valuation")
-                  ? "border-destructive ring-destructive/20"
-                  : "focus:ring-primary/20"
-              }`}
-            />
-          </FieldWithHelp>
+        <div className="grid grid-cols-3 gap-6 pt-2">
+         
+          <div className="col-span-2">
+            <FieldWithHelp
+              label="Valuation"
+              helpText="The company valuation amount in dollars"
+              required
+              error={
+                touchedFields.has("valuation")
+                  ? getFieldError(validation?.errors ?? [], "valuation")
+                  : undefined
+              }
+              htmlFor="valuation"
+            >
+              <Input
+                id={
+                  roundIndex !== undefined
+                    ? `round-${roundIndex}-valuation`
+                    : "valuation"
+                }
+                type="text"
+                value={round.valuation ? formatCurrency(round.valuation) : ""}
+                onChange={(e) => {
+                  const parsed = parseFormattedNumber(e.target.value);
+                  onUpdate({
+                    valuation: parsed > 0 ? parsed : undefined,
+                  });
+                }}
+                onBlur={() => onFieldTouched("valuation")}
+                placeholder="e.g., $10,000,000"
+                className={`font-semibold ${
+                  touchedFields.has("valuation") &&
+                  getFieldError(validation?.errors ?? [], "valuation")
+                    ? "border-destructive ring-destructive/20"
+                    : "focus:ring-primary/20"
+                }`}
+              />
+            </FieldWithHelp>
+          </div>
           <FieldWithHelp
             label="Valuation Basis"
             helpText="Pre-money: valuation before investment. Post-money: valuation after investment."
@@ -229,7 +258,11 @@ export function RoundParametersSection({
               }}
             >
               <SelectTrigger
-                id={roundIndex !== undefined ? `round-${roundIndex}-valuation-basis` : "valuation-basis"}
+                id={
+                  roundIndex !== undefined
+                    ? `round-${roundIndex}-valuation-basis`
+                    : "valuation-basis"
+                }
                 className="focus:ring-primary/20"
               >
                 <SelectValue />

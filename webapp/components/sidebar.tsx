@@ -285,168 +285,168 @@ export function Sidebar({
         <div className="flex flex-col h-full">
           <div ref={sidebarWrapperRef} className="flex-1 overflow-hidden">
             <div ref={sidebarContentRef} className="p-3 space-y-5">
-            {/* Rounds Section */}
-            <div className="space-y-3 pt-5">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-base font-semibold">Rounds</h2>
-                <Badge variant="secondary" className="ml-auto text-xs">
-                  {rounds.length}
-                </Badge>
+              {/* Rounds Section */}
+              <div className="space-y-3 pt-5">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  <h2 className="text-base font-semibold">Rounds</h2>
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {rounds.length}
+                  </Badge>
+                </div>
+
+                {rounds.length === 0 ? (
+                  <Card className="p-2.5 border-border/50 shadow-none transition-all hover:shadow-sm hover:border-border">
+                    <p className="text-xs text-muted-foreground text-center">
+                      No rounds yet
+                    </p>
+                  </Card>
+                ) : (
+                  <SortableContext
+                    items={rounds.map((_, i) => `sidebar-round-${i}`)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-3">
+                      {rounds.map((round, index) => {
+                        const roundHolders = getRoundHolders(round);
+                        const proRataHolders = getProRataHolders(round);
+                        const validation = validations?.[index];
+                        const isSelected = selectedRoundIndex === index;
+                        return (
+                          <DraggableRoundSidebar
+                            key={index}
+                            id={`sidebar-round-${index}`}
+                            round={round}
+                            index={index}
+                            roundHolders={roundHolders}
+                            proRataHolders={proRataHolders}
+                            validation={validation}
+                            isSelected={isSelected}
+                            onSelect={onSelectRound}
+                            onEdit={onEditRound}
+                            onDelete={onDeleteRound}
+                            isDragging={activeId === `sidebar-round-${index}`}
+                          />
+                        );
+                      })}
+                    </div>
+                  </SortableContext>
+                )}
+
+                {onAddRound && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-xs"
+                    size="sm"
+                    onClick={onAddRound}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Add Round
+                  </Button>
+                )}
               </div>
 
-              {rounds.length === 0 ? (
-                <Card className="p-2.5 border-border/50 shadow-none transition-all hover:shadow-sm hover:border-border">
-                  <p className="text-xs text-muted-foreground text-center">
-                    No rounds yet
-                  </p>
-                </Card>
-              ) : (
-                <SortableContext
-                  items={rounds.map((_, i) => `sidebar-round-${i}`)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-3">
-                    {rounds.map((round, index) => {
-                      const roundHolders = getRoundHolders(round);
-                      const proRataHolders = getProRataHolders(round);
-                      const validation = validations?.[index];
-                      const isSelected = selectedRoundIndex === index;
-                      return (
-                        <DraggableRoundSidebar
-                          key={index}
-                          id={`sidebar-round-${index}`}
-                          round={round}
-                          index={index}
-                          roundHolders={roundHolders}
-                          proRataHolders={proRataHolders}
-                          validation={validation}
-                          isSelected={isSelected}
-                          onSelect={onSelectRound}
-                          onEdit={onEditRound}
-                          onDelete={onDeleteRound}
-                          isDragging={activeId === `sidebar-round-${index}`}
-                        />
-                      );
-                    })}
-                  </div>
-                </SortableContext>
-              )}
+              {/* Holders Section */}
+              <div className="space-y-3 border-t pt-5">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <h2 className="text-base font-semibold">Holders</h2>
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {holders.length}
+                  </Badge>
+                </div>
 
-              {onAddRound && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full text-xs"
-                  size="sm"
-                  onClick={onAddRound}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  Add Round
-                </Button>
-              )}
-            </div>
+                {/* Grouped Holders */}
+                {groupedHolders.groups.map(([groupName, groupHolders]) => (
+                  <DroppableGroup
+                    key={groupName}
+                    groupName={groupName}
+                    activeId={activeId}
+                    overId={overId}
+                    holders={groupHolders}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-medium text-muted-foreground">
+                          {groupName}
+                        </h3>
+                        <Badge variant="outline" className="text-xs">
+                          {groupHolders.length}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2">
+                        {groupHolders.map((holder) => (
+                          <DraggableHolder
+                            key={holder.name}
+                            holder={holder}
+                            onEdit={onEditHolder}
+                            onDelete={onDeleteHolder}
+                            isDragging={activeId === `holder-${holder.name}`}
+                            groupName={groupName}
+                            activeId={activeId}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </DroppableGroup>
+                ))}
 
-            {/* Holders Section */}
-            <div className="space-y-3 border-t pt-5">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-base font-semibold">Holders</h2>
-                <Badge variant="secondary" className="ml-auto text-xs">
-                  {holders.length}
-                </Badge>
+                {/* Ungrouped Holders */}
+                {groupedHolders.ungrouped.length > 0 && (
+                  <DroppableGroup
+                    groupName="ungrouped"
+                    activeId={activeId}
+                    overId={overId}
+                    holders={groupedHolders.ungrouped}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-medium text-muted-foreground">
+                          Other
+                        </h3>
+                        <Badge variant="outline" className="text-xs">
+                          {groupedHolders.ungrouped.length}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2">
+                        {groupedHolders.ungrouped.map((holder) => (
+                          <DraggableHolder
+                            key={holder.name}
+                            holder={holder}
+                            onEdit={onEditHolder}
+                            onDelete={onDeleteHolder}
+                            isDragging={activeId === `holder-${holder.name}`}
+                            groupName="ungrouped"
+                            activeId={activeId}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </DroppableGroup>
+                )}
+
+                {holders.length === 0 && (
+                  <Card className="p-2.5 border-border/50 shadow-none transition-all hover:shadow-sm hover:border-border">
+                    <p className="text-xs text-muted-foreground text-center">
+                      No holders yet
+                    </p>
+                  </Card>
+                )}
+
+                {onAddHolder && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-xs"
+                    size="sm"
+                    onClick={onAddHolder}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Add Holder
+                  </Button>
+                )}
               </div>
-
-              {/* Grouped Holders */}
-              {groupedHolders.groups.map(([groupName, groupHolders]) => (
-                <DroppableGroup
-                  key={groupName}
-                  groupName={groupName}
-                  activeId={activeId}
-                  overId={overId}
-                  holders={groupHolders}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-medium text-muted-foreground">
-                        {groupName}
-                      </h3>
-                      <Badge variant="outline" className="text-xs">
-                        {groupHolders.length}
-                      </Badge>
-                    </div>
-                    <div className="space-y-2">
-                      {groupHolders.map((holder) => (
-                        <DraggableHolder
-                          key={holder.name}
-                          holder={holder}
-                          onEdit={onEditHolder}
-                          onDelete={onDeleteHolder}
-                          isDragging={activeId === `holder-${holder.name}`}
-                          groupName={groupName}
-                          activeId={activeId}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </DroppableGroup>
-              ))}
-
-              {/* Ungrouped Holders */}
-              {groupedHolders.ungrouped.length > 0 && (
-                <DroppableGroup
-                  groupName="ungrouped"
-                  activeId={activeId}
-                  overId={overId}
-                  holders={groupedHolders.ungrouped}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-medium text-muted-foreground">
-                        Other
-                      </h3>
-                      <Badge variant="outline" className="text-xs">
-                        {groupedHolders.ungrouped.length}
-                      </Badge>
-                    </div>
-                    <div className="space-y-2">
-                      {groupedHolders.ungrouped.map((holder) => (
-                        <DraggableHolder
-                          key={holder.name}
-                          holder={holder}
-                          onEdit={onEditHolder}
-                          onDelete={onDeleteHolder}
-                          isDragging={activeId === `holder-${holder.name}`}
-                          groupName="ungrouped"
-                          activeId={activeId}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </DroppableGroup>
-              )}
-
-              {holders.length === 0 && (
-                <Card className="p-2.5 border-border/50 shadow-none transition-all hover:shadow-sm hover:border-border">
-                  <p className="text-xs text-muted-foreground text-center">
-                    No holders yet
-                  </p>
-                </Card>
-              )}
-
-              {onAddHolder && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full text-xs"
-                  size="sm"
-                  onClick={onAddHolder}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  Add Holder
-                </Button>
-              )}
-            </div>
             </div>
           </div>
 
@@ -773,6 +773,18 @@ function DraggableRoundSidebar({
 
   const hasValidationErrors = validation && !validation.isValid;
 
+  // Check if round is incomplete (no instruments/pro-rata or validation errors)
+  const regularInstruments = round.instruments.filter(
+    (inst) => !("pro_rata_type" in inst)
+  );
+  const proRataInstruments = round.instruments.filter(
+    (inst) => "pro_rata_type" in inst
+  );
+  const hasInstrumentsOrProRata =
+    regularInstruments.length > 0 || proRataInstruments.length > 0;
+  const isValid = validation?.isValid ?? false;
+  const isIncomplete = !isValid || !hasInstrumentsOrProRata;
+
   const handleClick = (e: React.MouseEvent) => {
     // Don't trigger selection if clicking on action buttons
     const target = e.target as HTMLElement;
@@ -792,9 +804,11 @@ function DraggableRoundSidebar({
         className={`p-3 border-border/50 shadow-none transition-all cursor-pointer ${
           isDragging
             ? "shadow-lg border-primary/50 scale-105"
+            : isSelected && isIncomplete
+            ? "border-amber-600 dark:border-amber-500 bg-amber-50 dark:bg-amber-950/30 shadow-md ring-2 ring-amber-500/20"
             : isSelected
             ? "border-primary bg-primary/5 shadow-sm"
-            : hasValidationErrors
+            : isIncomplete
             ? "border-amber-500/50 dark:border-amber-500/50 hover:border-amber-500/70 dark:hover:border-amber-500/70"
             : "hover:shadow-sm hover:border-border"
         }`}
@@ -810,8 +824,15 @@ function DraggableRoundSidebar({
               <GripVertical className="h-4 w-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-semibold text-xs">
-                {round.name || `Round ${index + 1}`}
+              <div className="flex items-center gap-2 mb-0.5">
+                <div className="font-semibold text-xs">
+                  {round.name || `Round ${index + 1}`}
+                </div>
+                {isIncomplete ? (
+                  <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />
+                )}
               </div>
               <div className="text-xs text-muted-foreground mt-0.5 mb-2">
                 {round.round_date
@@ -837,7 +858,7 @@ function DraggableRoundSidebar({
                 </div>
               ) : (
                 <div className="text-xs text-muted-foreground">
-                  No holders yet
+                  No instruments yet
                 </div>
               )}
 
@@ -850,7 +871,7 @@ function DraggableRoundSidebar({
                     {proRataHolders.map((holder) => (
                       <Badge
                         key={holder.name}
-                        variant="secondary"
+                        variant="outline"
                         className="text-xs py-0"
                       >
                         {holder.name}

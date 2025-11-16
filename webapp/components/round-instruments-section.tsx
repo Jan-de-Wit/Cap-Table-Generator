@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,7 +25,6 @@ import {
   Clock,
   Shield,
   Target,
-  ArrowUpDown,
   ChevronDown,
 } from "lucide-react";
 import type { Round, Instrument, CalculationType } from "@/types/cap-table";
@@ -48,6 +46,13 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table";
+
+// Extend ColumnMeta to include sticky property
+declare module "@tanstack/react-table" {
+  interface ColumnMeta<TData, TValue> {
+    sticky?: boolean;
+  }
+}
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -91,8 +96,13 @@ export function RoundInstrumentsSection({
     regularInstruments.length > 0 || proRataInstruments.length > 0;
 
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  );
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({});
+  const [isScrollable, setIsScrollable] = React.useState(false);
+  const tableContainerRef = React.useRef<HTMLDivElement>(null);
 
   const getInstrumentFieldValue = (
     instrument: Instrument,
@@ -176,7 +186,10 @@ export function RoundInstrumentsSection({
       if ("pro_rata_rights" in instrument && instrument.pro_rata_rights) {
         const rights = instrument.pro_rata_rights;
         return (
-          <Badge variant={rights === "super" ? "default" : "secondary"} className="text-xs">
+          <Badge
+            variant={rights === "super" ? "default" : "secondary"}
+            className="text-xs"
+          >
             {rights === "super" ? "Super" : "Standard"}
           </Badge>
         );
@@ -231,19 +244,21 @@ export function RoundInstrumentsSection({
           return (
             <Button
               variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
               className="h-auto p-0 hover:bg-transparent"
             >
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <User className="h-3.5 w-3.5 text-muted-foreground" />
                 Holder
-                <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
               </div>
             </Button>
           );
         },
         cell: ({ row }) => {
-          const holderName = "holder_name" in row.original ? row.original.holder_name : "—";
+          const holderName =
+            "holder_name" in row.original ? row.original.holder_name : "—";
           return (
             <div className="flex items-center gap-2">
               <span className="font-medium">{holderName}</span>
@@ -262,13 +277,14 @@ export function RoundInstrumentsSection({
           return (
             <Button
               variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
               className="h-auto p-0 hover:bg-transparent"
             >
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                 Class
-                <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
               </div>
             </Button>
           );
@@ -318,7 +334,7 @@ export function RoundInstrumentsSection({
             header: () => (
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-                Pro-Rata %
+                Pro-Rata
               </div>
             ),
             cell: ({ row }) => (
@@ -475,7 +491,10 @@ export function RoundInstrumentsSection({
             ),
             cell: ({ row }) => (
               <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "expected_conversion_date")}
+                {getInstrumentFieldValue(
+                  row.original,
+                  "expected_conversion_date"
+                )}
               </span>
             ),
           },
@@ -591,7 +610,10 @@ export function RoundInstrumentsSection({
             ),
             cell: ({ row }) => (
               <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "expected_conversion_date")}
+                {getInstrumentFieldValue(
+                  row.original,
+                  "expected_conversion_date"
+                )}
               </span>
             ),
           },
@@ -708,6 +730,9 @@ export function RoundInstrumentsSection({
         },
         enableSorting: false,
         enableHiding: false,
+        meta: {
+          sticky: true,
+        },
       },
     ];
   }, [columns, onEditInstrument, onDeleteInstrument]);
@@ -728,6 +753,26 @@ export function RoundInstrumentsSection({
     },
   });
 
+  // Check if table is scrollable
+  React.useEffect(() => {
+    const checkScrollable = () => {
+      if (tableContainerRef.current) {
+        const { scrollWidth, clientWidth } = tableContainerRef.current;
+        setIsScrollable(scrollWidth > clientWidth);
+      }
+    };
+
+    checkScrollable();
+    const resizeObserver = new ResizeObserver(checkScrollable);
+    if (tableContainerRef.current) {
+      resizeObserver.observe(tableContainerRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [tableData, columnVisibility]);
+
   return (
     <div className="space-y-4">
       {instrumentsError && !hasAnyInstruments && (
@@ -739,72 +784,87 @@ export function RoundInstrumentsSection({
       )}
 
       {regularInstruments.length === 0 ? (
-        <Card className="border-dashed border-border/50 shadow-sm bg-muted/20">
-          <CardContent className="pt-16 pb-16">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="rounded-full bg-primary/10 p-4">
-                <Plus className="h-8 w-8 text-primary" />
-              </div>
-              <div className="space-y-2">
-                <h4 className="text-base font-semibold text-foreground">
-                  No instruments yet
-                </h4>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Add instruments to define how shares are allocated in this
-                  round. Each instrument represents a holder's stake.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="default"
-                size="sm"
-                onClick={onAddInstrument}
-                className="mt-2"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Instrument
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-start">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onAddInstrument}
+            className="font-medium"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Instrument
+          </Button>
+        </div>
       ) : (
         <div className="space-y-4">
-          <div className="flex items-center justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  Columns <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => {
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) =>
-                          column.toggleVisibility(!!value)
-                        }
-                      >
-                        {column.id}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex items-center justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onAddInstrument}
+              className="font-medium"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Instrument
+            </Button>
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    Columns <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {table
+                    .getAllColumns()
+                    .filter((column) => column.getCanHide())
+                    .map((column) => {
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={column.id}
+                          className="capitalize"
+                          checked={column.getIsVisible()}
+                          onCheckedChange={(value) =>
+                            column.toggleVisibility(!!value)
+                          }
+                        >
+                          {column.id}
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-          <div className="rounded-md border border-border/50 overflow-x-auto">
-            <Table>
+          <div
+            ref={tableContainerRef}
+            className={`rounded-md border border-border/50 overflow-x-auto w-full relative ${
+              isScrollable
+                ? "shadow-[inset_-8px_0_8px_-8px_rgba(0,0,0,0.1)] dark:shadow-[inset_-8px_0_8px_-8px_rgba(0,0,0,0.3)]"
+                : ""
+            }`}
+          >
+            {isScrollable && (
+              <div className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none bg-gradient-to-l from-background to-transparent z-10" />
+            )}
+            <Table className="min-w-full">
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => {
+                      const isSticky = header.column.columnDef.meta?.sticky;
                       return (
-                        <TableHead key={header.id}>
+                        <TableHead
+                          key={header.id}
+                          className={`min-w-[120px] whitespace-nowrap ${
+                            isSticky
+                              ? "sticky right-0 bg-background z-20 border-l border-border/50 shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.1)] dark:shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.3)]"
+                              : ""
+                          }`}
+                          style={isSticky ? { minWidth: "100px" } : undefined}
+                        >
                           {header.isPlaceholder
                             ? null
                             : flexRender(
@@ -818,37 +878,42 @@ export function RoundInstrumentsSection({
                 ))}
               </TableHeader>
               <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
-                      className={
-                        row.original.hasError
-                          ? "bg-destructive/5 hover:bg-destructive/10"
-                          : ""
-                      }
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
+                {table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    className={`group ${
+                      row.original.hasError
+                        ? "bg-destructive/5 hover:bg-destructive/10"
+                        : ""
+                    }`}
+                  >
+                    {row.getVisibleCells().map((cell) => {
+                      const isSticky = cell.column.columnDef.meta?.sticky;
+                      const rowHasError = row.original.hasError;
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          className={`min-w-[120px] whitespace-nowrap ${
+                            isSticky
+                              ? `sticky right-0 z-20 border-l border-border/50 shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.1)] dark:shadow-[inset_4px_0_4px_-4px_rgba(0,0,0,0.3)] ${
+                                  rowHasError
+                                    ? "bg-destructive/5 group-hover:bg-destructive/10"
+                                    : "bg-background group-hover:bg-muted/50"
+                                }`
+                              : ""
+                          }`}
+                          style={isSticky ? { minWidth: "100px" } : undefined}
+                        >
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext()
                           )}
                         </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columnsWithActions.length}
-                      className="h-24 text-center"
-                    >
-                      No results.
-                    </TableCell>
+                      );
+                    })}
                   </TableRow>
-                )}
+                ))}
               </TableBody>
             </Table>
           </div>

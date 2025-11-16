@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +9,22 @@ import { Separator } from "@/components/ui/separator";
 import { RoundForm } from "@/components/round-form";
 import { Sidebar } from "@/components/sidebar";
 import { HolderDialog } from "@/components/holder-dialog";
-import { Plus, Sparkles, TrendingUp } from "lucide-react";
+import {
+  Plus,
+  Sparkles,
+  TrendingUp,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Round, Holder, CapTableData } from "@/types/cap-table";
 import { validateRound } from "@/lib/validation";
 
@@ -396,30 +411,155 @@ export default function Home() {
         <div className="w-full max-w-3xl mx-auto p-3 sm:p-5 lg:p-6">
           {/* Header */}
           <div className="mb-6 pt-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-                Cap Table Generator
-              </h1>
-              <p className="text-muted-foreground mt-1.5 text-sm">
-                {selectedRoundIndex !== null && rounds[selectedRoundIndex]
-                  ? `Editing: ${rounds[selectedRoundIndex].name || `Round ${selectedRoundIndex + 1}`}`
-                  : "Select a round from the sidebar to edit"}
-              </p>
+            <div className="mb-6">
+              <Image
+                src="/zebra.legal.svg"
+                alt="Zebra Legal"
+                width={100}
+                height={100}
+                className="h-5 w-auto"
+              />
             </div>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight pt-4">
+              Cap Table Generator
+            </h1>
           </div>
 
           {/* Rounds Section */}
           <div className="space-y-5">
+            <div className="space-y-3 pb-2">
             <div className="flex items-center gap-2 border-b border-border/50 pb-2.5">
               <h2 className="text-base font-semibold">
                 {selectedRoundIndex !== null && rounds[selectedRoundIndex]
-                  ? `Editing: ${rounds[selectedRoundIndex].name || `Round ${selectedRoundIndex + 1}`}`
+                  ? `Editing: ${
+                      rounds[selectedRoundIndex].name ||
+                      `Round ${selectedRoundIndex + 1}`
+                    }`
                   : "Select a Round"}
               </h2>
               {rounds.length > 0 && (
                 <Badge variant="secondary" className="text-xs">
                   {rounds.length}
                 </Badge>
+                )}
+              </div>
+              {/* Summary badges */}
+              {selectedRoundIndex !== null && rounds[selectedRoundIndex] && (
+                <div className="flex items-center gap-4 flex-wrap">
+                  {validations[selectedRoundIndex] && (() => {
+                    const round = rounds[selectedRoundIndex];
+                    const regularInstruments = round.instruments.filter(
+                      (inst) => !("pro_rata_type" in inst)
+                    );
+                    const proRataInstruments = round.instruments.filter(
+                      (inst) => "pro_rata_type" in inst
+                    );
+                    const hasInstrumentsOrProRata = regularInstruments.length > 0 || proRataInstruments.length > 0;
+                    const isValid = validations[selectedRoundIndex].isValid;
+                    const isComplete = isValid && hasInstrumentsOrProRata;
+                    
+                    // Determine what's missing
+                    let tooltipMessage = "";
+                    if (!isComplete) {
+                      if (!hasInstrumentsOrProRata) {
+                        tooltipMessage = "Add at least one instrument or pro-rata allocation to complete this round.";
+                      } else if (!isValid) {
+                        const errors = validations[selectedRoundIndex].errors;
+                        const errorFields = errors.map(e => e.field).filter(f => f !== "instruments");
+                        if (errorFields.length > 0) {
+                          const fieldNames = errorFields.map(f => {
+                            if (f === "name") return "Round Name";
+                            if (f === "round_date") return "Round Date";
+                            if (f === "calculation_type") return "Round Type";
+                            if (f === "valuation") return "Valuation";
+                            if (f === "valuation_basis") return "Valuation Basis";
+                            return f;
+                          });
+                          tooltipMessage = `Please fix: ${fieldNames.join(", ")}`;
+                        } else {
+                          tooltipMessage = "Please fix the validation errors to complete this round.";
+                        }
+                      }
+                    }
+                    
+                    const statusElement = (
+                      <div className="flex items-center gap-2">
+                        {isComplete ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                        )}
+                        <span className="text-sm text-muted-foreground">
+                          {isComplete ? "Complete" : "Incomplete"}
+                        </span>
+                      </div>
+                    );
+                    
+                    if (!isComplete && tooltipMessage) {
+                      return (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              {statusElement}
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{tooltipMessage}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      );
+                    }
+                    
+                    return statusElement;
+                  })()}
+                  {rounds[selectedRoundIndex].round_date && (
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <span>
+                        {new Date(
+                          rounds[selectedRoundIndex].round_date
+                        ).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  {(() => {
+                    const round = rounds[selectedRoundIndex];
+                    const regularInstruments = round.instruments.filter(
+                      (inst) => !("pro_rata_type" in inst)
+                    );
+                    const instrumentsCount = regularInstruments.length;
+                    const holdersCount = new Set(
+                      regularInstruments
+                        .filter(
+                          (inst) => "holder_name" in inst && inst.holder_name
+                        )
+                        .map((inst) =>
+                          "holder_name" in inst ? inst.holder_name : ""
+                        )
+                    ).size;
+                    return (
+                      <>
+                        <Badge
+                          variant="secondary"
+                          className="text-xs font-medium"
+                        >
+                          <FileText className="h-3 w-3 mr-1" />
+                          {instrumentsCount}{" "}
+                          {instrumentsCount === 1
+                            ? "instrument"
+                            : "instruments"}
+                        </Badge>
+                        <Badge
+                          variant="secondary"
+                          className="text-xs font-medium"
+                        >
+                          <Users className="h-3 w-3 mr-1" />
+                          {holdersCount}{" "}
+                          {holdersCount === 1 ? "holder" : "holders"}
+                        </Badge>
+                      </>
+                    );
+                  })()}
+                </div>
               )}
             </div>
 
@@ -451,8 +591,8 @@ export default function Home() {
                     <div className="space-y-1.5">
                       <h3 className="text-lg font-semibold">Select a Round</h3>
                       <p className="text-muted-foreground max-w-md text-sm">
-                        Select a round from the sidebar on the right to view and edit its
-                        details.
+                        Select a round from the sidebar on the right to view and
+                        edit its details.
                       </p>
                     </div>
                   </div>
