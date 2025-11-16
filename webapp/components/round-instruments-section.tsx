@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import { InstrumentCard } from "@/components/instrument-card";
 import type { Round, Instrument, CalculationType } from "@/types/cap-table";
 import type { RoundValidation } from "@/lib/validation";
+import { getFieldError } from "@/lib/validation";
 
 interface RoundInstrumentsSectionProps {
   round: Round;
@@ -27,6 +28,12 @@ export function RoundInstrumentsSection({
   onEditInstrument,
   onDeleteInstrument,
 }: RoundInstrumentsSectionProps) {
+  const instrumentsError = getFieldError(validation?.errors ?? [], "instruments");
+  const proRataInstruments = round.instruments.filter(
+    (inst) => "pro_rata_type" in inst
+  );
+  const hasAnyInstruments = regularInstruments.length > 0 || proRataInstruments.length > 0;
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between border-b pb-3">
@@ -47,6 +54,11 @@ export function RoundInstrumentsSection({
           Add Instrument
         </Button>
       </div>
+      {instrumentsError && !hasAnyInstruments && (
+        <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
+          <p className="text-sm font-medium text-destructive">{instrumentsError}</p>
+        </div>
+      )}
       <div className="space-y-3">
         {regularInstruments.map((instrument, displayIndex) => {
           const actualIndex = round.instruments.findIndex(
@@ -66,7 +78,7 @@ export function RoundInstrumentsSection({
           );
         })}
         {regularInstruments.length === 0 && (
-          <Card className="border-dashed">
+          <Card className={`border-dashed ${instrumentsError && !hasAnyInstruments ? "border-destructive/50" : ""}`}>
             <CardContent className="pt-6 pb-6">
               <p className="text-center text-sm text-muted-foreground">
                 No instruments yet. Click "Add Instrument" to get started.

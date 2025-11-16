@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { spawn } from "child_process";
-import { join } from "path";
-import { writeFile, readFile, unlink } from "fs/promises";
+import { join, resolve } from "path";
+import { writeFile, readFile, unlink, access } from "fs/promises";
+import { constants } from "fs";
 import { tmpdir } from "os";
 
 export async function POST(request: NextRequest) {
@@ -19,23 +20,44 @@ export async function POST(request: NextRequest) {
     // Write JSON to temporary file
     await writeFile(jsonPath, JSON.stringify(data, null, 2));
 
-    // Get the project root (two levels up from webapp/app/api)
-    const projectRoot = join(process.cwd(), "..", "..");
-    const pythonScript = join(projectRoot, "scripts", "generate_excel.py");
+    // Get the project root
+    // When Next.js runs, process.cwd() is the webapp directory
+    // We need to go up one level to get to the project root
+    const currentDir = process.cwd();
+    const projectRoot = resolve(currentDir, "..");
+    const pythonScript = resolve(projectRoot, "scripts", "generate_excel.py");
+    
+    // Log paths for debugging (remove in production if needed)
+    console.log("Current directory:", currentDir);
+    console.log("Project root:", projectRoot);
+    console.log("Python script path:", pythonScript);
+    
+    // Verify the script exists
+    try {
+      await access(pythonScript, constants.F_OK);
+    } catch (error) {
+      console.error("Script access error:", error);
+      throw new Error(`Python script not found at: ${pythonScript}. Current working directory: ${currentDir}, Project root: ${projectRoot}`);
+    }
+
+    // Ensure paths are not null
+    if (!jsonPath || !excelPath) {
+      throw new Error("Failed to create temporary file paths");
+    }
 
     // Call Python script to generate Excel
     return new Promise((resolve, reject) => {
-      const python = spawn("python3", [pythonScript, jsonPath, excelPath], {
+      const python = spawn("python3", [pythonScript, jsonPath!, excelPath!], {
         cwd: projectRoot,
       });
 
       let errorOutput = "";
 
-      python.stderr.on("data", (data) => {
+      python.stderr?.on("data", (data: Buffer) => {
         errorOutput += data.toString();
       });
 
-      python.on("close", async (code) => {
+      python.on("close", async (code: number | null) => {
         try {
           if (code !== 0) {
             reject(
@@ -72,7 +94,7 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      python.on("error", async (error) => {
+      python.on("error", async (error: Error) => {
         reject(new Error(`Failed to spawn Python process: ${error.message}`));
       });
     });

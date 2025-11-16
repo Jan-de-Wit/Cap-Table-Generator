@@ -1,14 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RoundForm } from "@/components/round-form";
-import { JsonPreview } from "@/components/json-preview";
-import { HoldersManager } from "@/components/holders-manager";
 import { Sidebar } from "@/components/sidebar";
 import { HolderDialog } from "@/components/holder-dialog";
-import { Plus, CheckCircle2, FileText, Sparkles, Users, GripVertical } from "lucide-react";
+import { Plus, Sparkles, GripVertical } from "lucide-react";
+import { toast } from "sonner";
 import type { Round, Holder, CapTableData } from "@/types/cap-table";
 import { validateRound } from "@/lib/validation";
 import {
@@ -31,9 +30,10 @@ import { CSS } from "@dnd-kit/utilities";
 export default function Home() {
   const [rounds, setRounds] = React.useState<Round[]>([]);
   const [holders, setHolders] = React.useState<Holder[]>([]);
-  const [showPreview, setShowPreview] = React.useState(false);
   const [isGenerating, setIsGenerating] = React.useState(false);
-  const [expandedRounds, setExpandedRounds] = React.useState<Set<number>>(new Set([0]));
+  const [expandedRounds, setExpandedRounds] = React.useState<Set<number>>(
+    new Set([0])
+  );
   const [editingHolder, setEditingHolder] = React.useState<Holder | null>(null);
   const [holderDialogOpen, setHolderDialogOpen] = React.useState(false);
 
@@ -42,7 +42,7 @@ export default function Home() {
     setHolders((prev) => {
       const holderNames = new Set(prev.map((h) => h.name));
       const newHolders: Holder[] = [];
-      
+
       rounds.forEach((round) => {
         round.instruments.forEach((instrument) => {
           if ("holder_name" in instrument && instrument.holder_name) {
@@ -79,6 +79,14 @@ export default function Home() {
   };
 
   const deleteRound = (index: number) => {
+    const deletedRound = rounds[index];
+    const roundName = deletedRound.name || `Round ${index + 1}`;
+
+    // Store state for undo
+    const previousRounds = [...rounds];
+    const previousExpanded = new Set(expandedRounds);
+
+    // Perform deletion
     setRounds(rounds.filter((_, i) => i !== index));
     const newExpanded = new Set(expandedRounds);
     newExpanded.delete(index);
@@ -89,6 +97,62 @@ export default function Home() {
       else if (idx > index) adjusted.add(idx - 1);
     });
     setExpandedRounds(adjusted);
+
+    // Show toast with undo
+    toast(`"${roundName}" has been removed.`, {
+      description: 'Accident? Hit "Undo" to restore.',
+      action: {
+        label: "Undo",
+        onClick: () => {
+          setRounds(previousRounds);
+          setExpandedRounds(previousExpanded);
+          toast.success("Round restored", {
+            description: `"${roundName}" has been restored.`,
+          });
+        },
+      },
+    });
+  };
+
+  const deleteHolder = (holderName: string) => {
+    const deletedHolder = holders.find((h) => h.name === holderName);
+    if (!deletedHolder) return;
+
+    // Store state for undo
+    const previousHolders = [...holders];
+    const previousRounds = rounds.map((round) => ({
+      ...round,
+      instruments: [...round.instruments],
+    }));
+
+    // Remove holder from holders list
+    setHolders(holders.filter((h) => h.name !== holderName));
+
+    // Remove all instruments that reference this holder from all rounds
+    setRounds(
+      rounds.map((round) => ({
+        ...round,
+        instruments: round.instruments.filter(
+          (inst) => !("holder_name" in inst && inst.holder_name === holderName)
+        ),
+      }))
+    );
+
+    // Show toast with undo
+    toast(`"${holderName}" has been removed.`, {
+      description:
+        "The holder and all associated instruments have been removed.",
+      action: {
+        label: "Undo",
+        onClick: () => {
+          setHolders(previousHolders);
+          setRounds(previousRounds);
+          toast.success("Holder restored", {
+            description: `"${holderName}" and all instruments have been restored.`,
+          });
+        },
+      },
+    });
   };
 
   const duplicateRound = (index: number) => {
@@ -114,7 +178,7 @@ export default function Home() {
 
   const reorderRounds = (startIndex: number, endIndex: number) => {
     if (startIndex === endIndex) return;
-    
+
     const newRounds = Array.from(rounds);
     const [removed] = newRounds.splice(startIndex, 1);
     newRounds.splice(endIndex, 0, removed);
@@ -144,7 +208,10 @@ export default function Home() {
     setExpandedRounds(newExpanded);
   };
 
-  const moveHolderToGroup = (holderName: string, newGroup: string | undefined) => {
+  const moveHolderToGroup = (
+    holderName: string,
+    newGroup: string | undefined
+  ) => {
     const holder = holders.find((h) => h.name === holderName);
     if (holder) {
       updateHolder(holderName, { ...holder, group: newGroup });
@@ -265,9 +332,15 @@ export default function Home() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      toast.success("Excel file downloaded", {
+        description: "Your cap table has been exported successfully.",
+      });
     } catch (error) {
       console.error("Error generating Excel:", error);
-      alert(`Error generating Excel: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error("Download failed", {
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred",
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -278,117 +351,149 @@ export default function Home() {
     [rounds]
   );
 
-  const canProceedToPreview = rounds.length > 0 && validations.every((v) => v.isValid);
+  const canDownload = rounds.length > 0 && validations.every((v) => v.isValid);
   const completedCount = validations.filter((v) => v.isValid).length;
-  const progressPercentage = rounds.length > 0 ? (completedCount / rounds.length) * 100 : 0;
+  const progressPercentage =
+    rounds.length > 0 ? (completedCount / rounds.length) * 100 : 0;
+
+  const handleCopyJson = () => {
+    const data = buildCapTableData();
+    const jsonString = JSON.stringify(data, null, 2);
+    navigator.clipboard
+      .writeText(jsonString)
+      .then(() => {
+        toast.success("JSON copied", {
+          description: "The cap table has been copied to your clipboard.",
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to copy JSON:", err);
+        toast.error("Copy failed", {
+          description: "Failed to copy JSON to clipboard",
+        });
+      });
+  };
+
+  const handleDownloadJson = () => {
+    const data = buildCapTableData();
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "cap-table.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("JSON file downloaded", {
+      description: "Your cap table has been saved as JSON.",
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
       <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        {/* Header with Progress Bar */}
-        <div className="mb-8 space-y-4">
-          <div>
-            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">Cap Table Generator</h1>
-            <p className="text-muted-foreground mt-2 text-base">
-              Create your capitalization table by adding rounds and instruments
-            </p>
+          {/* Header with Progress Bar */}
+          <div className="mb-8 space-y-4">
+            <div>
+              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
+                Cap Table Generator
+              </h1>
+              <p className="text-muted-foreground mt-2 text-base">
+                Create your capitalization table by adding rounds and
+                instruments
+              </p>
+            </div>
+
+            {/* Progress Bar - More Prominent */}
+            {rounds.length > 0 && (
+              <div className="bg-card border rounded-lg p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-foreground">
+                    Progress: {completedCount} of {rounds.length} rounds
+                    complete
+                  </span>
+                  <span className="text-base font-semibold text-primary">
+                    {Math.round(progressPercentage)}%
+                  </span>
+                </div>
+                <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500 rounded-full"
+                    style={{ width: `${progressPercentage}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Progress Bar - More Prominent */}
-          {rounds.length > 0 && (
-            <div className="bg-card border rounded-lg p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-foreground">
-                  Progress: {completedCount} of {rounds.length} rounds complete
-                </span>
-                <span className="text-base font-semibold text-primary">{Math.round(progressPercentage)}%</span>
-              </div>
-              <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-500 rounded-full"
-                  style={{ width: `${progressPercentage}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {!showPreview ? (
-          <>
-            {/* Rounds Section */}
-            <div className="space-y-8">
-              <div className="flex items-center justify-between border-b pb-3">
-                <h2 className="text-3xl font-bold tracking-tight">Rounds</h2>
-              </div>
-
-              {rounds.length === 0 ? (
-                <Card className="border-dashed shadow-sm">
-                  <CardContent className="pt-16 pb-16">
-                    <div className="flex flex-col items-center text-center space-y-5">
-                      <div className="rounded-full bg-primary/10 p-5">
-                        <Sparkles className="h-10 w-10 text-primary" />
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-2xl font-semibold">Get Started</h3>
-                        <p className="text-muted-foreground max-w-md text-base">
-                          Create your first financing round to begin building your capitalization table.
-                          You can add multiple rounds, instruments, and pro-rata allocations.
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <DraggableRoundsList
-                  rounds={rounds}
-                  holders={holders}
-                  expandedRounds={expandedRounds}
-                  validations={validations}
-                  usedGroups={usedGroups}
-                  usedClassNames={usedClassNames}
-                  onReorder={reorderRounds}
-                  onUpdate={updateRound}
-                  onAddHolder={addHolder}
-                  onUpdateHolder={updateHolder}
-                  onDelete={deleteRound}
-                  onDuplicate={duplicateRound}
-                  onToggleExpand={toggleRound}
-                />
-              )}
-
-              <div className="flex justify-end pt-4">
-                <Button onClick={addRound} size="lg" variant="default" className="shadow-md hover:shadow-lg transition-shadow">
-                  <Plus className="h-5 w-5 mr-2" />
-                  Add Round
-                </Button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="space-y-6">
+          {/* Rounds Section */}
+          <div className="space-y-8">
             <div className="flex items-center justify-between border-b pb-3">
-              <h2 className="text-3xl font-bold tracking-tight">Preview</h2>
-              <Button variant="outline" onClick={() => setShowPreview(false)}>
-                Back to Edit
-              </Button>
+              <h2 className="text-3xl font-bold tracking-tight">Rounds</h2>
             </div>
-            <JsonPreview
-              data={buildCapTableData()}
-              onDownloadExcel={handleDownloadExcel}
-            />
-            {isGenerating && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    <p>Generating Excel file...</p>
+
+            {rounds.length === 0 ? (
+              <Card className="border-dashed shadow-sm">
+                <CardContent className="pt-16 pb-16">
+                  <div className="flex flex-col items-center text-center space-y-5">
+                    <div className="rounded-full bg-primary/10 p-5">
+                      <Sparkles className="h-10 w-10 text-primary" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-2xl font-semibold">Get Started</h3>
+                      <p className="text-muted-foreground max-w-md text-base">
+                        Create your first financing round to begin building your
+                        capitalization table. You can add multiple rounds,
+                        instruments, and pro-rata allocations.
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
+            ) : (
+              <DraggableRoundsList
+                rounds={rounds}
+                holders={holders}
+                expandedRounds={expandedRounds}
+                validations={validations}
+                usedGroups={usedGroups}
+                usedClassNames={usedClassNames}
+                onReorder={reorderRounds}
+                onUpdate={updateRound}
+                onAddHolder={addHolder}
+                onUpdateHolder={updateHolder}
+                onDelete={deleteRound}
+                onDuplicate={duplicateRound}
+                onToggleExpand={toggleRound}
+              />
             )}
+
+            <div className="flex justify-end pt-4">
+              <Button
+                onClick={addRound}
+                size="lg"
+                variant="default"
+                className="shadow-md hover:shadow-lg transition-shadow"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Add Round
+              </Button>
+            </div>
           </div>
-        )}
+
+          {isGenerating && (
+            <Card className="mt-6">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <p>Generating Excel file...</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
       <Sidebar
@@ -396,10 +501,14 @@ export default function Home() {
         rounds={rounds}
         onEditHolder={handleEditHolder}
         onEditRound={handleEditRound}
+        onDeleteHolder={deleteHolder}
+        onDeleteRound={deleteRound}
         onAddRound={addRound}
         onAddHolder={handleAddHolderFromSidebar}
-        onPreview={() => setShowPreview(true)}
-        canProceedToPreview={canProceedToPreview}
+        onDownloadExcel={handleDownloadExcel}
+        onCopyJson={handleCopyJson}
+        onDownloadJson={handleDownloadJson}
+        canDownload={canDownload}
         onReorderRounds={reorderRounds}
         onMoveHolderToGroup={moveHolderToGroup}
       />
@@ -568,23 +677,23 @@ function DraggableRoundItem({
           <GripVertical className="h-5 w-5" />
         </div>
         <div className="flex-1">
-            <RoundForm
-              round={round}
-              holders={holders}
-              onUpdate={(updatedRound) => onUpdate(index, updatedRound)}
-              onAddHolder={onAddHolder}
-              onUpdateHolder={onUpdateHolder}
-              usedGroups={usedGroups}
-              usedClassNames={usedClassNames}
-              allRounds={allRounds}
-              roundIndex={index}
-              onUpdateRound={onUpdateRound}
-              onDelete={onDelete ? () => onDelete(index) : undefined}
-              onDuplicate={() => onDuplicate(index)}
-              isExpanded={isExpanded}
-              onToggleExpand={() => onToggleExpand(index)}
-              validation={validation}
-            />
+          <RoundForm
+            round={round}
+            holders={holders}
+            onUpdate={(updatedRound) => onUpdate(index, updatedRound)}
+            onAddHolder={onAddHolder}
+            onUpdateHolder={onUpdateHolder}
+            usedGroups={usedGroups}
+            usedClassNames={usedClassNames}
+            allRounds={allRounds}
+            roundIndex={index}
+            onUpdateRound={onUpdateRound}
+            onDelete={onDelete ? () => onDelete(index) : undefined}
+            onDuplicate={() => onDuplicate(index)}
+            isExpanded={isExpanded}
+            onToggleExpand={() => onToggleExpand(index)}
+            validation={validation}
+          />
         </div>
       </div>
     </div>

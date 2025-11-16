@@ -123,7 +123,6 @@ export function HolderSelector({
         {selectedHolder && (
           <Button
             type="button"
-            size="sm"
             variant="outline"
             onClick={(e) => {
               e.stopPropagation();
@@ -137,7 +136,6 @@ export function HolderSelector({
         {allowCreate && (
           <Button
             type="button"
-            size="sm"
             variant="outline"
             onClick={(e) => {
               e.stopPropagation();

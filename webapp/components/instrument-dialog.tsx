@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -66,6 +67,7 @@ export function InstrumentDialog({
   const [formData, setFormData] = React.useState<Partial<Instrument>>({});
   const [touchedFields, setTouchedFields] = React.useState<Set<string>>(new Set());
   const [className, setClassName] = React.useState<string>("");
+  const classNameInputRef = React.useRef<HTMLInputElement>(null);
 
   // Initialize form when dialog opens
   React.useEffect(() => {
@@ -198,18 +200,38 @@ export function InstrumentDialog({
               required
               htmlFor="instrument-class"
             >
-              <Combobox
-                options={classNameOptions}
-                value={className}
-                onValueChange={(value) => {
-                  setClassName(value);
-                  updateField("class_name", value);
-                }}
-                placeholder="Select or type a class name..."
-                searchPlaceholder="Search class names..."
-                emptyText="No class name found. Type to create a new one."
-                allowCustom={true}
-              />
+              {usedClassNames.length === 0 ? (
+                <>
+                  <Input
+                    ref={classNameInputRef}
+                    id="instrument-class"
+                    type="text"
+                    value={className}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setClassName(value);
+                      updateField("class_name", value);
+                    }}
+                    placeholder="Type a class name (e.g., 'Series A Preferred')"
+                    onBlur={() =>
+                      setTouchedFields((prev) => new Set([...prev, "class_name"]))
+                    }
+                  />
+                </>
+              ) : (
+                <Combobox
+                  options={classNameOptions}
+                  value={className}
+                  onValueChange={(value) => {
+                    setClassName(value);
+                    updateField("class_name", value);
+                  }}
+                  placeholder="Select or type a class name..."
+                  searchPlaceholder="Search class names..."
+                  emptyText="No class name found. Type to create a new one."
+                  allowCustom={true}
+                />
+              )}
             </FieldWithHelp>
           </div>
 

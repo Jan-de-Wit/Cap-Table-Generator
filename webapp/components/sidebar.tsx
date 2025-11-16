@@ -4,7 +4,21 @@ import * as React from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, Pencil, Plus, CheckCircle2, GripVertical } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Users,
+  TrendingUp,
+  Pencil,
+  Plus,
+  CheckCircle2,
+  GripVertical,
+  FileSpreadsheet,
+  Download,
+  Copy,
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+} from "lucide-react";
 import type { Holder, Round } from "@/types/cap-table";
 import {
   DndContext,
@@ -31,10 +45,14 @@ interface SidebarProps {
   rounds: Round[];
   onEditHolder?: (holder: Holder) => void;
   onEditRound?: (index: number) => void;
+  onDeleteHolder?: (holderName: string) => void;
+  onDeleteRound?: (index: number) => void;
   onAddRound?: () => void;
   onAddHolder?: () => void;
-  onPreview?: () => void;
-  canProceedToPreview?: boolean;
+  onDownloadExcel?: () => void;
+  onCopyJson?: () => void;
+  onDownloadJson?: () => void;
+  canDownload?: boolean;
   onReorderRounds?: (startIndex: number, endIndex: number) => void;
   onMoveHolderToGroup?: (
     holderName: string,
@@ -47,16 +65,20 @@ export function Sidebar({
   rounds,
   onEditHolder,
   onEditRound,
+  onDeleteHolder,
+  onDeleteRound,
   onAddRound,
   onAddHolder,
-  onPreview,
-  canProceedToPreview = false,
+  onDownloadExcel,
+  onCopyJson,
+  onDownloadJson,
+  canDownload = false,
   onReorderRounds,
   onMoveHolderToGroup,
 }: SidebarProps) {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [overId, setOverId] = React.useState<string | null>(null);
-  
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -73,7 +95,7 @@ export function Sidebar({
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    setOverId(event.over?.id as string ?? null);
+    setOverId((event.over?.id as string) ?? null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -104,7 +126,7 @@ export function Sidebar({
     // Handle holder group movement
     if (active.id.toString().startsWith("holder-")) {
       let targetGroup: string | undefined;
-      
+
       // Check if dropped on a group container
       if (over.id.toString().startsWith("group-")) {
         targetGroup = over.id.toString().replace("group-", "");
@@ -118,7 +140,7 @@ export function Sidebar({
           targetGroup = targetHolder.group || "ungrouped";
         }
       }
-      
+
       if (targetGroup !== undefined && onMoveHolderToGroup) {
         const holderName = active.id.toString().replace("holder-", "");
         onMoveHolderToGroup(
@@ -211,8 +233,8 @@ export function Sidebar({
 
               {/* Grouped Holders */}
               {groupedHolders.groups.map(([groupName, groupHolders]) => (
-                <DroppableGroup 
-                  key={groupName} 
+                <DroppableGroup
+                  key={groupName}
                   groupName={groupName}
                   activeId={activeId}
                   overId={overId}
@@ -233,6 +255,7 @@ export function Sidebar({
                           key={holder.name}
                           holder={holder}
                           onEdit={onEditHolder}
+                          onDelete={onDeleteHolder}
                           isDragging={activeId === `holder-${holder.name}`}
                           groupName={groupName}
                           activeId={activeId}
@@ -245,7 +268,7 @@ export function Sidebar({
 
               {/* Ungrouped Holders */}
               {groupedHolders.ungrouped.length > 0 && (
-                <DroppableGroup 
+                <DroppableGroup
                   groupName="ungrouped"
                   activeId={activeId}
                   overId={overId}
@@ -266,6 +289,7 @@ export function Sidebar({
                           key={holder.name}
                           holder={holder}
                           onEdit={onEditHolder}
+                          onDelete={onDeleteHolder}
                           isDragging={activeId === `holder-${holder.name}`}
                           groupName="ungrouped"
                           activeId={activeId}
@@ -332,6 +356,7 @@ export function Sidebar({
                           roundHolders={roundHolders}
                           proRataHolders={proRataHolders}
                           onEdit={onEditRound}
+                          onDelete={onDeleteRound}
                           isDragging={activeId === `sidebar-round-${index}`}
                         />
                       );
@@ -355,19 +380,30 @@ export function Sidebar({
             </div>
           </div>
 
-          {/* Bottom Action Button */}
-          {onPreview && (
+          {/* Bottom Action Buttons */}
+          {(onDownloadExcel || onCopyJson || onDownloadJson) && (
             <div className="border-t p-4">
-              <Button
-                type="button"
-                variant="default"
-                className="w-full"
-                onClick={onPreview}
-                disabled={!canProceedToPreview}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Preview & Download
-              </Button>
+              <div className="flex gap-2">
+                {onDownloadExcel && (
+                  <Button
+                    type="button"
+                    variant="default"
+                    className="flex-1"
+                    onClick={onDownloadExcel}
+                    disabled={!canDownload}
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Download Excel
+                  </Button>
+                )}
+                {(onCopyJson || onDownloadJson) && (
+                  <JsonDropdownMenu
+                    onCopyJson={onCopyJson}
+                    onDownloadJson={onDownloadJson}
+                    canDownload={canDownload}
+                  />
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -380,12 +416,14 @@ export function Sidebar({
 function DraggableHolder({
   holder,
   onEdit,
+  onDelete,
   isDragging: externalIsDragging,
   groupName,
   activeId,
 }: {
   holder: Holder;
   onEdit?: (holder: Holder) => void;
+  onDelete?: (holderName: string) => void;
   isDragging?: boolean;
   groupName?: string;
   activeId?: string | null;
@@ -427,14 +465,18 @@ function DraggableHolder({
 
   return (
     <div ref={combinedRef} style={style}>
-      <Card 
+      <Card
         className={`p-2.5 border-border/50 shadow-none transition-all ${
-          isDragging 
-            ? "shadow-lg border-primary/50 scale-105" 
+          isDragging
+            ? "shadow-lg border-primary/50 scale-105"
             : "hover:shadow-sm hover:border-border"
         }`}
       >
-        <div className={`flex justify-between gap-2 ${holder.description ? "items-start" : "items-center"}`}>
+        <div
+          className={`flex justify-between gap-2 ${
+            holder.description ? "items-start" : "items-center"
+          }`}
+        >
           <div
             {...attributes}
             {...listeners}
@@ -450,18 +492,32 @@ function DraggableHolder({
               </div>
             )}
           </div>
-          {onEdit && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 shrink-0"
-              onClick={() => onEdit(holder)}
-              title="Edit holder"
-            >
-              <Pencil className="h-2.5 w-2.5" />
-            </Button>
-          )}
+          <div className="flex gap-1 shrink-0">
+            {onEdit && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                onClick={() => onEdit(holder)}
+                title="Edit holder"
+              >
+                <Pencil className="h-2.5 w-2.5" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                onClick={() => onDelete(holder.name)}
+                title="Delete holder"
+              >
+                <Trash2 className="h-2.5 w-2.5" />
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
     </div>
@@ -487,10 +543,10 @@ function DroppableGroup({
   });
 
   const isDraggingHolder = activeId?.toString().startsWith("holder-");
-  
+
   // Check if hovering over the group container directly
   const isOverGroup = isOver && isDraggingHolder;
-  
+
   // Check if hovering over any holder card in this group
   const isOverHolderInGroup = React.useMemo(() => {
     if (!overId || !isDraggingHolder) return false;
@@ -523,6 +579,75 @@ function DroppableGroup({
   );
 }
 
+// JSON Dropdown Menu Component
+function JsonDropdownMenu({
+  onCopyJson,
+  onDownloadJson,
+  canDownload,
+}: {
+  onCopyJson?: () => void;
+  onDownloadJson?: () => void;
+  canDownload: boolean;
+}) {
+  const [open, setOpen] = React.useState(false);
+
+  const handleCopy = () => {
+    onCopyJson?.();
+    setOpen(false);
+  };
+
+  const handleDownload = () => {
+    onDownloadJson?.();
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="shrink-0"
+          disabled={!canDownload}
+        >
+          {open ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-48 p-2">
+        <div className="space-y-1">
+          {onCopyJson && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={handleCopy}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Copy JSON
+            </Button>
+          )}
+          {onDownloadJson && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={handleDownload}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download JSON
+            </Button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Draggable Round Sidebar Component
 function DraggableRoundSidebar({
   id,
@@ -531,6 +656,7 @@ function DraggableRoundSidebar({
   roundHolders,
   proRataHolders,
   onEdit,
+  onDelete,
   isDragging: externalIsDragging,
 }: {
   id: string;
@@ -539,6 +665,7 @@ function DraggableRoundSidebar({
   roundHolders: Holder[];
   proRataHolders: Holder[];
   onEdit?: (index: number) => void;
+  onDelete?: (index: number) => void;
   isDragging?: boolean;
 }) {
   const {
@@ -561,10 +688,10 @@ function DraggableRoundSidebar({
 
   return (
     <div ref={setNodeRef} style={style}>
-      <Card 
+      <Card
         className={`p-3 border-border/50 shadow-none transition-all ${
-          isDragging 
-            ? "shadow-lg border-primary/50 scale-105" 
+          isDragging
+            ? "shadow-lg border-primary/50 scale-105"
             : "hover:shadow-sm hover:border-border"
         }`}
       >
@@ -581,65 +708,80 @@ function DraggableRoundSidebar({
               <div className="font-semibold text-xs">
                 {round.name || `Round ${index + 1}`}
               </div>
-              <div className="text-xs text-muted-foreground mt-0.5">
+              <div className="text-xs text-muted-foreground mt-0.5 mb-2">
                 {round.round_date
                   ? new Date(round.round_date).toLocaleDateString()
                   : "No date"}
               </div>
+              {roundHolders.length > 0 ? (
+                <div className="space-y-1.5">
+                  <div className="text-xs font-medium text-muted-foreground">
+                    Holders ({roundHolders.length})
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {roundHolders.map((holder) => (
+                      <Badge
+                        key={holder.name}
+                        variant="outline"
+                        className="text-xs py-0"
+                      >
+                        {holder.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground">
+                  No holders yet
+                </div>
+              )}
+
+              {proRataHolders.length > 0 && (
+                <div className="space-y-1.5 mt-2">
+                  <div className="text-xs font-medium text-muted-foreground">
+                    Pro-Rata ({proRataHolders.length})
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {proRataHolders.map((holder) => (
+                      <Badge
+                        key={holder.name}
+                        variant="secondary"
+                        className="text-xs py-0"
+                      >
+                        {holder.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-            {onEdit && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 p-0 shrink-0"
-                onClick={() => onEdit(index)}
-                title="Edit round"
-              >
-                <Pencil className="h-2.5 w-2.5" />
-              </Button>
-            )}
+            <div className="flex gap-1 shrink-0">
+              {onEdit && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0"
+                  onClick={() => onEdit(index)}
+                  title="Edit round"
+                >
+                  <Pencil className="h-2.5 w-2.5" />
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                  onClick={() => onDelete(index)}
+                  title="Delete round"
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                </Button>
+              )}
+            </div>
           </div>
-
-          {roundHolders.length > 0 ? (
-            <div className="space-y-1.5">
-              <div className="text-xs font-medium text-muted-foreground">
-                Holders ({roundHolders.length})
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {roundHolders.map((holder) => (
-                  <Badge
-                    key={holder.name}
-                    variant="outline"
-                    className="text-xs py-0"
-                  >
-                    {holder.name}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground">No holders yet</div>
-          )}
-
-          {proRataHolders.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="text-xs font-medium text-muted-foreground">
-                Pro-Rata ({proRataHolders.length})
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {proRataHolders.map((holder) => (
-                  <Badge
-                    key={holder.name}
-                    variant="secondary"
-                    className="text-xs py-0"
-                  >
-                    {holder.name}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </Card>
     </div>
