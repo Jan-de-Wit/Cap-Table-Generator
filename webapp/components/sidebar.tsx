@@ -301,8 +301,8 @@ export function Sidebar({
               )}
 
               {holders.length === 0 && (
-                <Card className="p-4">
-                  <p className="text-sm text-muted-foreground text-center">
+                <Card className="p-2.5 border-border/50 shadow-none transition-all hover:shadow-sm hover:border-border">
+                  <p className="text-xs text-muted-foreground text-center">
                     No holders yet
                   </p>
                 </Card>
@@ -333,8 +333,8 @@ export function Sidebar({
               </div>
 
               {rounds.length === 0 ? (
-                <Card className="p-4">
-                  <p className="text-sm text-muted-foreground text-center">
+                <Card className="p-2.5 border-border/50 shadow-none transition-all hover:shadow-sm hover:border-border">
+                  <p className="text-xs text-muted-foreground text-center">
                     No rounds yet
                   </p>
                 </Card>

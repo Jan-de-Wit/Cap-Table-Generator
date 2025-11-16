@@ -73,9 +73,8 @@ export function HolderSelector({
       <>
         <Button
           type="button"
-          size="lg"
           variant="outline"
-          className="w-full justify-start"
+          className="w-full justify-start h-9"
           onClick={(e) => {
             e.stopPropagation();
             handleCreateNew();

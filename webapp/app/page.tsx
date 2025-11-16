@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { RoundForm } from "@/components/round-form";
 import { Sidebar } from "@/components/sidebar";
 import { HolderDialog } from "@/components/holder-dialog";
@@ -394,57 +395,62 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background flex">
       <div className="flex-1 overflow-auto">
-        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto p-3 sm:p-5 lg:p-6">
           {/* Header with Progress Bar */}
-          <div className="mb-8 space-y-4">
+          <div className="mb-6 space-y-4 pt-4">
             <div>
-              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
                 Cap Table Generator
               </h1>
-              <p className="text-muted-foreground mt-2 text-base">
+              <p className="text-muted-foreground mt-1.5 text-sm">
                 Create your capitalization table by adding rounds and
                 instruments
               </p>
             </div>
 
-            {/* Progress Bar - More Prominent */}
+            {/* Progress Bar - Refined */}
             {rounds.length > 0 && (
-              <div className="bg-card border rounded-lg p-4 shadow-sm">
+              <Card className="border-border/50 shadow-none p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-foreground">
+                  <span className="text-xs font-medium text-foreground">
                     Progress: {completedCount} of {rounds.length} rounds
                     complete
                   </span>
-                  <span className="text-base font-semibold text-primary">
+                  <span className="text-sm font-semibold text-primary">
                     {Math.round(progressPercentage)}%
                   </span>
                 </div>
-                <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary transition-all duration-500 rounded-full"
                     style={{ width: `${progressPercentage}%` }}
                   />
                 </div>
-              </div>
+              </Card>
             )}
           </div>
 
           {/* Rounds Section */}
-          <div className="space-y-8">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h2 className="text-3xl font-bold tracking-tight">Rounds</h2>
+          <div className="space-y-5">
+            <div className="flex items-center gap-2 border-b border-border/50 pb-2.5">
+              <h2 className="text-base font-semibold">Rounds</h2>
+              {rounds.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {rounds.length}
+                </Badge>
+              )}
             </div>
 
             {rounds.length === 0 ? (
-              <Card className="border-dashed shadow-sm">
-                <CardContent className="pt-16 pb-16">
-                  <div className="flex flex-col items-center text-center space-y-5">
-                    <div className="rounded-full bg-primary/10 p-5">
-                      <Sparkles className="h-10 w-10 text-primary" />
+              <Card className="border-border/50 border-dashed shadow-none">
+                <CardContent className="pt-12 pb-12">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="rounded-full bg-primary/10 p-4">
+                      <Sparkles className="h-8 w-8 text-primary" />
                     </div>
-                    <div className="space-y-2">
-                      <h3 className="text-2xl font-semibold">Get Started</h3>
-                      <p className="text-muted-foreground max-w-md text-base">
+                    <div className="space-y-1.5">
+                      <h3 className="text-lg font-semibold">Get Started</h3>
+                      <p className="text-muted-foreground max-w-md text-sm">
                         Create your first financing round to begin building your
                         capitalization table. You can add multiple rounds,
                         instruments, and pro-rata allocations.
@@ -471,25 +477,25 @@ export default function Home() {
               />
             )}
 
-            <div className="flex justify-end pt-4">
+            <div className="flex justify-end pt-2">
               <Button
                 onClick={addRound}
-                size="lg"
-                variant="default"
-                className="shadow-md hover:shadow-lg transition-shadow"
+                size="sm"
+                variant="outline"
+                className="text-xs"
               >
-                <Plus className="h-5 w-5 mr-2" />
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
                 Add Round
               </Button>
             </div>
           </div>
 
           {isGenerating && (
-            <Card className="mt-6">
-              <CardContent className="pt-6">
+            <Card className="mt-5 border-border/50 shadow-none">
+              <CardContent className="pt-4 pb-4">
                 <div className="flex items-center justify-center gap-2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                  <p>Generating Excel file...</p>
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <p className="text-sm">Generating Excel file...</p>
                 </div>
               </CardContent>
             </Card>
@@ -587,7 +593,7 @@ function DraggableRoundsList({
         items={rounds.map((_, i) => `round-${i}`)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="space-y-6">
+        <div className="space-y-3">
           {rounds.map((round, index) => (
             <DraggableRoundItem
               key={`round-${index}`}
@@ -672,9 +678,9 @@ function DraggableRoundItem({
         <div
           {...attributes}
           {...listeners}
-          className="mt-2 cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground"
+          className="mt-2 cursor-grab active:cursor-grabbing p-0.5 text-muted-foreground hover:text-foreground touch-none"
         >
-          <GripVertical className="h-5 w-5" />
+          <GripVertical className="h-4 w-4" />
         </div>
         <div className="flex-1">
           <RoundForm

@@ -352,39 +352,39 @@ export function RoundForm({
 
   return (
     <Card
-      className={`shadow-md hover:shadow-lg transition-shadow ${
+      className={`border-border/50 shadow-none transition-all ${
         isComplete 
-          ? "border-green-200 dark:border-green-800 bg-green-50/30 dark:bg-green-950/20" 
-          : "border-border"
+          ? "border-green-200/50 dark:border-green-800/50 bg-green-50/20 dark:bg-green-950/10 hover:shadow-sm hover:border-green-300/50 dark:hover:border-green-700/50" 
+          : "hover:shadow-sm hover:border-border"
       }`}
     >
-      <CardHeader className="pb-4">
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 flex-1">
+          <div className="flex items-center gap-2 flex-1">
             {onToggleExpand && (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={onToggleExpand}
-                className="h-8 w-8 p-0"
+                className="h-6 w-6 p-0"
               >
                 {isExpanded ? (
-                  <ChevronDown className="h-5 w-5" />
+                  <ChevronDown className="h-3.5 w-3.5" />
                 ) : (
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-3.5 w-3.5" />
                 )}
               </Button>
             )}
-            <div className="flex items-center gap-3 flex-1">
+            <div className="flex items-center gap-2 flex-1">
               {isComplete ? (
-                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400 shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
               ) : (
-                <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400 shrink-0" />
+                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
               )}
               <div className="flex-1 min-w-0">
-                <CardTitle className="flex items-center gap-3 text-xl font-bold">
-                  <span className="text-primary font-extrabold">Round {roundNumber}</span>
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                  <span className="text-primary">Round {roundNumber}</span>
                   {round.name && (
                     <>
                       <span className="text-muted-foreground">—</span>
@@ -392,13 +392,13 @@ export function RoundForm({
                     </>
                   )}
                 {!isComplete && validation && (
-                    <Badge variant="destructive" className="text-xs font-semibold ml-2">
+                    <Badge variant="destructive" className="text-xs font-medium ml-1.5">
                       {validation.errors.length} issue{validation.errors.length !== 1 ? "s" : ""}
                   </Badge>
                 )}
               </CardTitle>
                 {isExpanded && (
-                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                     <span className="font-medium">{instrumentsCount} instrument{instrumentsCount !== 1 ? "s" : ""}</span>
                     <span>•</span>
                     <span className="font-medium">{holdersCount} holder{holdersCount !== 1 ? "s" : ""}</span>
@@ -413,17 +413,17 @@ export function RoundForm({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {onDuplicate && (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={onDuplicate}
-                className="h-9 w-9 p-0 hover:bg-accent"
+                className="h-5 w-5 p-0"
                 title="Duplicate round"
               >
-                <Copy className="h-4 w-4" />
+                <Copy className="h-2.5 w-2.5" />
               </Button>
             )}
             {onDelete && (
@@ -432,18 +432,18 @@ export function RoundForm({
                 variant="ghost"
                 size="sm"
                 onClick={onDelete}
-                className="h-9 w-9 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                className="h-5 w-5 p-0 text-destructive hover:text-destructive"
                 title="Delete round"
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-2.5 w-2.5" />
               </Button>
             )}
           </div>
         </div>
       </CardHeader>
       {isExpanded && (
-        <CardContent className="space-y-8 pt-2">
-          <div className="border-b pb-6">
+        <CardContent className="space-y-5 pt-2">
+          <div className="border-b border-border/50 pb-4">
           <RoundParametersSection
             round={round}
             touchedFields={touchedFields}
@@ -455,7 +455,7 @@ export function RoundForm({
           />
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             <RoundInstrumentsSection
               round={round}
               calculationType={round.calculation_type}
