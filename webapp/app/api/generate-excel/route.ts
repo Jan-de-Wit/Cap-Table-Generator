@@ -5,7 +5,7 @@ import { writeFile, readFile, unlink, access } from "fs/promises";
 import { constants } from "fs";
 import { tmpdir } from "os";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   let jsonPath: string | null = null;
   let excelPath: string | null = null;
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Call Python script to generate Excel
-    return new Promise((resolve, reject) => {
+    return new Promise<NextResponse>((resolve, reject) => {
       const python = spawn("python3", [pythonScript, jsonPath!, excelPath!], {
         cwd: projectRoot,
       });

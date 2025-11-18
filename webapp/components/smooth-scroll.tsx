@@ -17,7 +17,6 @@ export function SmoothScroll() {
       orientation: "vertical",
       gestureOrientation: "vertical",
       anchors: true,
-      touchInertiaMultiplier: 35,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
     });
 
