@@ -10,8 +10,6 @@ import { tmpdir } from "os";
  * 
  * In development/local environments: Uses spawn to call local Python script directly
  * In production/Vercel: Calls Python serverless function via HTTP
- * 
- * Uses INTERNAL_API_SECRET for secure communication in production.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Check if we're in development/non-production environment
@@ -182,18 +180,6 @@ async function generateExcelServerless(
   try {
     const data = await request.json();
 
-    // Get INTERNAL_API_SECRET from environment
-    const internalApiSecret = process.env.INTERNAL_API_SECRET;
-    if (!internalApiSecret) {
-      console.error("INTERNAL_API_SECRET is not configured");
-      return NextResponse.json(
-        {
-          error: "Server configuration error: INTERNAL_API_SECRET not set",
-        },
-        { status: 500 }
-      );
-    }
-
     // Determine the Python function URL
     // On Vercel, serverless functions are accessible via relative paths
     // The Python function will be at /api/generate-excel-python
@@ -218,7 +204,6 @@ async function generateExcelServerless(
       },
       body: JSON.stringify({
         data,
-        secret: internalApiSecret,
       }),
     });
 
