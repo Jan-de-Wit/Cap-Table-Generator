@@ -2,7 +2,6 @@
 FastAPI application for generating Excel cap tables from JSON data.
 """
 
-from captable import generate_from_data, CapTableGenerator
 import sys
 from pathlib import Path
 from typing import Dict, Any
@@ -14,12 +13,37 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# Add src to path to import captable module
-project_root = Path(__file__).parent
-src_path = project_root / "src"
-sys.path.insert(0, str(src_path))
-
-# Import captable after path is set up
+# Import captable module
+# First try importing as installed package (for production/Vercel)
+# Then fall back to adding src to path (for local development)
+try:
+    from captable import generate_from_data, CapTableGenerator
+except ImportError:
+    # If not installed, add src directory to path
+    project_root = Path(__file__).parent
+    possible_src_paths = [
+        project_root / "src",
+        project_root.parent / "src",  # If app.py is in a subdirectory
+        Path("/var/task/src"),  # Vercel serverless function location
+    ]
+    
+    for src_path in possible_src_paths:
+        if src_path.exists() and (src_path / "captable").exists():
+            sys.path.insert(0, str(src_path))
+            break
+    
+    # Try importing again
+    try:
+        from captable import generate_from_data, CapTableGenerator
+    except ImportError as e:
+        print(f"ERROR: Could not import captable module", file=sys.stderr)
+        print(f"Python path: {sys.path}", file=sys.stderr)
+        print(f"Project root: {project_root}", file=sys.stderr)
+        print(f"Checked paths: {possible_src_paths}", file=sys.stderr)
+        raise ImportError(
+            f"Could not import captable. Make sure the package is installed "
+            f"(pip install .) or the src directory is accessible."
+        ) from e
 
 
 app = FastAPI(
