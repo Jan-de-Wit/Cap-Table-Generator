@@ -11,49 +11,46 @@ import base64
 import tempfile
 
 # Import captable module
-# Priority: 1. Local module in same directory (for Vercel deployment)
-#           2. Parent directory's src (for local development)
-#           3. Installed package
+# Priority: 1. Local module in api directory (webapp/api/captable) - primary for Vercel
+#           2. Installed package (if build script ran)
+#           3. Parent src directory (for local development)
 current_file = Path(__file__).resolve()
 api_dir = current_file.parent  # webapp/api/
 
-# First, try to import from local captable module (same directory as this file)
-# This is the primary method for Vercel serverless functions
+# Add api directory to path first (so local captable module is found)
 sys.path.insert(0, str(api_dir))
 print(f"Added API directory to Python path: {api_dir}", file=sys.stderr)
 
-# Also try to add parent directory's src for local development
-project_root = api_dir.parent.parent  # Go up from webapp/api/ to project root
-src_path = project_root / "src"
-if src_path.exists():
-    sys.path.insert(0, str(src_path))
-    print(f"Added src to Python path: {src_path}", file=sys.stderr)
-
 try:
+    # Try importing from local module in api directory (primary method for Vercel)
     from captable import generate_from_data
-    print("Successfully imported captable from local module", file=sys.stderr)
+    print("Successfully imported captable from local module in api directory", file=sys.stderr)
 except ImportError as e:
-    # Fallback: try alternative paths (in case of different deployment structure)
-    alt_paths = [
-        project_root.parent / "src",  # If webapp is nested differently
-        api_dir.parent / "src",  # If api is at root level
-    ]
-    for alt_path in alt_paths:
-        if alt_path.exists():
-            sys.path.insert(0, str(alt_path))
-            print(f"Added to Python path (alternative): {alt_path}", file=sys.stderr)
+    # Fallback 1: Try installed package (if build script ran)
+    try:
+        from captable import generate_from_data
+        print("Successfully imported captable from installed package", file=sys.stderr)
+    except ImportError:
+        # Fallback 2: Try parent directory's src (for local development)
+        print("Captable not found in api directory or installed, trying src path...", file=sys.stderr)
+
+        project_root = api_dir.parent.parent  # Go up from webapp/api/ to project root
+        src_path = project_root / "src"
+        if src_path.exists():
+            sys.path.insert(0, str(src_path))
+            print(f"Added src to Python path: {src_path}", file=sys.stderr)
             try:
                 from captable import generate_from_data
-                print("Successfully imported captable from alternative path", file=sys.stderr)
-                break
+                print("Successfully imported captable from src directory", file=sys.stderr)
             except ImportError:
-                continue
-    else:
-        # Last resort: try to import from installed package
-        try:
-            from captable import generate_from_data
-            print("Successfully imported captable (from installed package)", file=sys.stderr)
-        except ImportError:
+                print(f"ERROR: Could not import captable: {e}", file=sys.stderr)
+                print(f"Current file: {current_file}", file=sys.stderr)
+                print(f"API directory: {api_dir}", file=sys.stderr)
+                print(f"Project root: {project_root}", file=sys.stderr)
+                print(f"Src path: {src_path} (exists: {src_path.exists()})", file=sys.stderr)
+                print(f"Python path: {sys.path}", file=sys.stderr)
+                raise
+        else:
             print(f"ERROR: Could not import captable: {e}", file=sys.stderr)
             print(f"Current file: {current_file}", file=sys.stderr)
             print(f"API directory: {api_dir}", file=sys.stderr)

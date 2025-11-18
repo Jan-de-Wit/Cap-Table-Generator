@@ -184,8 +184,6 @@ async function generateExcelServerless(
     console.log("Running serverless function for production");
     console.log("Data:", data);
 
-    console.log("Environment variables:", process.env);
-
     // Determine the Python function URL
     // On Vercel, serverless functions are accessible via relative paths
     // The Python function will be at /api/generate-excel-python

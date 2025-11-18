@@ -23,4 +23,3 @@ __all__ = [
     "ExcelReference",
     "CAP_TABLE_SCHEMA",
 ]
-
