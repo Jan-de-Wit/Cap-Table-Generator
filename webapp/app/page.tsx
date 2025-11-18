@@ -434,7 +434,7 @@ export default function Home() {
       const data = buildCapTableData();
       const apiUrl =
         process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000";
-      const response = await fetch(`${apiUrl}/generate-excel-raw`, {
+      const response = await fetch(`${apiUrl}/generate-excel`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

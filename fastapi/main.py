@@ -27,22 +27,24 @@ except ImportError:
     # If not installed, add src directory to path
     current_file = Path(__file__).resolve()
     project_root = current_file.parent.parent
-    
+
     # Build list of possible paths to check
     # Priority: local copy first, then standard locations
     possible_src_paths = [
-        current_file.parent / "src",  # Same directory as main.py (highest priority)
+        # Same directory as main.py (highest priority)
+        current_file.parent / "src",
         project_root / "src",  # Standard: project_root/src
         current_file.parent.parent / "src",  # Alternative parent
         Path("/var/task/src"),  # Vercel serverless function location
         Path("/var/task"),  # Vercel root - might have src here
         Path.cwd() / "src",  # Current working directory
     ]
-    
+
     # Also check if captable is directly in any of these locations
     # Priority: local copy first
     possible_direct_paths = [
-        current_file.parent / "captable",  # Directly in fastapi directory (highest priority)
+        # Directly in fastapi directory (highest priority)
+        current_file.parent / "captable",
         Path("/var/task/captable"),  # Vercel root with direct captable
         Path("/var/task/src/captable"),  # Vercel src/captable
         project_root / "src" / "captable",  # Standard location
@@ -56,14 +58,15 @@ except ImportError:
             sys.path.insert(0, str(src_path))
             found_path = src_path
             break
-    
+
     # If not found in src paths, check direct paths
     if not found_path:
         for direct_path in possible_direct_paths:
             logger.info(f"Checking direct path {direct_path}")
             if direct_path.exists() and direct_path.is_dir():
                 parent_path = direct_path.parent
-                logger.info(f"Found captable module at {direct_path}, adding {parent_path} to path")
+                logger.info(
+                    f"Found captable module at {direct_path}, adding {parent_path} to path")
                 sys.path.insert(0, str(parent_path))
                 found_path = parent_path
                 break
@@ -138,79 +141,6 @@ async def generate_excel(request: CapTableRequest, background_tasks: BackgroundT
 
         # Validate the data
         generator = CapTableGenerator(json_data=data)
-        if not generator.validate():
-            errors = generator.get_validation_errors()
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "Validation failed",
-                    "validation_errors": errors
-                }
-            )
-
-        # Create temporary file for Excel output
-        excel_path = None
-        try:
-            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp_file:
-                excel_path = tmp_file.name
-
-            # Generate Excel file
-            generator.generate_excel(excel_path)
-
-            # Schedule cleanup after response is sent
-            background_tasks.add_task(cleanup_file, excel_path)
-
-            # Return the Excel file
-            return FileResponse(
-                excel_path,
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                filename="cap-table.xlsx",
-                headers={
-                    "Content-Disposition": 'attachment; filename="cap-table.xlsx"'
-                }
-            )
-        except Exception as e:
-            # Clean up on error
-            if excel_path and os.path.exists(excel_path):
-                try:
-                    os.unlink(excel_path)
-                except:
-                    pass
-            raise
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        error_msg = str(e)
-        traceback_str = traceback.format_exc()
-        print(f"ERROR: {error_msg}", file=sys.stderr)
-        print(traceback_str, file=sys.stderr)
-
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": error_msg,
-                "traceback": traceback_str if os.environ.get("DEBUG") else None
-            }
-        )
-
-
-@app.post("/generate-excel-raw")
-async def generate_excel_raw(request: Dict[str, Any], background_tasks: BackgroundTasks):
-    """
-    Generate Excel file from cap table JSON data (raw dict format).
-    This endpoint accepts any JSON object and is more flexible.
-
-    Args:
-        request: Cap table data as raw dictionary
-
-    Returns:
-        Excel file as binary response
-    """
-    try:
-        # Validate the data
-        generator = CapTableGenerator(json_data=request)
         if not generator.validate():
             errors = generator.get_validation_errors()
             raise HTTPException(
