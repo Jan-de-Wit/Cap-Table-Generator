@@ -4,7 +4,7 @@
   "installCommand": "echo 'Dependencies installed in build script'",
   "functions": {
     "api/generate-excel-python.py": {
-      "runtime": "python3.11"
+      "runtime": "python"
     }
   }
 }
