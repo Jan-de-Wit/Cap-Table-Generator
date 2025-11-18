@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "chmod +x build.sh && ./build.sh",
-  "installCommand": "echo 'Dependencies installed in build script'"
+  "installCommand": "echo 'Dependencies installed in build script'",
+  "functions": {
+    "api/generate-excel-python.py": {}
+  }
 }
-
