@@ -2,7 +2,6 @@
   "buildCommand": "./build.sh",
   "functions": {
     "app.py": {
-      "runtime": "python",
       "includeFiles": "src/**"
     }
   },
