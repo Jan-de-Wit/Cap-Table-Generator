@@ -1,238 +1,344 @@
-"""
-FastAPI application for generating Excel cap tables from JSON data.
-"""
-
-import sys
-from pathlib import Path
-from typing import Dict, Any
-import tempfile
-import os
-
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-
-# Import captable module
-# First try importing as installed package (for production/Vercel)
-# Then fall back to adding src to path (for local development)
-try:
-    from captable import generate_from_data, CapTableGenerator
-except ImportError:
-    # If not installed, add src directory to path
-    project_root = Path(__file__).parent.parent
-    possible_src_paths = [
-        project_root / "src",
-        project_root.parent / "src",  # If app.py is in a subdirectory
-        Path("/var/task/src"),  # Vercel serverless function location
-    ]
-
-    for src_path in possible_src_paths:
-        if src_path.exists() and (src_path / "captable").exists():
-            sys.path.insert(0, str(src_path))
-            break
-
-    # Try importing again
-    try:
-        from captable import generate_from_data, CapTableGenerator
-    except ImportError as e:
-        print(f"ERROR: Could not import captable module", file=sys.stderr)
-        print(f"Python path: {sys.path}", file=sys.stderr)
-        print(f"Project root: {project_root}", file=sys.stderr)
-        print(f"Checked paths: {possible_src_paths}", file=sys.stderr)
-        raise ImportError(
-            f"Could not import captable. Make sure the package is installed "
-            f"(pip install .) or the src directory is accessible."
-        ) from e
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 
 
 app = FastAPI(
-    title="Cap Table Generator API",
-    description="API for generating Excel cap tables from JSON data",
-    version="1.0.0"
-)
-
-# Configure CORS to allow requests from the Next.js frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    title="Vercel + FastAPI",
+    description="Vercel + FastAPI",
+    version="1.0.0",
 )
 
 
-class CapTableRequest(BaseModel):
-    """Request model for cap table generation."""
-    schema_version: str
-    holders: list
-    rounds: list
+@app.get("/api/data")
+def get_sample_data():
+    return {
+        "data": [
+            {"id": 1, "name": "Sample Item 1", "value": 100},
+            {"id": 2, "name": "Sample Item 2", "value": 200},
+            {"id": 3, "name": "Sample Item 3", "value": 300}
+        ],
+        "total": 3,
+        "timestamp": "2024-01-01T00:00:00Z"
+    }
 
 
-def cleanup_file(file_path: str):
-    """Background task to clean up temporary file."""
-    try:
-        if os.path.exists(file_path):
-            os.unlink(file_path)
-    except Exception as e:
-        print(
-            f"Warning: Failed to cleanup file {file_path}: {e}", file=sys.stderr)
+@app.get("/api/items/{item_id}")
+def get_item(item_id: int):
+    return {
+        "item": {
+            "id": item_id,
+            "name": "Sample Item " + str(item_id),
+            "value": item_id * 100
+        },
+        "timestamp": "2024-01-01T00:00:00Z"
+    }
 
 
-@app.post("/generate-excel")
-async def generate_excel(request: CapTableRequest, background_tasks: BackgroundTasks):
-    """
-    Generate Excel file from cap table JSON data.
-
-    Args:
-        request: Cap table data in JSON format
-
-    Returns:
-        Excel file as binary response
-    """
-    try:
-        # Convert Pydantic model to dict
-        data = request.model_dump()
-
-        # Validate the data
-        generator = CapTableGenerator(json_data=data)
-        if not generator.validate():
-            errors = generator.get_validation_errors()
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "Validation failed",
-                    "validation_errors": errors
-                }
-            )
-
-        # Create temporary file for Excel output
-        excel_path = None
-        try:
-            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp_file:
-                excel_path = tmp_file.name
-
-            # Generate Excel file
-            generator.generate_excel(excel_path)
-
-            # Schedule cleanup after response is sent
-            background_tasks.add_task(cleanup_file, excel_path)
-
-            # Return the Excel file
-            return FileResponse(
-                excel_path,
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                filename="cap-table.xlsx",
-                headers={
-                    "Content-Disposition": 'attachment; filename="cap-table.xlsx"'
-                }
-            )
-        except Exception as e:
-            # Clean up on error
-            if excel_path and os.path.exists(excel_path):
-                try:
-                    os.unlink(excel_path)
-                except:
-                    pass
-            raise
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        error_msg = str(e)
-        traceback_str = traceback.format_exc()
-        print(f"ERROR: {error_msg}", file=sys.stderr)
-        print(traceback_str, file=sys.stderr)
-
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": error_msg,
-                "traceback": traceback_str if os.environ.get("DEBUG") else None
+@app.get("/", response_class=HTMLResponse)
+def read_root():
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Vercel + FastAPI</title>
+        <link rel="icon" type="image/x-icon" href="/favicon.ico">
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
             }
-        )
-
-
-@app.post("/generate-excel-raw")
-async def generate_excel_raw(request: Dict[str, Any], background_tasks: BackgroundTasks):
-    """
-    Generate Excel file from cap table JSON data (raw dict format).
-    This endpoint accepts any JSON object and is more flexible.
-
-    Args:
-        request: Cap table data as raw dictionary
-
-    Returns:
-        Excel file as binary response
-    """
-    try:
-        # Validate the data
-        generator = CapTableGenerator(json_data=request)
-        if not generator.validate():
-            errors = generator.get_validation_errors()
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "Validation failed",
-                    "validation_errors": errors
-                }
-            )
-
-        # Create temporary file for Excel output
-        excel_path = None
-        try:
-            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp_file:
-                excel_path = tmp_file.name
-
-            # Generate Excel file
-            generator.generate_excel(excel_path)
-
-            # Schedule cleanup after response is sent
-            background_tasks.add_task(cleanup_file, excel_path)
-
-            # Return the Excel file
-            return FileResponse(
-                excel_path,
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                filename="cap-table.xlsx",
-                headers={
-                    "Content-Disposition": 'attachment; filename="cap-table.xlsx"'
-                }
-            )
-        except Exception as e:
-            # Clean up on error
-            if excel_path and os.path.exists(excel_path):
-                try:
-                    os.unlink(excel_path)
-                except:
-                    pass
-            raise
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        error_msg = str(e)
-        traceback_str = traceback.format_exc()
-        print(f"ERROR: {error_msg}", file=sys.stderr)
-        print(traceback_str, file=sys.stderr)
-
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": error_msg,
-                "traceback": traceback_str if os.environ.get("DEBUG") else None
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+                background-color: #000000;
+                color: #ffffff;
+                line-height: 1.6;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
             }
-        )
+            
+            header {
+                border-bottom: 1px solid #333333;
+                padding: 0;
+            }
+            
+            nav {
+                max-width: 1200px;
+                margin: 0 auto;
+                display: flex;
+                align-items: center;
+                padding: 1rem 2rem;
+                gap: 2rem;
+            }
+            
+            .logo {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: #ffffff;
+                text-decoration: none;
+            }
+            
+            .nav-links {
+                display: flex;
+                gap: 1.5rem;
+                margin-left: auto;
+            }
+            
+            .nav-links a {
+                text-decoration: none;
+                color: #888888;
+                padding: 0.5rem 1rem;
+                border-radius: 6px;
+                transition: all 0.2s ease;
+                font-size: 0.875rem;
+                font-weight: 500;
+            }
+            
+            .nav-links a:hover {
+                color: #ffffff;
+                background-color: #111111;
+            }
+            
+            main {
+                flex: 1;
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 4rem 2rem;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            
+            .hero {
+                margin-bottom: 3rem;
+            }
+            
+            .hero-code {
+                margin-top: 2rem;
+                width: 100%;
+                max-width: 900px;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            }
+            
+            .hero-code pre {
+                background-color: #0a0a0a;
+                border: 1px solid #333333;
+                border-radius: 8px;
+                padding: 1.5rem;
+                text-align: left;
+                grid-column: 1 / -1;
+            }
+            
+            h1 {
+                font-size: 3rem;
+                font-weight: 700;
+                margin-bottom: 1rem;
+                background: linear-gradient(to right, #ffffff, #888888);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+            
+            .subtitle {
+                font-size: 1.25rem;
+                color: #888888;
+                margin-bottom: 2rem;
+                max-width: 600px;
+            }
+            
+            .cards {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 1.5rem;
+                width: 100%;
+                max-width: 900px;
+            }
+            
+            .card {
+                background-color: #111111;
+                border: 1px solid #333333;
+                border-radius: 8px;
+                padding: 1.5rem;
+                transition: all 0.2s ease;
+                text-align: left;
+            }
+            
+            .card:hover {
+                border-color: #555555;
+                transform: translateY(-2px);
+            }
+            
+            .card h3 {
+                font-size: 1.125rem;
+                font-weight: 600;
+                margin-bottom: 0.5rem;
+                color: #ffffff;
+            }
+            
+            .card p {
+                color: #888888;
+                font-size: 0.875rem;
+                margin-bottom: 1rem;
+            }
+            
+            .card a {
+                display: inline-flex;
+                align-items: center;
+                color: #ffffff;
+                text-decoration: none;
+                font-size: 0.875rem;
+                font-weight: 500;
+                padding: 0.5rem 1rem;
+                background-color: #222222;
+                border-radius: 6px;
+                border: 1px solid #333333;
+                transition: all 0.2s ease;
+            }
+            
+            .card a:hover {
+                background-color: #333333;
+                border-color: #555555;
+            }
+            
+            .status-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                background-color: #0070f3;
+                color: #ffffff;
+                padding: 0.25rem 0.75rem;
+                border-radius: 20px;
+                font-size: 0.75rem;
+                font-weight: 500;
+                margin-bottom: 2rem;
+            }
+            
+            .status-dot {
+                width: 6px;
+                height: 6px;
+                background-color: #00ff88;
+                border-radius: 50%;
+            }
+            
+            pre {
+                background-color: #0a0a0a;
+                border: 1px solid #333333;
+                border-radius: 6px;
+                padding: 1rem;
+                overflow-x: auto;
+                margin: 0;
+            }
+            
+            code {
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: 0.85rem;
+                line-height: 1.5;
+                color: #ffffff;
+            }
+            
+            /* Syntax highlighting */
+            .keyword {
+                color: #ff79c6;
+            }
+            
+            .string {
+                color: #f1fa8c;
+            }
+            
+            .function {
+                color: #50fa7b;
+            }
+            
+            .class {
+                color: #8be9fd;
+            }
+            
+            .module {
+                color: #8be9fd;
+            }
+            
+            .variable {
+                color: #f8f8f2;
+            }
+            
+            .decorator {
+                color: #ffb86c;
+            }
+            
+            @media (max-width: 768px) {
+                nav {
+                    padding: 1rem;
+                    flex-direction: column;
+                    gap: 1rem;
+                }
+                
+                .nav-links {
+                    margin-left: 0;
+                }
+                
+                main {
+                    padding: 2rem 1rem;
+                }
+                
+                h1 {
+                    font-size: 2rem;
+                }
+                
+                .hero-code {
+                    grid-template-columns: 1fr;
+                }
+                
+                .cards {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <nav>
+                <a href="/" class="logo">Vercel + FastAPI</a>
+                <div class="nav-links">
+                    <a href="/docs">API Docs</a>
+                    <a href="/api/data">API</a>
+                </div>
+            </nav>
+        </header>
+        <main>
+            <div class="hero">
+                <h1>Vercel + FastAPI</h1>
+                <div class="hero-code">
+                    <pre><code><span class="keyword">from</span> <span class="module">fastapi</span> <span class="keyword">import</span> <span class="class">FastAPI</span>
 
+<span class="variable">app</span> = <span class="class">FastAPI</span>()
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "ok"}
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+<span class="decorator">@app.get</span>(<span class="string">"/"</span>)
+<span class="keyword">def</span> <span class="function">read_root</span>():
+    <span class="keyword">return</span> {<span class="string">"Python"</span>: <span class="string">"on Vercel"</span>}</code></pre>
+                </div>
+            </div>
+            
+            <div class="cards">
+                <div class="card">
+                    <h3>Interactive API Docs</h3>
+                    <p>Explore this API's endpoints with the interactive Swagger UI. Test requests and view response schemas in real-time.</p>
+                    <a href="/docs">Open Swagger UI →</a>
+                </div>
+                
+                <div class="card">
+                    <h3>Sample Data</h3>
+                    <p>Access sample JSON data through our REST API. Perfect for testing and development purposes.</p>
+                    <a href="/api/data">Get Data →</a>
+                </div>
+                
+            </div>
+        </main>
+    </body>
+    </html>
+    """
