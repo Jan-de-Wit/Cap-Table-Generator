@@ -233,21 +233,6 @@ async def health_check():
     return {"status": "ok"}
 
 
-# Vercel serverless function handler
-# Mangum wraps the FastAPI ASGI app for serverless environments
-try:
-    from mangum import Mangum
-    handler = Mangum(app, lifespan="off")
-except ImportError:
-    # If mangum is not available, create a simple handler
-    # This should not happen if requirements.txt is properly installed
-    def handler(event, context):
-        return {
-            "statusCode": 500,
-            "body": "Mangum is required for serverless deployment. Install with: pip install mangum"
-        }
-
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
