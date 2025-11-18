@@ -2,6 +2,7 @@
 FastAPI application for generating Excel cap tables from JSON data.
 """
 
+from captable import generate_from_data, CapTableGenerator
 import sys
 from pathlib import Path
 from typing import Dict, Any
@@ -19,7 +20,6 @@ src_path = project_root / "src"
 sys.path.insert(0, str(src_path))
 
 # Import captable after path is set up
-from captable import generate_from_data, CapTableGenerator
 
 
 app = FastAPI(

@@ -373,8 +373,9 @@ export default function Home() {
     const processedRounds = rounds.map((round, roundIndex) => {
       const processedInstruments = round.instruments.map((instrument) => {
         // Remove React component-specific fields that shouldn't be in the schema
-        const { displayIndex, actualIndex, hasError, ...cleanInstrument } = instrument as any;
-        
+        const { displayIndex, actualIndex, hasError, ...cleanInstrument } =
+          instrument as any;
+
         // Only process regular instruments (not pro-rata allocations)
         if ("pro_rata_type" in cleanInstrument) {
           return cleanInstrument; // Keep pro-rata allocations as-is (but cleaned)
@@ -389,17 +390,19 @@ export default function Home() {
         ) {
           // Check if there's a corresponding pro-rata allocation in any later round
           const holderName = cleanInstrument.holder_name;
-          const hasExercisedProRata = rounds.some((laterRound, laterRoundIndex) => {
-            if (laterRoundIndex <= roundIndex) {
-              return false; // Only check later rounds
+          const hasExercisedProRata = rounds.some(
+            (laterRound, laterRoundIndex) => {
+              if (laterRoundIndex <= roundIndex) {
+                return false; // Only check later rounds
+              }
+              return laterRound.instruments.some(
+                (laterInst) =>
+                  "pro_rata_type" in laterInst &&
+                  "holder_name" in laterInst &&
+                  laterInst.holder_name === holderName
+              );
             }
-            return laterRound.instruments.some(
-              (laterInst) =>
-                "pro_rata_type" in laterInst &&
-                "holder_name" in laterInst &&
-                laterInst.holder_name === holderName
-            );
-          });
+          );
 
           // If not exercised, remove pro_rata_rights and related fields
           if (!hasExercisedProRata) {
@@ -429,7 +432,8 @@ export default function Home() {
     setIsGenerating(true);
     try {
       const data = buildCapTableData();
-      const apiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000";
+      const apiUrl =
+        process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000";
       const response = await fetch(`${apiUrl}/generate-excel-raw`, {
         method: "POST",
         headers: {
@@ -442,7 +446,8 @@ export default function Home() {
         let errorMessage = "Failed to generate Excel";
         try {
           const errorData = await response.json();
-          errorMessage = errorData.detail?.error || errorData.error || errorMessage;
+          errorMessage =
+            errorData.detail?.error || errorData.error || errorMessage;
         } catch {
           const errorText = await response.text();
           errorMessage = errorText || errorMessage;
