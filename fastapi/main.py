@@ -25,34 +25,66 @@ try:
     from captable import generate_from_data, CapTableGenerator
 except ImportError:
     # If not installed, add src directory to path
-    project_root = Path(__file__).parent.parent
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent
+    
+    # Build list of possible paths to check
+    # Priority: local copy first, then standard locations
     possible_src_paths = [
-        project_root / "src",
-        project_root.parent / "src",  # If app.py is in a subdirectory
+        current_file.parent / "src",  # Same directory as main.py (highest priority)
+        project_root / "src",  # Standard: project_root/src
+        current_file.parent.parent / "src",  # Alternative parent
         Path("/var/task/src"),  # Vercel serverless function location
+        Path("/var/task"),  # Vercel root - might have src here
+        Path.cwd() / "src",  # Current working directory
+    ]
+    
+    # Also check if captable is directly in any of these locations
+    # Priority: local copy first
+    possible_direct_paths = [
+        current_file.parent / "captable",  # Directly in fastapi directory (highest priority)
+        Path("/var/task/captable"),  # Vercel root with direct captable
+        Path("/var/task/src/captable"),  # Vercel src/captable
+        project_root / "src" / "captable",  # Standard location
     ]
 
+    found_path = None
     for src_path in possible_src_paths:
         logger.info(f"Checking {src_path} for captable module")
         if src_path.exists() and (src_path / "captable").exists():
             logger.info(f"Found captable module in {src_path}")
             sys.path.insert(0, str(src_path))
+            found_path = src_path
             break
-        else:
-            logger.info(f"No captable module found in {src_path}")
+    
+    # If not found in src paths, check direct paths
+    if not found_path:
+        for direct_path in possible_direct_paths:
+            logger.info(f"Checking direct path {direct_path}")
+            if direct_path.exists() and direct_path.is_dir():
+                parent_path = direct_path.parent
+                logger.info(f"Found captable module at {direct_path}, adding {parent_path} to path")
+                sys.path.insert(0, str(parent_path))
+                found_path = parent_path
+                break
 
     # Try importing again
     try:
         from captable import generate_from_data, CapTableGenerator
+        logger.info(f"Successfully imported captable module")
     except ImportError as e:
-        logger.error(f"ERROR: Could not import captable module",
-                     file=sys.stderr)
+        error_msg = f"ERROR: Could not import captable module"
+        print(error_msg, file=sys.stderr)
         print(f"Python path: {sys.path}", file=sys.stderr)
         logger.error(f"Project root: {project_root}")
-        logger.error(f"Checked paths: {possible_src_paths}")
+        logger.error(f"Current file: {current_file}")
+        logger.error(f"Checked src paths: {possible_src_paths}")
+        logger.error(f"Checked direct paths: {possible_direct_paths}")
+        logger.error(f"Import error: {e}")
         raise ImportError(
             f"Could not import captable. Make sure the package is installed "
-            f"(pip install .) or the src directory is accessible."
+            f"(pip install .) or the src directory is accessible. "
+            f"Current file: {current_file}, Project root: {project_root}"
         ) from e
 
 
