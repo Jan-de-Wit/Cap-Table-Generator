@@ -22,7 +22,7 @@ export function validateRound(
   const errors: FieldError[] = [];
 
   if (!round.name || round.name.trim() === "") {
-    errors.push({ field: "name", message: "Round name is required" });
+    errors.push({ field: "name", message: "Give the round a name" });
   } else if (allRounds && currentRoundIndex !== undefined) {
     // Check for duplicate round names (excluding current round)
     const duplicateIndex = allRounds.findIndex(
@@ -31,18 +31,18 @@ export function validateRound(
         r.name.trim().toLowerCase() === round.name.trim().toLowerCase()
     );
     if (duplicateIndex !== -1) {
-      errors.push({ field: "name", message: "Round name must be unique" });
+      errors.push({ field: "name", message: "Rounds must have unique names" });
     }
   }
 
   if (!round.round_date) {
-    errors.push({ field: "round_date", message: "Round date is required" });
+    errors.push({ field: "round_date", message: "Add a date for the round" });
   }
 
   if (!round.calculation_type) {
     errors.push({
       field: "calculation_type",
-      message: "Calculation type is required",
+      message: "Choose a calculation type for the round",
     });
   }
 
@@ -56,7 +56,7 @@ export function validateRound(
     if (!round.valuation_basis) {
       errors.push({
         field: "valuation_basis",
-        message: "Valuation basis is required",
+        message: "Add a valuation basis",
       });
     }
     if (!round.valuation || round.valuation <= 0) {
@@ -78,7 +78,8 @@ export function validateRound(
   if (regularInstruments.length === 0 && proRataInstruments.length === 0) {
     errors.push({
       field: "instruments",
-      message: "Round must have at least one instrument or pro-rata allocation",
+      message:
+        "Add at least one instrument or pro-rata allocation to the round",
     });
   }
 
@@ -89,14 +90,14 @@ export function validateRound(
     if (!("holder_name" in instrument) || !instrument.holder_name) {
       errors.push({
         field: `${prefix}.holder_name`,
-        message: "Holder name is required",
+        message: "Add a holder",
       });
     }
 
     if (!("class_name" in instrument) || !instrument.class_name) {
       errors.push({
         field: `${prefix}.class_name`,
-        message: "Class name is required",
+        message: "Add a class name",
       });
     }
 
@@ -115,8 +116,7 @@ export function validateRound(
       ) {
         errors.push({
           field: `${prefix}.target_percentage`,
-          message:
-            "Target percentage must be greater than 0 and less than 100%",
+          message: "Target percentage must be between 0 and 100%",
         });
       }
     }
@@ -144,7 +144,7 @@ export function validateRound(
           errors.push({
             field: `${prefix}.pro_rata_percentage`,
             message:
-              "Pro-rata percentage must be greater than 0 and less than 100% when pro-rata rights is 'super'",
+              "Pro-rata percentage must be between 0 and 100% when pro-rata rights is 'super'",
           });
         }
       }
@@ -161,7 +161,7 @@ export function validateRound(
           errors.push({
             field: `${prefix}.pro_rata_percentage`,
             message:
-              "Pro-rata percentage must be greater than 0 and less than 100% for super pro-rata",
+              "Pro-rata percentage must be between 0 and 100% for super pro-rata",
           });
         }
       }
@@ -174,8 +174,7 @@ export function validateRound(
       ) {
         errors.push({
           field: `${prefix}.exercise_type`,
-          message:
-            "Exercise type must be 'full' or 'partial' for pro-rata allocations",
+          message: "Choose an exercise type for the pro-rata allocation",
         });
       }
 
@@ -252,9 +251,6 @@ export function validateRound(
             }
           }
         }
-
-        // Validate that both partial exercise fields are not provided simultaneously (optional business rule)
-        // Actually, allowing both might be useful for validation purposes, so we'll allow it
       }
     }
 
@@ -262,7 +258,7 @@ export function validateRound(
       if (instrument.interest_rate < 0 || instrument.interest_rate >= 1) {
         errors.push({
           field: `${prefix}.interest_rate`,
-          message: "Interest rate must be between 0 and less than 100%",
+          message: "Interest rate must be between 0 and 100%",
         });
       }
     }
@@ -271,7 +267,7 @@ export function validateRound(
       if (instrument.discount_rate < 0 || instrument.discount_rate >= 1) {
         errors.push({
           field: `${prefix}.discount_rate`,
-          message: "Discount rate must be between 0 and less than 100%",
+          message: "Discount rate must be between 0 and 100%",
         });
       }
     }
