@@ -197,9 +197,18 @@ async function generateExcelServerless(
     // Determine the Python function URL
     // On Vercel, serverless functions are accessible via relative paths
     // The Python function will be at /api/generate-excel-python
-    const pythonFunctionUrl = "/api/generate-excel-python";
+    // We need to construct an absolute URL for Node.js fetch()
+    const baseUrl = 
+      process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}`
+        : request.headers.get("host")
+        ? `${request.headers.get("x-forwarded-proto") || "https"}://${request.headers.get("host")}`
+        : "http://localhost:3000";
+    
+    const pythonFunctionUrl = `${baseUrl}/api/generate-excel-python`;
 
     console.log("Using serverless Python function (production mode)");
+    console.log("Python function URL:", pythonFunctionUrl);
 
     // Call Python serverless function
     const response = await fetch(pythonFunctionUrl, {
