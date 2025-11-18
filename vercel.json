@@ -1,6 +1,6 @@
 {
   "buildCommand": "chmod +x build.sh && ./build.sh",
-  "outputDirectory": "webapp/.next",
+  "outputDirectory": ".next",
   "installCommand": "echo 'Dependencies installed in build script'"
 }
 
