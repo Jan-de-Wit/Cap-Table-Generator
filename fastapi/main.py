@@ -199,6 +199,46 @@ async def generate_excel(request: CapTableRequest, background_tasks: BackgroundT
         )
 
 
+@app.post("/validate")
+async def validate_cap_table(request: CapTableRequest):
+    """
+    Validate cap table JSON data without generating Excel.
+
+    Args:
+        request: Cap table data in JSON format
+
+    Returns:
+        Validation result with errors if any
+    """
+    try:
+        # Convert Pydantic model to dict
+        data = request.model_dump()
+
+        # Validate the data
+        generator = CapTableGenerator(json_data=data)
+        is_valid = generator.validate()
+        errors = generator.get_validation_errors() if not is_valid else []
+
+        return {
+            "is_valid": is_valid,
+                    "validation_errors": errors
+                }
+    except Exception as e:
+        import traceback
+        error_msg = str(e)
+        traceback_str = traceback.format_exc()
+        print(f"ERROR: {error_msg}", file=sys.stderr)
+        print(traceback_str, file=sys.stderr)
+
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": error_msg,
+                "traceback": traceback_str if os.environ.get("DEBUG") else None
+            }
+        )
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

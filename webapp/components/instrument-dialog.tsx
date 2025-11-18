@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useEffect, useRef } from "react";
+import Lenis from "lenis";
 import {
   Dialog,
   DialogContent,
@@ -89,6 +91,9 @@ export function InstrumentDialog({
   const [className, setClassName] = React.useState<string>("");
   const classNameInputRef = React.useRef<HTMLInputElement>(null);
   const previousInstrumentRef = React.useRef<Instrument | null>(null);
+  const lenisWrapperRef = useRef<HTMLDivElement>(null);
+  const lenisContentRef = useRef<HTMLDivElement>(null);
+  const lenisRef = useRef<Lenis | null>(null);
 
   // Helper function to validate percentage
   const validatePercentage = (
@@ -424,6 +429,99 @@ export function InstrumentDialog({
     [formData, calculationType, isProRata]
   );
 
+  // Initialize Lenis for smooth scrolling
+  useEffect(() => {
+    if (!open) {
+      if (lenisRef.current) {
+        lenisRef.current.destroy();
+        lenisRef.current = null;
+      }
+      return;
+    }
+
+    // Small delay to ensure DOM is ready and dialog animation completes
+    const timeoutId = setTimeout(() => {
+      const wrapper = lenisWrapperRef.current;
+      const content = lenisContentRef.current;
+      
+      if (!wrapper || !content) {
+        return;
+      }
+
+      // Ensure elements have dimensions
+      const wrapperHeight = wrapper.clientHeight;
+      const contentHeight = content.scrollHeight;
+      
+      if (wrapperHeight === 0 || contentHeight === 0) {
+        // Retry after a bit more time if dimensions aren't ready
+        setTimeout(() => {
+          if (!wrapper || !content) return;
+          const lenis = new Lenis({
+            wrapper: wrapper,
+            content: content,
+            lerp: 0.05,
+            duration: 1.2,
+            smoothWheel: true,
+            syncTouch: false,
+            touchMultiplier: 2,
+            wheelMultiplier: 1,
+            infinite: false,
+            autoResize: true,
+            orientation: "vertical",
+            gestureOrientation: "vertical",
+            anchors: false,
+            easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+          });
+
+          lenisRef.current = lenis;
+
+          function raf(time: number) {
+            lenis.raf(time);
+            requestAnimationFrame(raf);
+          }
+
+          requestAnimationFrame(raf);
+        }, 100);
+        return;
+      }
+
+      const lenis = new Lenis({
+        wrapper: wrapper,
+        content: content,
+        lerp: 0.05,
+        duration: 1.2,
+        smoothWheel: true,
+        syncTouch: false,
+        touchMultiplier: 2,
+        wheelMultiplier: 1,
+        infinite: false,
+        autoResize: true,
+        orientation: "vertical",
+        gestureOrientation: "vertical",
+        anchors: false,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      });
+
+      // Store lenis instance in ref
+      lenisRef.current = lenis;
+
+      function raf(time: number) {
+        lenis.raf(time);
+        requestAnimationFrame(raf);
+      }
+
+      requestAnimationFrame(raf);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (lenisRef.current) {
+        lenisRef.current.destroy();
+        lenisRef.current = null;
+      }
+    };
+  }, [open]);
+
   const handleSave = () => {
     if (validationErrors.length > 0) {
       return;
@@ -436,28 +534,38 @@ export function InstrumentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {isEditMode
-              ? editProRataOnly
-                ? "Edit Pro-Rata Rights"
+      <DialogContent className="sm:max-w-[600px] h-[80vh] flex flex-col p-0">
+        <div className="flex flex-col h-full">
+          <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
+            <DialogTitle>
+              {isEditMode
+                ? editProRataOnly
+                  ? "Edit Pro-Rata Rights"
+                  : isProRata
+                  ? "Edit Pro-Rata Allocation"
+                  : "Edit Instrument"
                 : isProRata
-                ? "Edit Pro-Rata Allocation"
-                : "Edit Instrument"
-              : isProRata
-              ? "Create Pro-Rata Allocation"
-              : "Create Instrument"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? editProRataOnly
-                ? "Update pro-rata rights allocation settings"
-                : "Update instrument details"
-              : "Add a new instrument to this round"}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-6 py-4">
+                ? "Create Pro-Rata Allocation"
+                : "Create Instrument"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditMode
+                ? editProRataOnly
+                  ? "Update pro-rata rights allocation settings"
+                  : "Update instrument details"
+                : "Add a new instrument to this round"}
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            ref={lenisWrapperRef}
+            className="flex-1 overflow-hidden min-h-0"
+            style={{ position: "relative" }}
+          >
+            <div
+              ref={lenisContentRef}
+              className="px-6 space-y-6 py-4"
+              style={{ willChange: "transform" }}
+            >
           {/* Basic Information Section - Only show if not editing pro-rata allocation or pro-rata only */}
           {!isProRata && !editProRataOnly && (
             <div className="space-y-4">
@@ -1719,8 +1827,9 @@ export function InstrumentDialog({
               )}
             </>
           )}
-        </div>
-        <DialogFooter>
+            </div>
+          </div>
+          <DialogFooter className="px-6 pb-6 pt-4 shrink-0 border-t">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -1736,6 +1845,7 @@ export function InstrumentDialog({
             {isEditMode ? "Save Changes" : "Create Instrument"}
           </Button>
         </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -32,7 +32,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         self.round_constants_rows = {}
         # Padding offset for table positioning
         self.padding_offset = 1
-    
+
     def _format_interest_type(self, value: str) -> str:
         """Format interest type for display: remove underscores and capitalize."""
         if not value:
@@ -46,7 +46,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
             'compound_daily': 'Compounded daily'
         }
         return mapping.get(value, value.replace('_', ' ').title())
-    
+
     def _format_valuation_cap_type(self, value: str) -> str:
         """Format valuation cap type for display: remove underscores and capitalize."""
         if not value:
@@ -378,13 +378,15 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                     # Price per share calculated from pre-investment valuation
                     pre_round_shares_ref = self._get_pre_round_shares_ref(
                         round_idx, round_data, all_rounds)
-                    col_value_ref = self.padding_offset + 3  # Values column (column 4)
+                    col_value_ref = self.padding_offset + \
+                        3  # Values column (column 4)
                     col_letter = self._col_letter(col_value_ref)
-                    
+
                     # Get pre-investment valuation reference
-                    pre_investment_row = self._find_constant_row(round_idx, 'Pre-investment Valuation:')
+                    pre_investment_row = self._find_constant_row(
+                        round_idx, 'Pre-investment Valuation:')
                     pre_investment_ref = f"{col_letter}{pre_investment_row + 1}" if pre_investment_row is not None else "0"
-                    
+
                     # Price per share = Pre-investment Valuation / Pre-round Shares
                     pps_formula = valuation.create_price_per_share_from_valuation_formula(
                         pre_investment_ref, pre_round_shares_ref
@@ -396,7 +398,8 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                                 self.formats.get('currency'))
 
                 # Register named range
-                round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
+                round_name_key = self._sanitize_excel_name(
+                    round_data.get('name', ''))
                 col_letter = self._col_letter(col_value)
                 price_per_share_cell = f"${col_letter}${current_row + 1}"
                 named_range_name = f"{round_name_key}_PricePerShare"
@@ -408,74 +411,96 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 # Special handling for valuation_based, convertible, and safe rounds
                 if calc_type in ['valuation_based', 'convertible', 'safe']:
                     col_letter = self._col_letter(col_value)
-                    valuation_basis = round_data.get('valuation_basis', 'pre_money')
+                    valuation_basis = round_data.get(
+                        'valuation_basis', 'pre_money')
                     valuation_value = round_data.get('valuation')
-                    investment_total_ref = self._get_round_investment_total_ref(round_idx, round_data)
-                    
+                    investment_total_ref = self._get_round_investment_total_ref(
+                        round_idx, round_data)
+
                     if label == 'Pre-investment Valuation:':
                         if valuation_basis == 'pre_money' and valuation_value is not None:
                             # Direct value
-                            sheet.write(current_row, col_value, valuation_value, self.formats.get('currency'))
+                            sheet.write(
+                                current_row, col_value, valuation_value, self.formats.get('currency'))
                         else:
                             # Calculate: Post-investment - Investment
                             # Reference the Investment field (which is the next row for all types)
-                            post_row = self._find_constant_row(round_idx, 'Post-investment Valuation:')
+                            post_row = self._find_constant_row(
+                                round_idx, 'Post-investment Valuation:')
                             if post_row is None:
                                 post_row = current_row + 2  # Investment is next, Post-investment is after
                             post_ref = f"{col_letter}{post_row + 1}"
                             # Reference the Investment field (next row)
-                            investment_row = self._find_constant_row(round_idx, 'Investment:')
+                            investment_row = self._find_constant_row(
+                                round_idx, 'Investment:')
                             if investment_row is not None:
                                 investment_ref = f"{col_letter}{investment_row + 1}"
                             else:
                                 # Fallback: Investment is the next row after Pre-investment
                                 investment_ref = f"{col_letter}{current_row + 2}"
                             formula = f"={post_ref} - {investment_ref}"
-                            sheet.write_formula(current_row, col_value, formula, self.formats.get('currency'))
+                            sheet.write_formula(
+                                current_row, col_value, formula, self.formats.get('currency'))
                         # Register named range
-                        round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
+                        round_name_key = self._sanitize_excel_name(
+                            round_data.get('name', ''))
                         valuation_cell = f"${col_letter}${current_row + 1}"
                         named_range_name = f"{round_name_key}_PreMoneyValuation"
-                        self.dlm.register_named_range(named_range_name, 'Rounds', current_row, col_value)
-                        self.workbook.define_name(named_range_name, f"'Rounds'!{valuation_cell}")
-                    
+                        self.dlm.register_named_range(
+                            named_range_name, 'Rounds', current_row, col_value)
+                        self.workbook.define_name(
+                            named_range_name, f"'Rounds'!{valuation_cell}")
+
                     elif label == 'Investment:':
                         # For valuation_based: sum of investment amounts from instruments table
                         # For convertible: sum of conversion amounts (includes interest)
                         # For safe: sum of principal (investment_amount) since there's no conversion amount column
                         if calc_type == 'valuation_based':
-                            sheet.write_formula(current_row, col_value, f"={investment_total_ref}", self.formats.get('currency'))
+                            sheet.write_formula(
+                                current_row, col_value, f"={investment_total_ref}", self.formats.get('currency'))
                         elif calc_type == 'convertible':
                             # For convertible, use conversion amount total
-                            conversion_total_ref = self._get_round_conversion_amount_total_ref(round_idx, round_data)
-                            sheet.write_formula(current_row, col_value, f"={conversion_total_ref}", self.formats.get('currency'))
+                            conversion_total_ref = self._get_round_conversion_amount_total_ref(
+                                round_idx, round_data)
+                            sheet.write_formula(
+                                current_row, col_value, f"={conversion_total_ref}", self.formats.get('currency'))
                         else:
                             # For safe, use investment amount total (Principal)
-                            sheet.write_formula(current_row, col_value, f"={investment_total_ref}", self.formats.get('currency'))
-                    
+                            sheet.write_formula(
+                                current_row, col_value, f"={investment_total_ref}", self.formats.get('currency'))
+
                     elif label == 'Post-investment Valuation:':
                         if valuation_basis == 'post_money' and valuation_value is not None:
                             # Direct value
-                            sheet.write(current_row, col_value, valuation_value, self.formats.get('currency'))
+                            sheet.write(
+                                current_row, col_value, valuation_value, self.formats.get('currency'))
                         else:
                             # Calculate: Pre-investment + Investment (or Conversion Amount for convertible/safe)
-                            pre_row = self._find_constant_row(round_idx, 'Pre-investment Valuation:')
+                            pre_row = self._find_constant_row(
+                                round_idx, 'Pre-investment Valuation:')
                             if pre_row is None:
-                                pre_row = current_row - 2  # Pre-investment is 2 rows before (Investment is in between)
+                                # Pre-investment is 2 rows before (Investment is in between)
+                                pre_row = current_row - 2
                             pre_ref = f"{col_letter}{pre_row + 1}"
                             # Get investment/conversion total reference
-                            investment_row = self._find_constant_row(round_idx, 'Investment:')
+                            investment_row = self._find_constant_row(
+                                round_idx, 'Investment:')
                             investment_ref = f"{col_letter}{investment_row + 1}" if investment_row is not None else investment_total_ref
                             formula = f"={pre_ref} + {investment_ref}"
-                            sheet.write_formula(current_row, col_value, formula, self.formats.get('currency'))
+                            sheet.write_formula(
+                                current_row, col_value, formula, self.formats.get('currency'))
                         # Register named range
-                        round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
+                        round_name_key = self._sanitize_excel_name(
+                            round_data.get('name', ''))
                         valuation_cell = f"${col_letter}${current_row + 1}"
                         named_range_name = f"{round_name_key}_PostMoneyValuation"
-                        self.dlm.register_named_range(named_range_name, 'Rounds', current_row, col_value)
-                        self.workbook.define_name(named_range_name, f"'Rounds'!{valuation_cell}")
+                        self.dlm.register_named_range(
+                            named_range_name, 'Rounds', current_row, col_value)
+                        self.workbook.define_name(
+                            named_range_name, f"'Rounds'!{valuation_cell}")
                     else:
-                        sheet.write(current_row, col_value, value or '', self.formats.get(format_type))
+                        sheet.write(current_row, col_value,
+                                    value or '', self.formats.get(format_type))
                 else:
                     # Regular value (for other fields)
                     sheet.write(current_row, col_value, value or '',
@@ -534,7 +559,8 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                        'valuation_cap_type': 5, 'valuation_cap': 6, 'pro_rata': 7, 'shares': 8}
         else:
             headers = ['Holder Name', 'Class Name', 'Pro Rata', 'Shares']
-            col_map = {'holder_name': 0, 'class_name': 1, 'pro_rata': 2, 'shares': 3}
+            col_map = {'holder_name': 0, 'class_name': 1,
+                       'pro_rata': 2, 'shares': 3}
 
         # Write headers (shifted by table_start_col)
         for col_idx, header in enumerate(headers):
@@ -545,7 +571,8 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         # Write instruments
         first_instrument_row = current_row  # Track for shares_issued calculation
         interest_type_rows = []  # Track rows with interest_type for dropdown validation
-        valuation_cap_type_rows = []  # Track rows with valuation_cap_type for dropdown validation
+        # Track rows with valuation_cap_type for dropdown validation
+        valuation_cap_type_rows = []
         for inst_idx, instrument in enumerate(instruments):
             row = current_row
 
@@ -602,11 +629,13 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                     table_start_col + col_map['investment_amount'])
 
                 # Get reference to Pre-investment Valuation constant
-                col_value_ref = self.padding_offset + 3  # Values column (column 4)
+                col_value_ref = self.padding_offset + \
+                    3  # Values column (column 4)
                 col_letter = self._col_letter(col_value_ref)
-                pre_investment_row = self._find_constant_row(round_idx, 'Pre-investment Valuation:')
+                pre_investment_row = self._find_constant_row(
+                    round_idx, 'Pre-investment Valuation:')
                 pre_investment_ref = f"{col_letter}{pre_investment_row + 1}" if pre_investment_row is not None else "0"
-                
+
                 # Formula: investment / pre_investment_valuation * pre_round_shares
                 shares_formula = f"=ROUND(IFERROR(({investment_col}{row + 1} / {pre_investment_ref}) * {pre_round_shares_ref}, 0), 0)"
 
@@ -631,12 +660,14 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                             discount_rate, self.formats.get('table_percent'))
 
                 # Payment Date (use payment_date if available, fallback to interest_start_date for backward compatibility)
-                payment_date = instrument.get('payment_date') or instrument.get('interest_start_date', '')
+                payment_date = instrument.get(
+                    'payment_date') or instrument.get('interest_start_date', '')
                 sheet.write(row, table_start_col + col_map['payment_date'],
                             payment_date, self.formats.get('table_date'))
 
                 # Expected Conversion Date (use expected_conversion_date if available, fallback to interest_end_date)
-                expected_conversion_date = instrument.get('expected_conversion_date') or instrument.get('interest_end_date', '')
+                expected_conversion_date = instrument.get(
+                    'expected_conversion_date') or instrument.get('interest_end_date', '')
                 sheet.write(row, table_start_col + col_map['expected_conversion_date'],
                             expected_conversion_date, self.formats.get('table_date'))
 
@@ -653,7 +684,8 @@ class RoundsSheetGenerator(BaseSheetGenerator):
 
                 # Interest Type
                 interest_type = instrument.get('interest_type', 'simple')
-                interest_type_display = self._format_interest_type(interest_type)
+                interest_type_display = self._format_interest_type(
+                    interest_type)
                 sheet.write(row, table_start_col + col_map['interest_type'],
                             interest_type_display, self.formats.get('text'))
                 # Track this row for dropdown validation
@@ -684,8 +716,10 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                     row, table_start_col + col_map['conversion_amount'], conversion_amount_formula, self.formats.get('table_currency'))
 
                 # Valuation Cap Type (optional per-instrument, default is 'default' which uses round-level cap)
-                valuation_cap_type = instrument.get('valuation_cap_type', 'default')
-                valuation_cap_type_display = self._format_valuation_cap_type(valuation_cap_type)
+                valuation_cap_type = instrument.get(
+                    'valuation_cap_type', 'default')
+                valuation_cap_type_display = self._format_valuation_cap_type(
+                    valuation_cap_type)
                 sheet.write(row, table_start_col + col_map['valuation_cap_type'],
                             valuation_cap_type_display, self.formats.get('text'))
                 # Track this row for dropdown validation
@@ -700,9 +734,10 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 round_pps_ref = None
 
                 # Get round-level valuation cap reference (pre-investment valuation) as fallback
-                pre_investment_row = self._find_constant_row(round_idx, 'Pre-investment Valuation:')
+                pre_investment_row = self._find_constant_row(
+                    round_idx, 'Pre-investment Valuation:')
                 round_valuation_cap_ref = f"{col_letter}{pre_investment_row + 1}" if pre_investment_row is not None else "0"
-                
+
                 # Valuation Cap (optional per-instrument)
                 # If type is 'default', reference round's pre-investment valuation
                 valuation_cap = instrument.get('valuation_cap')
@@ -724,20 +759,24 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                     # Leave empty if no valuation_cap provided and type is not default (validation should catch this)
                     sheet.write(row, table_start_col + col_map['valuation_cap'],
                                 '', self.formats.get('table_currency'))
-                
+
                 # For post_money basis, we need to calculate pre-investment from post-investment
-                valuation_basis = round_data.get('valuation_basis', 'pre_money')
+                valuation_basis = round_data.get(
+                    'valuation_basis', 'pre_money')
                 if valuation_basis == 'post_money':
                     # Pre-investment = Post-investment - Conversion Amount (or Principal for SAFE)
-                    post_investment_row = self._find_constant_row(round_idx, 'Post-investment Valuation:')
+                    post_investment_row = self._find_constant_row(
+                        round_idx, 'Post-investment Valuation:')
                     post_investment_ref = f"{col_letter}{post_investment_row + 1}" if post_investment_row is not None else "0"
                     # For SAFE, use investment amount total (Principal); for convertible, use conversion amount total
                     if calc_type == 'safe':
-                        conversion_total_ref = self._get_round_investment_total_ref(round_idx, round_data)
+                        conversion_total_ref = self._get_round_investment_total_ref(
+                            round_idx, round_data)
                     else:
-                        conversion_total_ref = self._get_round_conversion_amount_total_ref(round_idx, round_data)
+                        conversion_total_ref = self._get_round_conversion_amount_total_ref(
+                            round_idx, round_data)
                     round_valuation_cap_ref = f"({post_investment_ref} - {conversion_total_ref})"
-                
+
                 # Get per-instrument valuation cap reference (if provided, otherwise use round-level)
                 valuation_cap_col = self._col_letter(
                     table_start_col + col_map['valuation_cap'])
@@ -747,11 +786,12 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 # IF(valuation_cap_col is not empty, use per-instrument logic, else use round-level)
                 per_instrument_cap_ref = f"{valuation_cap_col}{row + 1}"
                 per_instrument_cap_type_ref = f"{valuation_cap_type_col}{row + 1}"
-                
+
                 # Get post_money_ref for formula (needed for backward compatibility with formula signature)
-                post_investment_row = self._find_constant_row(round_idx, 'Post-investment Valuation:')
+                post_investment_row = self._find_constant_row(
+                    round_idx, 'Post-investment Valuation:')
                 post_money_ref = f"{col_letter}{post_investment_row + 1}" if post_investment_row is not None else None
-                
+
                 # Get pre-round shares reference
                 pre_round_shares_ref = self._get_pre_round_shares_ref(
                     round_idx, round_data, all_rounds)
@@ -763,26 +803,28 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                     table_start_col + col_map['discount_rate'])
 
                 # Get total conversion amount for current round (needed for post_conversion_total cap type)
-                total_conversion_amount_ref = self._get_round_conversion_amount_total_ref(round_idx, round_data)
+                total_conversion_amount_ref = self._get_round_conversion_amount_total_ref(
+                    round_idx, round_data)
 
                 # Check if round references a future valuation-based round
                 future_round_name = round_data.get('conversion_round_ref')
                 future_round_pps_ref = None
                 future_round_pre_investment_cap_ref = None
-                
+
                 if future_round_name:
                     # Find the referenced round
-                    future_round_result = self._find_round_by_name(future_round_name, all_rounds)
+                    future_round_result = self._find_round_by_name(
+                        future_round_name, all_rounds)
                     if future_round_result:
                         future_round_idx, future_round_data = future_round_result
                         # Verify it's a valuation-based round and comes after the current round
-                        if (future_round_data.get('calculation_type') == 'valuation_based' and 
-                            future_round_idx > round_idx):
+                        if (future_round_data.get('calculation_type') == 'valuation_based' and
+                                future_round_idx > round_idx):
                             # Use named range references for the future round's valuations
                             # Get pre-investment valuation (pre-money valuation of the future round)
                             future_round_pre_investment_cap_ref = self._get_round_valuation_named_ref(
                                 future_round_name, 'PreMoneyValuation')
-                            
+
                             # Get price per share using named range
                             future_round_pps_ref = self._get_round_valuation_named_ref(
                                 future_round_name, 'PricePerShare')
@@ -826,13 +868,16 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                             discount_rate, self.formats.get('table_percent'))
 
                 # Expected Conversion Date
-                expected_conversion_date = instrument.get('expected_conversion_date', '')
+                expected_conversion_date = instrument.get(
+                    'expected_conversion_date', '')
                 sheet.write(row, table_start_col + col_map['expected_conversion_date'],
                             expected_conversion_date, self.formats.get('table_date'))
 
                 # Valuation Cap Type (optional per-instrument, default is 'default' which uses round-level cap)
-                valuation_cap_type = instrument.get('valuation_cap_type', 'default')
-                valuation_cap_type_display = self._format_valuation_cap_type(valuation_cap_type)
+                valuation_cap_type = instrument.get(
+                    'valuation_cap_type', 'default')
+                valuation_cap_type_display = self._format_valuation_cap_type(
+                    valuation_cap_type)
                 sheet.write(row, table_start_col + col_map['valuation_cap_type'],
                             valuation_cap_type_display, self.formats.get('text'))
                 # Track this row for dropdown validation
@@ -847,9 +892,10 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 round_pps_ref = None
 
                 # Get round-level valuation cap reference (pre-investment valuation) as fallback
-                pre_investment_row = self._find_constant_row(round_idx, 'Pre-investment Valuation:')
+                pre_investment_row = self._find_constant_row(
+                    round_idx, 'Pre-investment Valuation:')
                 round_valuation_cap_ref = f"{col_letter}{pre_investment_row + 1}" if pre_investment_row is not None else "0"
-                
+
                 # Valuation Cap (optional per-instrument)
                 # If type is 'default', reference round's pre-investment valuation
                 valuation_cap = instrument.get('valuation_cap')
@@ -871,20 +917,24 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                     # Leave empty if no valuation_cap provided and type is not default (validation should catch this)
                     sheet.write(row, table_start_col + col_map['valuation_cap'],
                                 '', self.formats.get('table_currency'))
-                
+
                 # For post_money basis, we need to calculate pre-investment from post-investment
-                valuation_basis = round_data.get('valuation_basis', 'pre_money')
+                valuation_basis = round_data.get(
+                    'valuation_basis', 'pre_money')
                 if valuation_basis == 'post_money':
                     # Pre-investment = Post-investment - Conversion Amount (or Principal for SAFE)
-                    post_investment_row = self._find_constant_row(round_idx, 'Post-investment Valuation:')
+                    post_investment_row = self._find_constant_row(
+                        round_idx, 'Post-investment Valuation:')
                     post_investment_ref = f"{col_letter}{post_investment_row + 1}" if post_investment_row is not None else "0"
                     # For SAFE, use investment amount total (Principal); for convertible, use conversion amount total
                     if calc_type == 'safe':
-                        conversion_total_ref = self._get_round_investment_total_ref(round_idx, round_data)
+                        conversion_total_ref = self._get_round_investment_total_ref(
+                            round_idx, round_data)
                     else:
-                        conversion_total_ref = self._get_round_conversion_amount_total_ref(round_idx, round_data)
+                        conversion_total_ref = self._get_round_conversion_amount_total_ref(
+                            round_idx, round_data)
                     round_valuation_cap_ref = f"({post_investment_ref} - {conversion_total_ref})"
-                
+
                 # Get per-instrument valuation cap reference (if provided, otherwise use round-level)
                 valuation_cap_col = self._col_letter(
                     table_start_col + col_map['valuation_cap'])
@@ -894,11 +944,12 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 # IF(valuation_cap_col is not empty, use per-instrument logic, else use round-level)
                 per_instrument_cap_ref = f"{valuation_cap_col}{row + 1}"
                 per_instrument_cap_type_ref = f"{valuation_cap_type_col}{row + 1}"
-                
+
                 # Get post_money_ref for formula (needed for backward compatibility with formula signature)
-                post_investment_row = self._find_constant_row(round_idx, 'Post-investment Valuation:')
+                post_investment_row = self._find_constant_row(
+                    round_idx, 'Post-investment Valuation:')
                 post_money_ref = f"{col_letter}{post_investment_row + 1}" if post_investment_row is not None else None
-                
+
                 # Get pre-round shares reference
                 pre_round_shares_ref = self._get_pre_round_shares_ref(
                     round_idx, round_data, all_rounds)
@@ -912,26 +963,28 @@ class RoundsSheetGenerator(BaseSheetGenerator):
 
                 # Get total conversion amount for current round (needed for post_conversion_total cap type)
                 # For SAFE, this is the sum of Principal (investment_amount)
-                total_conversion_amount_ref = self._get_round_investment_total_ref(round_idx, round_data)
+                total_conversion_amount_ref = self._get_round_investment_total_ref(
+                    round_idx, round_data)
 
                 # Check if round references a future valuation-based round
                 future_round_name = round_data.get('conversion_round_ref')
                 future_round_pps_ref = None
                 future_round_pre_investment_cap_ref = None
-                
+
                 if future_round_name:
                     # Find the referenced round
-                    future_round_result = self._find_round_by_name(future_round_name, all_rounds)
+                    future_round_result = self._find_round_by_name(
+                        future_round_name, all_rounds)
                     if future_round_result:
                         future_round_idx, future_round_data = future_round_result
                         # Verify it's a valuation-based round and comes after the current round
-                        if (future_round_data.get('calculation_type') == 'valuation_based' and 
-                            future_round_idx > round_idx):
+                        if (future_round_data.get('calculation_type') == 'valuation_based' and
+                                future_round_idx > round_idx):
                             # Use named range references for the future round's valuations
                             # Get pre-investment valuation (pre-money valuation of the future round)
                             future_round_pre_investment_cap_ref = self._get_round_valuation_named_ref(
                                 future_round_name, 'PreMoneyValuation')
-                            
+
                             # Get price per share using named range
                             future_round_pps_ref = self._get_round_valuation_named_ref(
                                 future_round_name, 'PricePerShare')
@@ -968,7 +1021,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
             # Write merged Pro Rata column (type and percentage combined)
             pro_rata_rights = instrument.get('pro_rata_rights')
             pro_rata_percentage = instrument.get('pro_rata_percentage')
-            
+
             if pro_rata_rights:
                 # Format: "Standard (5%)" or "Super (10%)" or just "Standard" if no percentage
                 type_label = pro_rata_rights.capitalize()
@@ -1010,10 +1063,11 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                     'error_message': 'Please select a valid interest type from the dropdown.'
                 }
             )
-        
+
         # Add dropdown validation to valuation_cap_type column for convertible and SAFE instruments
         if calc_type in ['convertible', 'safe'] and valuation_cap_type_rows:
-            valuation_cap_type_col = table_start_col + col_map['valuation_cap_type']
+            valuation_cap_type_col = table_start_col + \
+                col_map['valuation_cap_type']
             first_row = min(valuation_cap_type_rows)
             last_row = max(valuation_cap_type_rows)
             # Create dropdown with valid valuation cap type options (human-friendly format)
@@ -1022,7 +1076,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 last_row, valuation_cap_type_col,
                 {
                     'validate': 'list',
-                    'source': ['Default', 'Pre-conversion', 'Post-conversion (own investment)', 'Post-conversion (total investment)'],
+                    'source': ['Pre-conversion', 'Post-conversion (own investment)', 'Post-conversion (total investment)'],
                     'error_type': 'stop',
                     'error_title': 'Invalid Valuation Cap Type',
                     'error_message': 'Please select a valid valuation cap type from the dropdown.'
@@ -1131,19 +1185,19 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         """
         Get Excel reference for holder's current shares before this round.
         Uses SUMIF to get the holder's total shares from the previous round in Cap Table.
-        
+
         Args:
             round_idx: Current round index
             holder_name: Name of the holder
             all_rounds: List of all rounds data
-            
+
         Returns:
             Excel formula string that references holder's current shares
         """
         if round_idx == 0:
             # First round - no previous shares
             return "0"
-        
+
         # Get the previous round's total column in progression sheet
         # Each round has 4 columns: Start, New, Total, %
         # Total is 2 columns after Start
@@ -1151,17 +1205,17 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         prev_round_idx = round_idx - 1
         prev_round_total_col_idx = 2 + (prev_round_idx * 5) + 4
         prev_round_total_col = self._col_letter(prev_round_total_col_idx)
-        
+
         # Holder names are in column B (padding_offset + 1 = column 2, which is B)
         holder_name_col = self._col_letter(self.padding_offset + 1)
-        
+
         # Use SUMIF to match holder name and get their total from previous round
         # Format: SUMIF('Cap Table'!B:B, holder_name, 'Cap Table'!<col>:<col>)
         holder_name_escaped = f'"{holder_name}"'
         progression_sheet = "'Cap Table'"
         holder_range = f"{progression_sheet}!{holder_name_col}:{holder_name_col}"
         total_range = f"{progression_sheet}!{prev_round_total_col}:{prev_round_total_col}"
-        
+
         return f"IFERROR(SUMIF({holder_range}, {holder_name_escaped}, {total_range}), 0)"
 
     def _get_pro_rata_total_ref(self, round_idx: int, round_data: Dict[str, Any],
@@ -1182,7 +1236,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
             return f"SUM({table_name}[[#All],[Principal]])"
         else:
             return f"SUM({table_name}[[#All],[Investment Amount]])"
-    
+
     def _get_round_conversion_amount_total_ref(self, round_idx: int, round_data: Dict[str, Any]) -> str:
         """Return an Excel SUM over this round's Conversion Amount column using table structured refs.
         Used for convertible/SAFE rounds where we need to account for interest in valuation calculations."""
@@ -1198,11 +1252,11 @@ class RoundsSheetGenerator(BaseSheetGenerator):
     def _find_round_by_name(self, round_name: str, all_rounds: List[Dict[str, Any]]) -> Optional[tuple[int, Dict[str, Any]]]:
         """
         Find a round by name in the all_rounds list.
-        
+
         Args:
             round_name: Name of the round to find
             all_rounds: List of all rounds data
-            
+
         Returns:
             Tuple of (round_idx, round_data) if found, None otherwise
         """
@@ -1214,11 +1268,11 @@ class RoundsSheetGenerator(BaseSheetGenerator):
     def _get_round_valuation_named_ref(self, round_name: str, valuation_type: str) -> str:
         """
         Get a named range reference for a round's valuation constant.
-        
+
         Args:
             round_name: Name of the round
             valuation_type: Either 'PreMoneyValuation' or 'PostMoneyValuation'
-            
+
         Returns:
             Named range reference string (e.g., 'RoundName_PreMoneyValuation')
         """
@@ -1228,11 +1282,14 @@ class RoundsSheetGenerator(BaseSheetGenerator):
     def _get_shares_column_index(self, calc_type: str) -> int:
         """Get the column index (within table) for shares based on calculation type."""
         if calc_type == 'fixed_shares':
-            return 3  # Holder Name, Class Name, Pro Rata, Shares (0-indexed: 3)
+            # Holder Name, Class Name, Pro Rata, Shares (0-indexed: 3)
+            return 3
         elif calc_type == 'target_percentage':
-            return 4  # Holder Name, Class Name, Target %, Pro Rata, Shares (0-indexed: 4)
+            # Holder Name, Class Name, Target %, Pro Rata, Shares (0-indexed: 4)
+            return 4
         elif calc_type == 'valuation_based':
-            return 4  # Holder Name, Class Name, Investment Amount, Pro Rata, Shares (0-indexed: 4)
+            # Holder Name, Class Name, Investment Amount, Pro Rata, Shares (0-indexed: 4)
+            return 4
         elif calc_type == 'convertible':
             return 14  # ... Pro Rata, Shares (0-indexed: 14)
         elif calc_type == 'safe':

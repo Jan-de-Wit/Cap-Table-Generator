@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { RoundForm } from "@/components/round-form";
 import { Sidebar } from "@/components/sidebar";
 import { HolderDialog } from "@/components/holder-dialog";
+import { JsonImportDialog } from "@/components/json-import-dialog";
 import {
   Plus,
   Sparkles,
@@ -17,6 +18,7 @@ import {
   AlertCircle,
   FileText,
   Users,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -34,6 +36,7 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [editingHolder, setEditingHolder] = React.useState<Holder | null>(null);
   const [holderDialogOpen, setHolderDialogOpen] = React.useState(false);
+  const [jsonImportDialogOpen, setJsonImportDialogOpen] = React.useState(false);
   const [selectedRoundIndex, setSelectedRoundIndex] = React.useState<
     number | null
   >(null);
@@ -520,6 +523,29 @@ export default function Home() {
     });
   };
 
+  const handleImportJson = (data: CapTableData) => {
+    // Validate that we're importing into an empty state
+    if (rounds.length > 0 || holders.length > 0) {
+      toast.error("Cannot import JSON", {
+        description: "Please clear existing data before importing.",
+      });
+      return;
+    }
+
+    // Set the imported data
+    setHolders(data.holders || []);
+    setRounds(data.rounds || []);
+
+    // Select the first round if available
+    if (data.rounds && data.rounds.length > 0) {
+      setSelectedRoundIndex(0);
+    }
+
+    toast.success("JSON imported successfully", {
+      description: `Imported ${data.rounds?.length || 0} rounds and ${data.holders?.length || 0} holders.`,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background flex">
       <div className="flex-1 overflow-auto">
@@ -699,14 +725,25 @@ export default function Home() {
                         instruments, and pro-rata allocations.
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      onClick={addRound}
-                      className="mt-2 w-fit"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Round
-                    </Button>
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        type="button"
+                        onClick={addRound}
+                        className="w-fit"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Round
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setJsonImportDialogOpen(true)}
+                        className="w-fit"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Import JSON
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -787,6 +824,11 @@ export default function Home() {
         existingHolders={holders}
         onSave={handleSaveHolder}
         usedGroups={usedGroups}
+      />
+      <JsonImportDialog
+        open={jsonImportDialogOpen}
+        onOpenChange={setJsonImportDialogOpen}
+        onImport={handleImportJson}
       />
     </div>
   );

@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useEffect, useRef } from "react";
+import Lenis from "lenis";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -103,6 +105,9 @@ export function RoundInstrumentsSection({
     React.useState<VisibilityState>({});
   const [isScrollable, setIsScrollable] = React.useState(false);
   const tableContainerRef = React.useRef<HTMLDivElement>(null);
+  const lenisWrapperRef = useRef<HTMLDivElement>(null);
+  const lenisContentRef = useRef<HTMLDivElement>(null);
+  const lenisRef = useRef<Lenis | null>(null);
 
   const getInstrumentFieldValue = (
     instrument: Instrument,
@@ -729,6 +734,43 @@ export function RoundInstrumentsSection({
     };
   }, [tableData, columnVisibility]);
 
+  // Initialize Lenis for smooth horizontal scrolling
+  useEffect(() => {
+    if (!lenisWrapperRef.current || !lenisContentRef.current) return;
+
+    const lenis = new Lenis({
+      wrapper: lenisWrapperRef.current,
+      content: lenisContentRef.current,
+      lerp: 0.05,
+      duration: 1.2,
+      smoothWheel: true,
+      syncTouch: false,
+      touchMultiplier: 2,
+      wheelMultiplier: 1,
+      infinite: false,
+      autoResize: true,
+      orientation: "horizontal",
+      gestureOrientation: "horizontal",
+      anchors: false,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+    });
+
+    // Store lenis instance in ref
+    lenisRef.current = lenis;
+
+    function raf(time: number) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+
+    requestAnimationFrame(raf);
+
+    return () => {
+      lenis.destroy();
+      lenisRef.current = null;
+    };
+  }, [tableData, columnVisibility]);
+
   return (
     <div className="space-y-4">
       {regularInstruments.length === 0 ? (
@@ -815,12 +857,19 @@ export function RoundInstrumentsSection({
             </Button>
           </div>
           <div
-            ref={tableContainerRef}
-            className={`rounded-md border border-border/50 overflow-x-auto w-full relative`}
+            ref={lenisWrapperRef}
+            className="rounded-md border border-border/50 overflow-hidden w-full relative"
           >
             {isScrollable && (
               <div className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none bg-gradient-to-l from-background to-transparent z-10" />
             )}
+            <div
+              ref={(node) => {
+                lenisContentRef.current = node;
+                tableContainerRef.current = node;
+              }}
+              style={{ display: "inline-block", minWidth: "100%" }}
+            >
             <Table className="min-w-full">
               <TableHeader style={{ padding: 0, margin: 0 }}>
                 {table.getHeaderGroups().map((headerGroup) => (
@@ -959,6 +1008,7 @@ export function RoundInstrumentsSection({
                 })}
               </TableBody>
             </Table>
+            </div>
           </div>
         </div>
       )}
