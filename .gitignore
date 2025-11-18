@@ -50,3 +50,4 @@ test_*.xlsx
 # Except sample data
 !sample_simple_captable.json
 !sample_complex_captable.json
+.vercel

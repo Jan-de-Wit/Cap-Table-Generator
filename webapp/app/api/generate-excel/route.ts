@@ -7,14 +7,14 @@ import { tmpdir } from "os";
 
 /**
  * Next.js API route that generates Excel files.
- * 
+ *
  * In development/local environments: Uses spawn to call local Python script directly
  * In production/Vercel: Calls Python serverless function via HTTP
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Check if we're in development/non-production environment
-  const isDevelopment = 
-    process.env.NODE_ENV === "development" || 
+  const isDevelopment =
+    process.env.NODE_ENV === "development" ||
     !process.env.VERCEL ||
     process.env.VERCEL_ENV === "development" ||
     process.env.VERCEL_ENV === "preview";
@@ -23,6 +23,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Use local Python instance for development
     return generateExcelLocal(request);
   } else {
+    console.log("Using serverless function for production");
     // Use serverless function for production
     return generateExcelServerless(request);
   }
@@ -31,9 +32,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 /**
  * Generate Excel using local Python script (development mode)
  */
-async function generateExcelLocal(
-  request: NextRequest
-): Promise<NextResponse> {
+async function generateExcelLocal(request: NextRequest): Promise<NextResponse> {
   let jsonPath: string | null = null;
   let excelPath: string | null = null;
 
@@ -113,7 +112,9 @@ async function generateExcelLocal(
             console.error("Python stderr:", errorOutput);
             reject(
               new Error(
-                `Python script failed with code ${code}: ${errorOutput || stdoutOutput || "Unknown error"}`
+                `Python script failed with code ${code}: ${
+                  errorOutput || stdoutOutput || "Unknown error"
+                }`
               )
             );
             return;
@@ -180,17 +181,23 @@ async function generateExcelServerless(
   try {
     const data = await request.json();
 
+    console.log("Running serverless function for production");
+    console.log("Data:", data);
+
+    console.log("Environment variables:", process.env);
+
     // Determine the Python function URL
     // On Vercel, serverless functions are accessible via relative paths
     // The Python function will be at /api/generate-excel-python
     // We need to construct an absolute URL for Node.js fetch()
-    const baseUrl = 
-      process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}`
-        : request.headers.get("host")
-        ? `${request.headers.get("x-forwarded-proto") || "https"}://${request.headers.get("host")}`
-        : "http://localhost:3000";
-    
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : request.headers.get("host")
+      ? `${
+          request.headers.get("x-forwarded-proto") || "https"
+        }://${request.headers.get("host")}`
+      : "http://localhost:3000";
+
     const pythonFunctionUrl = `${baseUrl}/api/generate-excel-python`;
 
     console.log("Using serverless Python function (production mode)");
@@ -207,6 +214,7 @@ async function generateExcelServerless(
       }),
     });
 
+    console.log("Response:", response);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({
         error: "Unknown error",
@@ -219,6 +227,7 @@ async function generateExcelServerless(
     }
 
     const result = await response.json();
+    console.log("Result:", result);
 
     if (!result.success || !result.excel) {
       return NextResponse.json(
@@ -235,7 +244,9 @@ async function generateExcelServerless(
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${result.filename || "cap-table.xlsx"}"`,
+        "Content-Disposition": `attachment; filename="${
+          result.filename || "cap-table.xlsx"
+        }"`,
       },
     });
   } catch (error) {
@@ -246,4 +257,3 @@ async function generateExcelServerless(
     );
   }
 }
-
