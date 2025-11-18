@@ -202,6 +202,32 @@ export function RoundInstrumentsSection({
         ? `${decimalToPercentage(instrument.pro_rata_percentage).toFixed(2)}%`
         : "—";
     }
+    if (field === "pro_rata") {
+      // Merged pro rata type and percentage
+      const hasRights = "pro_rata_rights" in instrument && instrument.pro_rata_rights;
+      const percentage = "pro_rata_percentage" in instrument && instrument.pro_rata_percentage !== undefined
+        ? instrument.pro_rata_percentage
+        : undefined;
+      
+      if (!hasRights) {
+        return <span className="text-muted-foreground text-sm">None</span>;
+      }
+      
+      const rights = instrument.pro_rata_rights;
+      const typeLabel = rights === "super" ? "Super" : "Standard";
+      const percentageLabel = percentage !== undefined
+        ? ` (${decimalToPercentage(percentage).toFixed(2)}%)`
+        : "";
+      
+      return (
+        <Badge
+          variant={rights === "super" ? "default" : "outline"}
+          className="text-xs"
+        >
+          {typeLabel}{percentageLabel}
+        </Badge>
+      );
+    }
     return "—";
   };
 
@@ -316,30 +342,16 @@ export function RoundInstrumentsSection({
             ),
           },
           {
-            accessorKey: "pro_rata_rights",
+            accessorKey: "pro_rata",
             header: () => (
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-                Pro-Rata Rights
-              </div>
-            ),
-            cell: ({ row }) => (
-              <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "pro_rata_rights")}
-              </span>
-            ),
-          },
-          {
-            accessorKey: "pro_rata_percentage",
-            header: () => (
-              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
                 Pro-Rata
               </div>
             ),
             cell: ({ row }) => (
               <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "pro_rata_percentage")}
+                {getInstrumentFieldValue(row.original, "pro_rata")}
               </span>
             ),
           },
@@ -362,30 +374,16 @@ export function RoundInstrumentsSection({
             ),
           },
           {
-            accessorKey: "pro_rata_rights",
+            accessorKey: "pro_rata",
             header: () => (
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-                Pro-Rata Rights
+                Pro-Rata
               </div>
             ),
             cell: ({ row }) => (
               <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "pro_rata_rights")}
-              </span>
-            ),
-          },
-          {
-            accessorKey: "pro_rata_percentage",
-            header: () => (
-              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-                Pro-Rata %
-              </div>
-            ),
-            cell: ({ row }) => (
-              <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "pro_rata_percentage")}
+                {getInstrumentFieldValue(row.original, "pro_rata")}
               </span>
             ),
           },
@@ -408,30 +406,16 @@ export function RoundInstrumentsSection({
             ),
           },
           {
-            accessorKey: "pro_rata_rights",
+            accessorKey: "pro_rata",
             header: () => (
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-                Pro-Rata Rights
+                Pro-Rata
               </div>
             ),
             cell: ({ row }) => (
               <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "pro_rata_rights")}
-              </span>
-            ),
-          },
-          {
-            accessorKey: "pro_rata_percentage",
-            header: () => (
-              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-                Pro-Rata %
-              </div>
-            ),
-            cell: ({ row }) => (
-              <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "pro_rata_percentage")}
+                {getInstrumentFieldValue(row.original, "pro_rata")}
               </span>
             ),
           },
@@ -555,30 +539,16 @@ export function RoundInstrumentsSection({
             ),
           },
           {
-            accessorKey: "pro_rata_rights",
+            accessorKey: "pro_rata",
             header: () => (
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-                Pro-Rata Rights
+                Pro-Rata
               </div>
             ),
             cell: ({ row }) => (
               <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "pro_rata_rights")}
-              </span>
-            ),
-          },
-          {
-            accessorKey: "pro_rata_percentage",
-            header: () => (
-              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-                Pro-Rata %
-              </div>
-            ),
-            cell: ({ row }) => (
-              <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "pro_rata_percentage")}
+                {getInstrumentFieldValue(row.original, "pro_rata")}
               </span>
             ),
           },
@@ -660,30 +630,16 @@ export function RoundInstrumentsSection({
             ),
           },
           {
-            accessorKey: "pro_rata_rights",
+            accessorKey: "pro_rata",
             header: () => (
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-                Pro-Rata Rights
+                Pro-Rata
               </div>
             ),
             cell: ({ row }) => (
               <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "pro_rata_rights")}
-              </span>
-            ),
-          },
-          {
-            accessorKey: "pro_rata_percentage",
-            header: () => (
-              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-                Pro-Rata %
-              </div>
-            ),
-            cell: ({ row }) => (
-              <span className="text-sm">
-                {getInstrumentFieldValue(row.original, "pro_rata_percentage")}
+                {getInstrumentFieldValue(row.original, "pro_rata")}
               </span>
             ),
           },
@@ -821,11 +777,7 @@ export function RoundInstrumentsSection({
                         discount_rate: "Discount",
                         valuation_cap: "Valuation Cap",
                         valuation_cap_type: "Cap Type",
-                        pro_rata_rights: "Pro-Rata Rights",
-                        pro_rata_percentage:
-                          calculationType === "fixed_shares"
-                            ? "Pro-Rata"
-                            : "Pro-Rata %",
+                        pro_rata: "Pro-Rata",
                       };
                       const displayName =
                         headerNameMap[column.id] ||

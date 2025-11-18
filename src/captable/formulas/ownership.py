@@ -44,12 +44,12 @@ def create_pro_rata_shares_formula(
     sum_current_shares_ref: str = "0",
 ) -> str:
     """
-    Create a pro rata shares calculation formula.
+    Create a Pro-rata Shares calculation formula without LET for simplicity.
 
     This solves for final total shares T such that:
       - For each participant i: final_i / T = p_i (their target percentage)
 
-    Let:
+    Variables:
       P = pre_round_shares
       B = shares_issued (base round shares before pro rata)
       R = sum of pro rata percentages
@@ -72,9 +72,32 @@ def create_pro_rata_shares_formula(
     Returns:
         Excel formula string computing shares to purchase for the participant
     """
+    # Calculate numerator: (pre_round_shares + shares_issued - sum_current_shares)
     numerator = f"({pre_round_shares_ref} + {shares_issued_ref} - {sum_current_shares_ref})"
+    
+    # Calculate denominator: (1 - sum_pro_rata_pct)
     denominator = f"(1 - {sum_pro_rata_pct_ref})"
-    total_shares = f"({numerator} * IFERROR(1 / {denominator}, 0))"
+    
+    # Calculate total shares after pro rata: numerator / denominator
+    # Formula: T = (P + B - C) / (1 - R)
+    total_shares = f"IFERROR({numerator} / {denominator}, 0)"
+    
+    # Calculate target shares for this participant: target_pct * total_shares
+    # Formula: targetShares = p_k * T
     target_shares = f"({participant_target_pct_ref} * {total_shares})"
+    
+    # Calculate shares to purchase: target_shares - current_shares
+    # Formula: sharesToPurchase = targetShares - current_k
     shares_to_purchase = f"({target_shares} - {holder_current_shares_ref})"
-    return f"=IFERROR(MAX(0, {shares_to_purchase}), 0)"
+    
+    # Final result: max(0, shares_to_purchase) to ensure non-negative
+    # Formula: MAX(0, sharesToPurchase) with error handling
+    result = f"IFERROR(MAX(0, {shares_to_purchase}), 0)"
+    
+    # Format formula with line breaks and indentation for readability
+    # Excel will accept formulas with whitespace/newlines
+    formula = (
+        f"={result}"
+    )
+    
+    return formula

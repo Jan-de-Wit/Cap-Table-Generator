@@ -34,7 +34,12 @@
     "ProRataAllocation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["holder_name", "class_name", "pro_rata_type", "exercise_type"],
+      "required": [
+        "holder_name",
+        "class_name",
+        "pro_rata_type",
+        "exercise_type"
+      ],
       "properties": {
         "holder_name": {
           "type": "string",
@@ -111,6 +116,17 @@
           "type": "number",
           "minimum": 0,
           "description": "Number of shares"
+        },
+        "pro_rata_rights": {
+          "type": "string",
+          "enum": ["standard", "super"],
+          "description": "Optional pro-rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
         }
       }
     },
@@ -132,6 +148,17 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Target ownership percentage (as decimal, e.g., 0.20 for 20%)"
+        },
+        "pro_rata_rights": {
+          "type": "string",
+          "enum": ["standard", "super"],
+          "description": "Optional pro-rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
         }
       }
     },
@@ -152,13 +179,33 @@
           "type": "number",
           "minimum": 0,
           "description": "Investment amount"
+        },
+        "pro_rata_rights": {
+          "type": "string",
+          "enum": ["standard", "super"],
+          "description": "Optional pro-rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
         }
       }
     },
     "ConvertibleInstrument": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["holder_name", "class_name", "investment_amount", "interest_rate", "payment_date", "expected_conversion_date", "interest_type", "discount_rate"],
+      "required": [
+        "holder_name",
+        "class_name",
+        "investment_amount",
+        "interest_rate",
+        "payment_date",
+        "expected_conversion_date",
+        "interest_type",
+        "discount_rate"
+      ],
       "properties": {
         "holder_name": {
           "type": "string",
@@ -191,7 +238,13 @@
         },
         "interest_type": {
           "type": "string",
-          "enum": ["simple", "compound_yearly", "compound_monthly", "compound_daily", "no_interest"],
+          "enum": [
+            "simple",
+            "compound_yearly",
+            "compound_monthly",
+            "compound_daily",
+            "no_interest"
+          ],
           "description": "Type of interest calculation"
         },
         "discount_rate": {
@@ -217,15 +270,37 @@
         },
         "valuation_cap_type": {
           "type": "string",
-          "enum": ["default", "pre_conversion", "post_conversion_own", "post_conversion_total"],
+          "enum": [
+            "default",
+            "pre_conversion",
+            "post_conversion_own",
+            "post_conversion_total"
+          ],
           "description": "Type of valuation cap: 'default' uses the round's pre-investment valuation (default option), 'pre_conversion' uses cap directly, 'post_conversion_own' subtracts only own conversion amount, 'post_conversion_total' subtracts round's total conversion amount."
+        },
+        "pro_rata_rights": {
+          "type": "string",
+          "enum": ["standard", "super"],
+          "description": "Optional pro-rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
         }
       }
     },
     "SafeInstrument": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["holder_name", "class_name", "investment_amount", "expected_conversion_date", "discount_rate"],
+      "required": [
+        "holder_name",
+        "class_name",
+        "investment_amount",
+        "expected_conversion_date",
+        "discount_rate"
+      ],
       "properties": {
         "holder_name": {
           "type": "string",
@@ -258,10 +333,36 @@
         },
         "valuation_cap_type": {
           "type": "string",
-          "enum": ["default", "pre_conversion", "post_conversion_own", "post_conversion_total"],
+          "enum": [
+            "default",
+            "pre_conversion",
+            "post_conversion_own",
+            "post_conversion_total"
+          ],
           "description": "Type of valuation cap: 'default' uses the round's pre-investment valuation (default option), 'pre_conversion' uses cap directly, 'post_conversion_own' subtracts only own conversion amount, 'post_conversion_total' subtracts round's total conversion amount."
+        },
+        "pro_rata_rights": {
+          "type": "string",
+          "enum": ["standard", "super"],
+          "description": "Optional pro-rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "pro_rata_rights": { "const": "super" } }
+          },
+          "then": {
+            "required": ["pro_rata_percentage"]
+          }
+        }
+      ]
     },
     "Holder": {
       "type": "object",
@@ -345,7 +446,9 @@
         },
         {
           "if": {
-            "properties": { "calculation_type": { "const": "target_percentage" } }
+            "properties": {
+              "calculation_type": { "const": "target_percentage" }
+            }
           },
           "then": {
             "properties": {

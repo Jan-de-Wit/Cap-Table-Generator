@@ -416,7 +416,7 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             sheet.write_formula(row, start_col, f"={prev_cell}", self.formats.get('table_number'))
         
         # NEW: Sum shares for this holder in this round
-        # Includes base shares from Rounds sheet + pro rata shares from Pro Rata Allocations sheet
+        # Includes base shares from Rounds sheet + Pro-rata Shares from Pro Rata Allocations sheet
         if round_idx in self.round_ranges:
             range_info = self.round_ranges[round_idx]
             table_name = range_info.get('table_name')
@@ -442,14 +442,14 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             holder_name_escaped = f'"{holder_name}"'
             rounds_shares = f'SUMIF(Rounds!A:A, {holder_name_escaped}, Rounds!{shares_col_letter}:{shares_col_letter})'
         
-        # Get pro rata shares from Pro Rata Allocations sheet
+        # Get Pro-rata Shares from Pro Rata Allocations sheet
         # Pro rata sheet has same row structure (holders in same order)
-        # Each round has columns: Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount, Separator
-        # Pro Rata Shares is 2 columns after the start of each round section
+        # Each round has columns: Pro Rata Type, Pro Rata %, Pro-rata Shares, Price Per Share, Investment Amount, Separator
+        # Pro-rata Shares is 2 columns after the start of each round section
         pro_rata_start_col = self._get_pro_rata_shares_col(round_idx, rounds)
         pro_rata_shares = f"'Pro Rata Allocations'!{pro_rata_start_col}{row + 1}"
         
-        # Total new shares = rounds sheet shares + pro rata shares
+        # Total new shares = rounds sheet shares + Pro-rata Shares
         new_formula = f'=ROUND({rounds_shares} + {pro_rata_shares}, 0)'
         sheet.write_formula(row, new_col, new_formula, self.formats.get('table_number'))
         
@@ -497,18 +497,18 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
             return 'D'  # Default to column D
     
     def _get_pro_rata_shares_col(self, round_idx: int, rounds: List[Dict[str, Any]]) -> str:
-        """Get the column letter for pro rata shares in Pro Rata Allocations sheet."""
+        """Get the column letter for Pro-rata Shares in Pro Rata Allocations sheet."""
         # Pro Rata Allocations sheet structure (with padding):
         # Column 0: Outer padding
         # Column 1: Inner padding (border_start_col)
         # Column 2: Shareholders (padding_offset + 1)
         # Column 3: Description (padding_offset + 2)
-        # Each round: Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount, Separator
-        # Pro Rata Shares is 2 columns after the start of each round
-        # Start of round: padding_offset + 1 + 2 + (round_idx * 6)
-        # Pro Rata Shares: padding_offset + 1 + 2 + (round_idx * 6) + 2
+        # Each round: Pro Rata Type, Pro Rata %, Effective %, Exercise Type, Partial Amount, Partial %, Pro-rata Shares, Price Per Share, Investment Amount, Separator
+        # Pro-rata Shares is 6 columns after the start of each round
+        # Start of round: padding_offset + 1 + 2 + (round_idx * 10)
+        # Pro-rata Shares: padding_offset + 1 + 2 + (round_idx * 10) + 6
         padding_offset = 1  # Pro Rata sheet has padding_offset = 1
-        col_idx = padding_offset + 1 + 2 + (round_idx * 6) + 2
+        col_idx = padding_offset + 1 + 2 + (round_idx * 10) + 6
         return self._col_letter(col_idx)
     
     def _get_shares_header(self, calc_type: str) -> str:

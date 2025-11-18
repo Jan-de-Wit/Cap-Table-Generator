@@ -18,6 +18,7 @@ class BusinessRulesValidator:
     - Instrument completeness based on round calculation type
     - Valuation data requirements for calculated rounds
     - Interest date validation
+    - Pro-rata allocation validation (exercise type, partial exercise requirements)
     """
     
     def validate(self, data: Dict[str, Any]) -> List[str]:
@@ -37,6 +38,7 @@ class BusinessRulesValidator:
         errors.extend(self._validate_instrument_completeness(data))
         errors.extend(self._validate_valuation_requirements(data))
         errors.extend(self._validate_interest_dates(data))
+        errors.extend(self._validate_pro_rata_allocations(data))
         
         return errors
     
@@ -133,7 +135,10 @@ class BusinessRulesValidator:
             return False
         
         # Check that it only has the allowed fields for pro rata allocations
-        allowed_fields = {"holder_name", "class_name", "pro_rata_type", "pro_rata_percentage"}
+        allowed_fields = {
+            "holder_name", "class_name", "pro_rata_type", "pro_rata_percentage",
+            "exercise_type", "partial_exercise_amount", "partial_exercise_percentage"
+        }
         instrument_fields = set(instrument.keys())
         
         # If the instrument has any fields beyond the allowed ones, it's not just a pro rata allocation
@@ -180,6 +185,16 @@ class BusinessRulesValidator:
                 # Skip validation for pro rata allocations
                 if self._is_pro_rata_allocation(instrument):
                     continue
+                
+                # Validate pro_rata_rights if present on regular instruments
+                pro_rata_rights = instrument.get("pro_rata_rights")
+                if pro_rata_rights == "super":
+                    pro_rata_percentage = instrument.get("pro_rata_percentage")
+                    if not pro_rata_percentage or pro_rata_percentage <= 0 or pro_rata_percentage >= 1:
+                        errors.append(
+                            f"Round '{round_name}', Instrument {inst_idx} ({holder_name}/{class_name}): "
+                            f"pro_rata_percentage must be greater than 0 and less than 100% when pro_rata_rights is 'super'"
+                        )
                 
                 # Validate based on calculation type
                 if calc_type == "fixed_shares":
@@ -337,6 +352,113 @@ class BusinessRulesValidator:
                         except ValueError:
                             # Date format errors will be caught by schema validation
                             pass
+        
+        return errors
+    
+    def _validate_pro_rata_allocations(self, data: Dict[str, Any]) -> List[str]:
+        """
+        Validate pro-rata allocation fields and exercise type requirements.
+        
+        Validates:
+        - exercise_type must be "full" or "partial"
+        - For "full" exercise: partial_exercise_amount and partial_exercise_percentage should not be provided
+        - For "partial" exercise: at least one of partial_exercise_amount or partial_exercise_percentage must be provided
+        - If partial_exercise_amount is provided, the round must have a valuation
+        
+        Args:
+            data: Cap table JSON data
+            
+        Returns:
+            List of error messages
+        """
+        errors = []
+        rounds = data.get("rounds", [])
+        
+        for round_idx, round_data in enumerate(rounds):
+            round_name = round_data.get("name", f"Round {round_idx}")
+            instruments = round_data.get("instruments", [])
+            round_valuation = round_data.get("valuation")
+            
+            for inst_idx, instrument in enumerate(instruments):
+                # Only validate pro-rata allocations
+                if not self._is_pro_rata_allocation(instrument):
+                    continue
+                
+                holder_name = instrument.get("holder_name", "Unknown")
+                exercise_type = instrument.get("exercise_type")
+                partial_amount = instrument.get("partial_exercise_amount")
+                partial_percentage = instrument.get("partial_exercise_percentage")
+                
+                # Validate exercise_type
+                if not exercise_type:
+                    errors.append(
+                        f"Round '{round_name}', Pro-rata Allocation {inst_idx} ({holder_name}): "
+                        f"exercise_type is required and must be 'full' or 'partial'"
+                    )
+                    continue
+                
+                if exercise_type not in ["full", "partial"]:
+                    errors.append(
+                        f"Round '{round_name}', Pro-rata Allocation {inst_idx} ({holder_name}): "
+                        f"exercise_type must be 'full' or 'partial', got '{exercise_type}'"
+                    )
+                    continue
+                
+                # Validate based on exercise type
+                if exercise_type == "full":
+                    # For full exercise, partial exercise fields should not be provided
+                    if partial_amount is not None:
+                        errors.append(
+                            f"Round '{round_name}', Pro-rata Allocation {inst_idx} ({holder_name}): "
+                            f"partial_exercise_amount should not be provided when exercise_type is 'full'"
+                        )
+                    
+                    if partial_percentage is not None:
+                        errors.append(
+                            f"Round '{round_name}', Pro-rata Allocation {inst_idx} ({holder_name}): "
+                            f"partial_exercise_percentage should not be provided when exercise_type is 'full'"
+                        )
+                
+                elif exercise_type == "partial":
+                    # For partial exercise, at least one partial exercise field must be provided
+                    if partial_amount is None and partial_percentage is None:
+                        errors.append(
+                            f"Round '{round_name}', Pro-rata Allocation {inst_idx} ({holder_name}): "
+                            f"Either partial_exercise_amount or partial_exercise_percentage must be provided for partial exercise"
+                        )
+                    
+                    # Validate partial_exercise_amount if provided
+                    if partial_amount is not None:
+                        if partial_amount <= 0:
+                            errors.append(
+                                f"Round '{round_name}', Pro-rata Allocation {inst_idx} ({holder_name}): "
+                                f"partial_exercise_amount must be greater than 0"
+                            )
+                        
+                        # Partial exercise by amount requires a valuation
+                        if not round_valuation or round_valuation <= 0:
+                            errors.append(
+                                f"Round '{round_name}', Pro-rata Allocation {inst_idx} ({holder_name}): "
+                                f"Partial exercise by amount requires a valuation to be specified for the round"
+                            )
+                    
+                    # Validate partial_exercise_percentage if provided
+                    if partial_percentage is not None:
+                        if partial_percentage <= 0 or partial_percentage >= 1:
+                            errors.append(
+                                f"Round '{round_name}', Pro-rata Allocation {inst_idx} ({holder_name}): "
+                                f"partial_exercise_percentage must be greater than 0 and less than 100%"
+                            )
+                        
+                        # For super pro-rata, validate that partial exercise percentage is lower than super pro-rata percentage
+                        pro_rata_type = instrument.get("pro_rata_type")
+                        pro_rata_percentage = instrument.get("pro_rata_percentage")
+                        if pro_rata_type == "super" and pro_rata_percentage is not None:
+                            if partial_percentage >= pro_rata_percentage:
+                                errors.append(
+                                    f"Round '{round_name}', Pro-rata Allocation {inst_idx} ({holder_name}): "
+                                    f"Partial exercise percentage must be lower than super pro-rata percentage"
+                                )
         
         return errors
 

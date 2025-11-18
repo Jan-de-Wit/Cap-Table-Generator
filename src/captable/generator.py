@@ -4,6 +4,7 @@ Coordinates JSON validation, DLM creation, and Excel generation.
 """
 
 import json
+import sys
 from typing import Dict, Any, Optional
 from pathlib import Path
 from .validation import validate_cap_table
@@ -103,9 +104,10 @@ def generate_from_json(json_path: str, output_path: str) -> str:
     generator = CapTableGenerator(json_path=json_path)
     
     if not generator.validate():
-        print("Validation errors found:")
+        error_msg = "Validation errors found:\n"
         for error in generator.get_validation_errors():
-            print(f"  - {error}")
+            error_msg += f"  - {error}\n"
+        print(error_msg, file=sys.stderr)
         raise ValueError("Cap table data is invalid")
     
     return generator.generate_excel(output_path)
@@ -125,9 +127,10 @@ def generate_from_data(data: Dict[str, Any], output_path: str) -> str:
     generator = CapTableGenerator(json_data=data)
     
     if not generator.validate():
-        print("Validation errors found:")
+        error_msg = "Validation errors found:\n"
         for error in generator.get_validation_errors():
-            print(f"  - {error}")
+            error_msg += f"  - {error}\n"
+        print(error_msg, file=sys.stderr)
         raise ValueError("Cap table data is invalid")
     
     return generator.generate_excel(output_path)

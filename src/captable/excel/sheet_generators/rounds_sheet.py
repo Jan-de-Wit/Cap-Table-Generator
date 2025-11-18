@@ -156,23 +156,23 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         for round_data in rounds:
             calc_type = round_data.get('calculation_type', 'fixed_shares')
             if calc_type == 'fixed_shares':
-                # Holder Name, Class Name, Acquisition Date, Shares = 4 columns
+                # Holder Name, Class Name, Pro Rata, Shares = 4 columns (0-indexed: 3)
                 max_col = max(max_col, 3)
             elif calc_type == 'target_percentage':
-                # Holder Name, Class Name, Target %, Calculated Shares = 4 columns
-                max_col = max(max_col, 3)
+                # Holder Name, Class Name, Target %, Pro Rata, Shares = 5 columns (0-indexed: 4)
+                max_col = max(max_col, 4)
             elif calc_type == 'valuation_based':
-                # Holder Name, Class Name, Investment Amount, Calculated Shares = 4 columns
-                max_col = max(max_col, 3)
+                # Holder Name, Class Name, Investment Amount, Pro Rata, Shares = 5 columns (0-indexed: 4)
+                max_col = max(max_col, 4)
             elif calc_type == 'convertible':
-                # 14 columns total
-                max_col = max(max_col, 13)
+                # ... Pro Rata, Shares = 15 columns total (0-indexed: 14)
+                max_col = max(max_col, 14)
             elif calc_type == 'safe':
-                # 8 columns total
-                max_col = max(max_col, 7)
+                # ... Pro Rata, Shares = 9 columns total (0-indexed: 8)
+                max_col = max(max_col, 8)
             else:
-                # Holder Name, Class Name, Shares = 3 columns
-                max_col = max(max_col, 2)
+                # Holder Name, Class Name, Pro Rata, Shares = 4 columns (0-indexed: 3)
+                max_col = max(max_col, 3)
         return max_col
 
     def _write_round(
@@ -504,37 +504,37 @@ class RoundsSheetGenerator(BaseSheetGenerator):
         # Define column headers based on calculation type
         if calc_type == 'fixed_shares':
             headers = ['Holder Name', 'Class Name',
-                       'Shares']
+                       'Pro Rata', 'Shares']
             col_map = {'holder_name': 0, 'class_name': 1,
-                       'shares': 2}
+                       'pro_rata': 2, 'shares': 3}
         elif calc_type == 'target_percentage':
             headers = ['Holder Name', 'Class Name',
-                       'Target %', 'Shares']
+                       'Target %', 'Pro Rata', 'Shares']
             col_map = {'holder_name': 0, 'class_name': 1,
-                       'target_percentage': 2, 'shares': 3}
+                       'target_percentage': 2, 'pro_rata': 3, 'shares': 4}
         elif calc_type == 'valuation_based':
             headers = ['Holder Name', 'Class Name', 'Investment Amount',
-                       'Shares']
+                       'Pro Rata', 'Shares']
             col_map = {'holder_name': 0, 'class_name': 1, 'investment_amount': 2,
-                       'shares': 3}
+                       'pro_rata': 3, 'shares': 4}
         elif calc_type == 'convertible':
             headers = ['Holder Name', 'Class Name', 'Principal', 'Interest (%)', 'Discount (%)',
                        'Payment Date', 'Expected Conversion Date', 'Days Outstanding',
-                       'Interest Type', 'Accrued Interest', 'Conversion Amount', 'Valuation Cap Type', 'Valuation Cap', 'Shares']
+                       'Interest Type', 'Accrued Interest', 'Conversion Amount', 'Valuation Cap Type', 'Valuation Cap', 'Pro Rata', 'Shares']
             col_map = {'holder_name': 0, 'class_name': 1, 'investment_amount': 2,
                        'interest_rate': 3, 'discount_rate': 4, 'payment_date': 5,
                        'expected_conversion_date': 6, 'days_passed': 7,
                        'interest_type': 8, 'accrued_interest': 9, 'conversion_amount': 10,
-                       'valuation_cap_type': 11, 'valuation_cap': 12, 'shares': 13}
+                       'valuation_cap_type': 11, 'valuation_cap': 12, 'pro_rata': 13, 'shares': 14}
         elif calc_type == 'safe':
             headers = ['Holder Name', 'Class Name', 'Principal', 'Discount (%)',
-                       'Expected Conversion Date', 'Valuation Cap Type', 'Valuation Cap', 'Shares']
+                       'Expected Conversion Date', 'Valuation Cap Type', 'Valuation Cap', 'Pro Rata', 'Shares']
             col_map = {'holder_name': 0, 'class_name': 1, 'investment_amount': 2,
                        'discount_rate': 3, 'expected_conversion_date': 4,
-                       'valuation_cap_type': 5, 'valuation_cap': 6, 'shares': 7}
+                       'valuation_cap_type': 5, 'valuation_cap': 6, 'pro_rata': 7, 'shares': 8}
         else:
-            headers = ['Holder Name', 'Class Name', 'Shares']
-            col_map = {'holder_name': 0, 'class_name': 1, 'shares': 2}
+            headers = ['Holder Name', 'Class Name', 'Pro Rata', 'Shares']
+            col_map = {'holder_name': 0, 'class_name': 1, 'pro_rata': 2, 'shares': 3}
 
         # Write headers (shifted by table_start_col)
         for col_idx, header in enumerate(headers):
@@ -965,6 +965,24 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 sheet.write_formula(
                     row, table_start_col + col_map['shares'], shares_formula, self.formats.get('table_number'))
 
+            # Write merged Pro Rata column (type and percentage combined)
+            pro_rata_rights = instrument.get('pro_rata_rights')
+            pro_rata_percentage = instrument.get('pro_rata_percentage')
+            
+            if pro_rata_rights:
+                # Format: "Standard (5%)" or "Super (10%)" or just "Standard" if no percentage
+                type_label = pro_rata_rights.capitalize()
+                if pro_rata_percentage is not None:
+                    pct_display = f"{pro_rata_percentage * 100:.2f}%"
+                    pro_rata_value = f"{type_label} ({pct_display})"
+                else:
+                    pro_rata_value = type_label
+                sheet.write(row, table_start_col + col_map['pro_rata'],
+                            pro_rata_value, self.formats.get('text'))
+            else:
+                sheet.write(row, table_start_col + col_map['pro_rata'],
+                            '', self.formats.get('text'))
+
             # Register instrument with DLM (col_map needs to be shifted by table_start_col)
             shifted_col_map = {k: table_start_col +
                                v for k, v in col_map.items()}
@@ -1058,6 +1076,10 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 # Average percentage columns (or empty - depends on requirement)
                 sheet.write(total_row, col_pos, '',
                             self.formats.get('total_text'))
+            elif header_name in ['Pro Rata']:
+                # Pro Rata column - empty (not summable)
+                sheet.write(total_row, col_pos, '',
+                            self.formats.get('total_text'))
             else:
                 # Other columns (dates, text) - empty
                 sheet.write(total_row, col_pos, '',
@@ -1144,7 +1166,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
 
     def _get_pro_rata_total_ref(self, round_idx: int, round_data: Dict[str, Any],
                                 all_rounds: List[Dict[str, Any]]) -> str:
-        """Get Named Range for total pro rata shares for a given round."""
+        """Get Named Range for total Pro-rata Shares for a given round."""
         round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
         named_range = f"{round_name_key}_ProRataShares"
         # Prefer DLM resolve if available, otherwise return named range directly
@@ -1206,15 +1228,15 @@ class RoundsSheetGenerator(BaseSheetGenerator):
     def _get_shares_column_index(self, calc_type: str) -> int:
         """Get the column index (within table) for shares based on calculation type."""
         if calc_type == 'fixed_shares':
-            return 3  # 4th column (0-indexed: 3)
+            return 3  # Holder Name, Class Name, Pro Rata, Shares (0-indexed: 3)
         elif calc_type == 'target_percentage':
-            return 3  # 4th column (0-indexed: 3)
+            return 4  # Holder Name, Class Name, Target %, Pro Rata, Shares (0-indexed: 4)
         elif calc_type == 'valuation_based':
-            return 4  # 5th column (0-indexed: 4)
+            return 4  # Holder Name, Class Name, Investment Amount, Pro Rata, Shares (0-indexed: 4)
         elif calc_type == 'convertible':
-            return 13  # 14th column (0-indexed: 13)
+            return 14  # ... Pro Rata, Shares (0-indexed: 14)
         elif calc_type == 'safe':
-            return 7  # 8th column (0-indexed: 7)
+            return 8  # ... Pro Rata, Shares (0-indexed: 8)
         return 3  # Default
 
     def _get_shares_column_letter(self, calc_type: str) -> str:

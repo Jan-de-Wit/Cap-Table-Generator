@@ -589,6 +589,7 @@ export function RoundForm({
                 })()
               : null
           }
+          roundValuation={round.valuation}
         />
       )}
     </div>

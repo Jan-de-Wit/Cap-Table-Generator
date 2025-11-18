@@ -107,13 +107,19 @@ export function ProRataExerciseSection({
   const [isScrollable, setIsScrollable] = React.useState(false);
   const tableContainerRef = React.useRef<HTMLDivElement>(null);
 
-  // Ensure Actions column is always visible
+  // Check if round has valuation (needed for partial exercise by amount)
+  const hasValuation = React.useMemo(() => {
+    return round.valuation !== undefined && round.valuation > 0;
+  }, [round.valuation]);
+
+  // Ensure Actions column is always visible, and conditionally show/hide partial_exercise_amount
   React.useEffect(() => {
     setColumnVisibility((prev) => ({
       ...prev,
       actions: true,
+      partial_exercise_amount: hasValuation,
     }));
-  }, []);
+  }, [hasValuation]);
 
   // Get the actual pro-rata allocation data for display
   const getProRataData = (
@@ -273,41 +279,29 @@ export function ProRataExerciseSection({
         ),
       },
       {
-        accessorKey: "pro_rata_type",
+        accessorKey: "pro_rata_rights",
         header: () => (
           <div className="flex items-center gap-1.5 whitespace-nowrap">
             <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-            Pro-Rata Type
+            Pro-Rata Rights
           </div>
         ),
         cell: ({ row }) => {
-          const isSuper = row.original.pro_rata_type === "super";
+          const rights = row.original.pro_rata_type;
+          const percentage = row.original.pro_rata_percentage;
+          
+          const typeLabel = rights === "super" ? "Super" : "Standard";
+          const percentageLabel = percentage !== undefined
+            ? ` (${decimalToPercentage(percentage).toFixed(2)}%)`
+            : "";
+          
           return (
             <Badge
-              variant={isSuper ? "default" : "outline"}
+              variant={rights === "super" ? "default" : "outline"}
               className="text-xs"
             >
-              {isSuper ? "Super" : "Standard"}
+              {typeLabel}{percentageLabel}
             </Badge>
-          );
-        },
-      },
-      {
-        accessorKey: "pro_rata_percentage",
-        header: () => (
-          <div className="flex items-center gap-1.5 whitespace-nowrap">
-            <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-            Pro-Rata
-          </div>
-        ),
-        cell: ({ row }) => {
-          const percentage = row.original.pro_rata_percentage;
-          return percentage !== undefined ? (
-            <span className="text-sm">
-              {decimalToPercentage(percentage).toFixed(2)}%
-            </span>
-          ) : (
-            <span className="text-muted-foreground text-sm">—</span>
           );
         },
       },
@@ -613,17 +607,17 @@ export function ProRataExerciseSection({
                 const rowBgClass = isExercised
                   ? isSuper
                     ? "bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-900/30 border-l-2 border-green-400 dark:border-green-500"
-                    : "bg-amber-50 dark:bg-amber-950/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 border-l-2 border-amber-400 dark:border-amber-500"
+                    : "bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-900/30 "
                   : "bg-background hover:bg-gray-50 dark:hover:bg-gray-900";
                 const stickyBaseBg = isExercised
                   ? isSuper
                     ? "bg-green-50 dark:bg-green-950/20"
-                    : "bg-amber-50 dark:bg-amber-950/20"
+                    : "bg-green-50 dark:bg-green-950/20"
                   : "bg-background";
                 const stickyHoverBg = isExercised
                   ? isSuper
                     ? "group-hover:bg-green-100 dark:group-hover:bg-green-900/30"
-                    : "group-hover:bg-amber-100 dark:group-hover:bg-amber-900/30"
+                    : "group-hover:bg-green-100 dark:group-hover:bg-green-900/30"
                   : "group-hover:bg-gray-50 dark:group-hover:bg-gray-900";
                 return (
                   <TableRow

@@ -367,10 +367,61 @@ export default function Home() {
   };
 
   const buildCapTableData = (): CapTableData => {
+    // Filter out pro_rata_rights from instruments when not exercised
+    // A pro_rata_right is considered exercised if there's a corresponding pro_rata allocation
+    // in any later round for the same holder
+    const processedRounds = rounds.map((round, roundIndex) => {
+      const processedInstruments = round.instruments.map((instrument) => {
+        // Remove React component-specific fields that shouldn't be in the schema
+        const { displayIndex, actualIndex, hasError, ...cleanInstrument } = instrument as any;
+        
+        // Only process regular instruments (not pro-rata allocations)
+        if ("pro_rata_type" in cleanInstrument) {
+          return cleanInstrument; // Keep pro-rata allocations as-is (but cleaned)
+        }
+
+        // Check if this instrument has pro_rata_rights
+        if (
+          "pro_rata_rights" in cleanInstrument &&
+          cleanInstrument.pro_rata_rights &&
+          "holder_name" in cleanInstrument &&
+          cleanInstrument.holder_name
+        ) {
+          // Check if there's a corresponding pro-rata allocation in any later round
+          const holderName = cleanInstrument.holder_name;
+          const hasExercisedProRata = rounds.some((laterRound, laterRoundIndex) => {
+            if (laterRoundIndex <= roundIndex) {
+              return false; // Only check later rounds
+            }
+            return laterRound.instruments.some(
+              (laterInst) =>
+                "pro_rata_type" in laterInst &&
+                "holder_name" in laterInst &&
+                laterInst.holder_name === holderName
+            );
+          });
+
+          // If not exercised, remove pro_rata_rights and related fields
+          if (!hasExercisedProRata) {
+            const { pro_rata_rights, pro_rata_percentage, ...rest } =
+              cleanInstrument;
+            return rest;
+          }
+        }
+
+        return cleanInstrument;
+      });
+
+      return {
+        ...round,
+        instruments: processedInstruments,
+      };
+    });
+
     return {
       schema_version: "2.0",
       holders,
-      rounds,
+      rounds: processedRounds,
     };
   };
 
@@ -472,155 +523,159 @@ export default function Home() {
 
           {/* Rounds Section */}
           <div className="space-y-5">
-            <div className="space-y-3 pb-2">
-              <div className="flex items-center gap-2 border-b border-border/50 pb-2.5">
-                <h2 className="text-base font-semibold">
-                  {selectedRoundIndex !== null && rounds[selectedRoundIndex]
-                    ? `Editing: ${
-                        rounds[selectedRoundIndex].name ||
-                        `Round ${selectedRoundIndex + 1}`
-                      }`
-                    : "Select a Round"}
-                </h2>
+            {rounds.length > 0 && (
+              <div className="space-y-3 pb-2">
+                <div className="flex items-center gap-2 border-b border-border/50 pb-2.5">
+                  <h2 className="text-base font-semibold">
+                    {selectedRoundIndex !== null && rounds[selectedRoundIndex]
+                      ? `Editing: ${
+                          rounds[selectedRoundIndex].name ||
+                          `Round ${selectedRoundIndex + 1}`
+                        }`
+                      : "Select a Round"}
+                  </h2>
 
-                {selectedRoundIndex !== null &&
-                  rounds[selectedRoundIndex] &&
-                  rounds[selectedRoundIndex].round_date && (
-                    <Badge variant="outline" className="text-xs">
-                      <span>
-                        {new Date(
-                          rounds[selectedRoundIndex].round_date
-                        ).toLocaleDateString()}
-                      </span>
-                    </Badge>
-                  )}
-              </div>
-              {/* Summary badges */}
-              {selectedRoundIndex !== null && rounds[selectedRoundIndex] && (
-                <div className="flex items-center gap-4 flex-wrap">
-                  {validations[selectedRoundIndex] &&
-                    (() => {
+                  {selectedRoundIndex !== null &&
+                    rounds[selectedRoundIndex] &&
+                    rounds[selectedRoundIndex].round_date && (
+                      <Badge variant="outline" className="text-xs">
+                        <span>
+                          {new Date(
+                            rounds[selectedRoundIndex].round_date
+                          ).toLocaleDateString()}
+                        </span>
+                      </Badge>
+                    )}
+                </div>
+                {/* Summary badges */}
+                {selectedRoundIndex !== null && rounds[selectedRoundIndex] && (
+                  <div className="flex items-center gap-4 flex-wrap">
+                    {validations[selectedRoundIndex] &&
+                      (() => {
+                        const round = rounds[selectedRoundIndex];
+                        const regularInstruments = round.instruments.filter(
+                          (inst) => !("pro_rata_type" in inst)
+                        );
+                        const proRataInstruments = round.instruments.filter(
+                          (inst) => "pro_rata_type" in inst
+                        );
+                        const hasInstrumentsOrProRata =
+                          regularInstruments.length > 0 ||
+                          proRataInstruments.length > 0;
+                        const isValid = validations[selectedRoundIndex].isValid;
+                        const isComplete = isValid && hasInstrumentsOrProRata;
+
+                        // Determine what's missing
+                        let tooltipMessage = "";
+                        if (!isComplete) {
+                          if (!hasInstrumentsOrProRata) {
+                            tooltipMessage =
+                              "Add at least one instrument or pro-rata allocation to complete this round.";
+                          } else if (!isValid) {
+                            const errors =
+                              validations[selectedRoundIndex].errors;
+                            const errorFields = errors
+                              .map((e) => e.field)
+                              .filter((f) => f !== "instruments");
+                            if (errorFields.length > 0) {
+                              const fieldNames = errorFields.map((f) => {
+                                if (f === "name") return "Round Name";
+                                if (f === "round_date") return "Round Date";
+                                if (f === "calculation_type")
+                                  return "Round Type";
+                                if (f === "valuation") return "Valuation";
+                                if (f === "valuation_basis")
+                                  return "Valuation Basis";
+                                return f;
+                              });
+                              tooltipMessage = `Please fix: ${fieldNames.join(
+                                ", "
+                              )}`;
+                            } else {
+                              tooltipMessage =
+                                "Please fix the validation errors to complete this round.";
+                            }
+                          }
+                        }
+
+                        const statusElement = (
+                          <div className="flex items-center gap-2">
+                            {isComplete ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                            )}
+                            <span className="text-sm text-muted-foreground">
+                              {isComplete ? "Complete" : "Incomplete"}
+                            </span>
+                          </div>
+                        );
+
+                        if (!isComplete && tooltipMessage) {
+                          return (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  {statusElement}
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{tooltipMessage}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        }
+
+                        return statusElement;
+                      })()}
+                    {(() => {
                       const round = rounds[selectedRoundIndex];
                       const regularInstruments = round.instruments.filter(
                         (inst) => !("pro_rata_type" in inst)
                       );
-                      const proRataInstruments = round.instruments.filter(
-                        (inst) => "pro_rata_type" in inst
+                      const instrumentsCount = regularInstruments.length;
+                      const holdersCount = new Set(
+                        regularInstruments
+                          .filter(
+                            (inst) => "holder_name" in inst && inst.holder_name
+                          )
+                          .map((inst) =>
+                            "holder_name" in inst ? inst.holder_name : ""
+                          )
+                      ).size;
+                      return (
+                        <>
+                          <Badge
+                            variant="secondary"
+                            className="text-xs font-medium"
+                          >
+                            <FileText className="h-3 w-3 mr-1" />
+                            {instrumentsCount}{" "}
+                            {instrumentsCount === 1
+                              ? "instrument"
+                              : "instruments"}
+                          </Badge>
+                          <Badge
+                            variant="secondary"
+                            className="text-xs font-medium"
+                          >
+                            <Users className="h-3 w-3 mr-1" />
+                            {holdersCount}{" "}
+                            {holdersCount === 1 ? "holder" : "holders"}
+                          </Badge>
+                        </>
                       );
-                      const hasInstrumentsOrProRata =
-                        regularInstruments.length > 0 ||
-                        proRataInstruments.length > 0;
-                      const isValid = validations[selectedRoundIndex].isValid;
-                      const isComplete = isValid && hasInstrumentsOrProRata;
-
-                      // Determine what's missing
-                      let tooltipMessage = "";
-                      if (!isComplete) {
-                        if (!hasInstrumentsOrProRata) {
-                          tooltipMessage =
-                            "Add at least one instrument or pro-rata allocation to complete this round.";
-                        } else if (!isValid) {
-                          const errors = validations[selectedRoundIndex].errors;
-                          const errorFields = errors
-                            .map((e) => e.field)
-                            .filter((f) => f !== "instruments");
-                          if (errorFields.length > 0) {
-                            const fieldNames = errorFields.map((f) => {
-                              if (f === "name") return "Round Name";
-                              if (f === "round_date") return "Round Date";
-                              if (f === "calculation_type") return "Round Type";
-                              if (f === "valuation") return "Valuation";
-                              if (f === "valuation_basis")
-                                return "Valuation Basis";
-                              return f;
-                            });
-                            tooltipMessage = `Please fix: ${fieldNames.join(
-                              ", "
-                            )}`;
-                          } else {
-                            tooltipMessage =
-                              "Please fix the validation errors to complete this round.";
-                          }
-                        }
-                      }
-
-                      const statusElement = (
-                        <div className="flex items-center gap-2">
-                          {isComplete ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                          )}
-                          <span className="text-sm text-muted-foreground">
-                            {isComplete ? "Complete" : "Incomplete"}
-                          </span>
-                        </div>
-                      );
-
-                      if (!isComplete && tooltipMessage) {
-                        return (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                {statusElement}
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{tooltipMessage}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        );
-                      }
-
-                      return statusElement;
                     })()}
-                  {(() => {
-                    const round = rounds[selectedRoundIndex];
-                    const regularInstruments = round.instruments.filter(
-                      (inst) => !("pro_rata_type" in inst)
-                    );
-                    const instrumentsCount = regularInstruments.length;
-                    const holdersCount = new Set(
-                      regularInstruments
-                        .filter(
-                          (inst) => "holder_name" in inst && inst.holder_name
-                        )
-                        .map((inst) =>
-                          "holder_name" in inst ? inst.holder_name : ""
-                        )
-                    ).size;
-                    return (
-                      <>
-                        <Badge
-                          variant="secondary"
-                          className="text-xs font-medium"
-                        >
-                          <FileText className="h-3 w-3 mr-1" />
-                          {instrumentsCount}{" "}
-                          {instrumentsCount === 1
-                            ? "instrument"
-                            : "instruments"}
-                        </Badge>
-                        <Badge
-                          variant="secondary"
-                          className="text-xs font-medium"
-                        >
-                          <Users className="h-3 w-3 mr-1" />
-                          {holdersCount}{" "}
-                          {holdersCount === 1 ? "holder" : "holders"}
-                        </Badge>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {rounds.length === 0 ? (
-              <Card className="border-border/50 border-dashed shadow-none">
+              <Card className="border-border shadow-none">
                 <CardContent className="pt-12 pb-12">
-                  <div className="flex flex-col items-center text-center space-y-4">
-                    <div className="rounded-full bg-primary/10 p-4">
+                  <div className="flex flex-col space-y-4">
+                    <div className="rounded-full bg-primary/10 p-4 w-fit">
                       <Sparkles className="h-8 w-8 text-primary" />
                     </div>
                     <div className="space-y-1.5">
@@ -631,6 +686,14 @@ export default function Home() {
                         instruments, and pro-rata allocations.
                       </p>
                     </div>
+                    <Button
+                      type="button"
+                      onClick={addRound}
+                      className="mt-2 w-fit"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Round
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

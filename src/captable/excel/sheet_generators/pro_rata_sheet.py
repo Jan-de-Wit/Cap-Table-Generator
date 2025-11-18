@@ -20,7 +20,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
     - Standard pro rata: Maintain current ownership percentage
     - Super pro rata: Achieve target ownership percentage
 
-    Pro rata shares are calculated AFTER regular round shares.
+    Pro-rata Shares are calculated AFTER regular round shares.
     """
 
     def __init__(self, workbook, data, formats, dlm, formula_resolver):
@@ -32,6 +32,8 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         self.holder_data_range = {}
         # Padding offset for table positioning
         self.padding_offset = 1
+        # Named ranges for SUMIF expressions per round (Option 7: Extract SUMIF to Named Range)
+        self.sumif_named_ranges = {}  # round_idx -> named_range_name
 
     def _get_sheet_name(self) -> str:
         """Returns 'Pro Rata Allocations'."""
@@ -65,10 +67,10 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         # Border starts at padding_offset (1), content starts at padding_offset + 1 (2)
         border_start_row = self.padding_offset
         border_start_col = self.padding_offset
-        # Calculate last column: padding + 1 (padding) + 2 (Shareholders + Description) + (rounds * 6) - 1
-        # Each round has 6 columns (5 data + 1 separator), last round's separator is the last column
+        # Calculate last column: padding + 1 (padding) + 2 (Shareholders + Description) + (rounds * 10) - 1
+        # Each round has 10 columns (9 data + 1 separator), last round's separator is the last column
         num_rounds = len(rounds)
-        border_end_col = self.padding_offset + 1 + 2 + (num_rounds * 6) - 1
+        border_end_col = self.padding_offset + 1 + 2 + (num_rounds * 10) - 1
         # Last row includes padding, so we need to calculate after writing data
 
         # Write headers aligned with title row for round names
@@ -80,6 +82,10 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         data_rows_per_holder, first_holder_row, last_holder_row = self._write_holder_data_with_groups(
             sheet, rounds, all_holders, holders_by_group, data_start_row
         )
+
+        # Create named ranges for SUMIF expressions (Option 7: Extract SUMIF to Named Range)
+        self._create_sumif_named_ranges(
+            rounds, first_holder_row, last_holder_row)
 
         # Write total row
         self._write_total_row(sheet, rounds, all_holders,
@@ -106,14 +112,14 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             (self.padding_offset + 2, self.padding_offset + 2, 35),
         ]
 
-        # For each round, set widths for Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount (15) and separator (5)
+        # For each round, set widths for Pro-rata Rights, Super pro rata %, Exercise Type, Partial Amount, Partial %, Effective %, Pro-rata Shares, Price Per Share, Investment Amount (20) and separator (5)
         for round_idx in range(num_rounds):
-            # Start column: padding + 1 (inner padding) + 2 (Shareholders + Description) + (round_idx * 6)
-            start_col = self.padding_offset + 1 + 2 + (round_idx * 6)
-            # Set Pro Rata Type, Pro Rata %, Pro Rata Shares, Price Per Share, Investment Amount columns to width 15
-            column_widths.append((start_col, start_col + 4, 20))
+            # Start column: padding + 1 (inner padding) + 2 (Shareholders + Description) + (round_idx * 10)
+            start_col = self.padding_offset + 1 + 2 + (round_idx * 10)
+            # Set Pro-rata Rights, Super pro rata %, Exercise Type, Partial Amount, Partial %, Effective %, Pro-rata Shares, Price Per Share, Investment Amount columns to width 20
+            column_widths.append((start_col, start_col + 8, 20))
             # Set separator column to width 5
-            separator_col = start_col + 5
+            separator_col = start_col + 9
             column_widths.append((separator_col, separator_col, 5))
 
         self.setup_table_formatting(
@@ -246,14 +252,14 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                     2, '', self.formats.get('header'))
 
         # Use utility function to write round headers
-        subheaders = ['Pro Rata Type', 'Pro Rata %',
-                      'Pro Rata Shares', 'Price per Share', 'Investment']
+        subheaders = ['Pro-rata Rights', 'Super pro rata %', 'Exercise Type',
+                      'Partial Amount', 'Partial %', 'Effective %', 'Pro-rata Shares', 'Price per Share', 'Investment']
         self.write_round_headers(
             sheet,
             rounds,
             header_row,
             start_col,
-            columns_per_round=5,
+            columns_per_round=9,
             separator_width=1,
             subheader_row=subheader_row,
             subheaders=subheaders
@@ -354,7 +360,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
             # For each round, write pro rata data
             for round_idx, round_data in enumerate(rounds):
-                type_col = col  # Pro Rata Type column for this round
+                type_col = col  # Pro-rata Rights column for this round
                 col = self._write_round_pro_rata_data(
                     sheet, row, col, round_idx, holder_name, rounds,
                     first_holder_row, last_holder_row
@@ -400,7 +406,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
             # For each round, write pro rata data
             for round_idx, round_data in enumerate(rounds):
-                type_col = col  # Pro Rata Type column for this round
+                type_col = col  # Pro-rata Rights column for this round
                 col = self._write_round_pro_rata_data(
                     sheet, row, col, round_idx, holder_name, rounds,
                     first_holder_row, last_holder_row
@@ -481,10 +487,14 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         """Write pro rata data for one round and return updated column position."""
         type_col = col
         pct_col = col + 1
-        shares_col = col + 2
-        pps_col = col + 3
-        investment_col = col + 4
-        separator_col = col + 5
+        exercise_type_col = col + 2
+        partial_amount_col = col + 3
+        partial_pct_col = col + 4
+        effective_pct_col = col + 5
+        shares_col = col + 6
+        pps_col = col + 7
+        investment_col = col + 8
+        separator_col = col + 9
 
         round_data = rounds[round_idx]
         instruments = round_data.get('instruments', [])
@@ -506,8 +516,10 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             pro_rata_type = holder_instrument.get('pro_rata_type', 'none')
             pro_rata_pct = holder_instrument.get('pro_rata_percentage')
             exercise_type = holder_instrument.get('exercise_type', 'full')
-            partial_exercise_amount = holder_instrument.get('partial_exercise_amount')
-            partial_exercise_percentage = holder_instrument.get('partial_exercise_percentage')
+            partial_exercise_amount = holder_instrument.get(
+                'partial_exercise_amount')
+            partial_exercise_percentage = holder_instrument.get(
+                'partial_exercise_percentage')
 
         # Check if holder has shares in previous rounds from JSON data
         has_previous_shares = self._has_shares_in_previous_rounds(
@@ -564,7 +576,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             )
 
         # Pro Rata % column: dynamic formula based on pro_rata_type
-        # For "standard": calculate ownership % = holder_shares_start / pre_round_shares
+        # For "standard": calculate ownership % = (holder_shares_start + shares issued to holder) / (pre_round_shares + total shares issued)
         # For "super": use the value from data (allow manual entry)
         # For "none": empty
         # Get references needed for ownership % calculation
@@ -572,44 +584,155 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
         pre_round_shares_ref = f"{round_name_key}_PreRoundShares"
 
-        # Dynamic formula for Pro Rata % column
-        # If "standard": calculate ownership % = holder_shares_start / pre_round_shares
-        # If "super": use initial value from data (stored in formula, but can be manually edited)
-        # Otherwise: empty
-        ownership_pct_formula = f"IFERROR({holder_shares_start_ref} / {pre_round_shares_ref}, 0)"
+        # Get holder's shares issued in this round (from Rounds table)
+        holder_row = row + 1
+        holder_base_shares_ref = self._get_holder_base_shares_ref(
+            round_idx, holder_row)
 
-        # Always use ownership % for both standard and super; blank for none or "-"
-        # Check for both lowercase and capitalized versions
-        pct_formula = (
-            f"=IF(OR({type_cell_ref}=\"standard\", {type_cell_ref}=\"super\", {type_cell_ref}=\"Standard\", {type_cell_ref}=\"Super\"), {ownership_pct_formula}, \"\")"
+        # Get total shares issued in this round
+        if round_idx in self.shares_issued_refs:
+            shares_issued_total_ref = self.shares_issued_refs[round_idx]
+        elif round_idx in self.round_ranges:
+            range_info = self.round_ranges[round_idx]
+            table_name = range_info.get('table_name')
+            if table_name:
+                shares_issued_total_ref = f"SUM({table_name}[[#All],[Shares]])"
+            else:
+                shares_col = range_info.get('shares_col', 'D')
+                shares_range = f"Rounds!{shares_col}{range_info['start_row']}:{shares_col}{range_info['end_row']}"
+                shares_issued_total_ref = f"SUM({shares_range})"
+        else:
+            shares_issued_total_ref = "0"
+
+        # Get previous round ownership % from Cap Table sheet (at end of previous round, before current round shares)
+        # This is needed for Effective % column (prev_round_ownership_pct_ref)
+        if round_idx == 0:
+            # First round: no previous round, so ownership % is 0
+            prev_round_ownership_pct_ref = "0"
+        else:
+            prev_round_percent_col = self._get_progression_percent_col(
+                round_idx - 1, rounds)
+            holder_row = row + 1
+            prev_round_ownership_pct_ref = f"'Cap Table'!{prev_round_percent_col}{holder_row}"
+
+        # Super pro rata % column: only filled when super pro rata % was included in input
+        # For "super": display the super pro rata % value (from data, editable) - only if provided in input
+        # For "standard" or "none": empty
+        # Calculate ownership % = (holder_shares_start + shares issued to holder) / (pre_round_shares + total shares issued)
+        # This accounts for shares already issued in the round (kept for current_ownership_pct_ref used elsewhere)
+        holder_total_shares_ref = f"({holder_shares_start_ref} + {holder_base_shares_ref})"
+        total_shares_ref = f"({pre_round_shares_ref} + {shares_issued_total_ref})"
+        ownership_pct_formula = f"IFERROR({holder_total_shares_ref} / {total_shares_ref}, 0)"
+
+        # Only fill Super pro rata % when super type is selected AND pro_rata_pct was provided in input
+        if pro_rata_type and pro_rata_type.lower() == 'super' and pro_rata_pct is not None:
+            # For "super": write the value directly (editable, not a formula)
+            sheet.write(row, pct_col, pro_rata_pct,
+                        self.formats.get('table_percent'))
+        else:
+            # For "standard", "none", or super without pro_rata_pct: empty
+            sheet.write(row, pct_col, '', self.formats.get('table_percent'))
+
+        # Get cell references needed for Effective % formula (calculate before writing columns)
+        pct_col_letter = self._col_letter(pct_col)
+        pct_cell_ref = f"{pct_col_letter}{row + 1}"
+        exercise_type_col_letter = self._col_letter(exercise_type_col)
+        exercise_type_cell_ref = f"{exercise_type_col_letter}{row + 1}"
+        partial_amount_col_letter = self._col_letter(partial_amount_col)
+        partial_amount_cell_ref = f"{partial_amount_col_letter}{row + 1}"
+        partial_pct_col_letter = self._col_letter(partial_pct_col)
+        partial_pct_cell_ref = f"{partial_pct_col_letter}{row + 1}"
+
+        # Get round valuation reference (post-money valuation)
+        round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
+        post_money_valuation_ref = f"{round_name_key}_PostMoneyValuation"
+
+        # Get current ownership % for budget-based calculations
+        # Current ownership % = (holder_shares_start + shares issued to holder) / (pre_round_shares + total shares issued)
+        # This is used for partial amount calculations in Effective % column
+        current_ownership_pct_ref = ownership_pct_formula
+
+        # Exercise Type column: write value from data
+        exercise_type_display = exercise_type.capitalize() if exercise_type else 'Full'
+        sheet.write(row, exercise_type_col, exercise_type_display,
+                    self.formats.get('text'))
+        # Add dropdown validation
+        sheet.data_validation(
+            row, exercise_type_col, row, exercise_type_col,
+            {
+                'validate': 'list',
+                'source': ['Full', 'Partial'],
+                'error_type': 'stop',
+                'error_title': 'Invalid Value',
+                'error_message': 'Please select one of: Full, Partial'
+            }
         )
-        sheet.write_formula(row, pct_col, pct_formula,
+
+        # Partial Exercise Amount column: write value from data (if exists)
+        if partial_exercise_amount is not None:
+            sheet.write(row, partial_amount_col, partial_exercise_amount,
+                        self.formats.get('table_currency'))
+        else:
+            sheet.write(row, partial_amount_col, '', self.formats.get('text'))
+
+        # Partial Exercise Percentage column: write value from data (if exists)
+        if partial_exercise_percentage is not None:
+            sheet.write(row, partial_pct_col, partial_exercise_percentage,
+                        self.formats.get('table_percent'))
+        else:
+            sheet.write(row, partial_pct_col, '', self.formats.get('text'))
+
+        # Get price per share reference for converting partial amount to effective %
+        pre_money_valuation_ref = f"{round_name_key}_PreMoneyValuation"
+        price_per_share_ref = f"IFERROR({pre_money_valuation_ref} / {pre_round_shares_ref}, 0)"
+
+        # Effective % column: calculate based on the new unified formula
+        effective_pct_formula = self._create_effective_pct_formula(
+            type_cell_ref, pct_cell_ref, exercise_type_cell_ref,
+            partial_amount_cell_ref, partial_pct_cell_ref, post_money_valuation_ref,
+            current_ownership_pct_ref, prev_round_ownership_pct_ref, price_per_share_ref, pre_round_shares_ref,
+            round_idx, row, first_holder_row, last_holder_row
+        )
+        sheet.write_formula(row, effective_pct_col, effective_pct_formula,
                             self.formats.get('table_percent'))
 
+        # Get effective % cell reference for shares calculation
+        effective_pct_col_letter = self._col_letter(effective_pct_col)
+        effective_pct_cell_ref = f"{effective_pct_col_letter}{row + 1}"
+
         # Create formulas for each pro rata type
+        # Pass cell references instead of hardcoded values so formulas update when Excel cells change
         pro_rata_formula = self._create_pro_rata_formula(
-            round_idx, holder_name, rounds, row, pct_col, first_holder_row, last_holder_row,
-            exercise_type, partial_exercise_amount, partial_exercise_percentage, pps_col
+            round_idx, holder_name, rounds, row, type_cell_ref, effective_pct_cell_ref,
+            current_ownership_pct_ref, pre_round_shares_ref, first_holder_row, last_holder_row
         ).lstrip('=')
 
+        # Shares calculation: use effective % approach
+        # The effective % already incorporates partial amount constraints (capped to ensure investment doesn't exceed partial amount)
+        # So we just use the effective % approach without any additional capping
         # Dynamic formula using nested IF to check pro_rata_type cell
         # Handles: "none", "None", "-", "standard", "super", "Standard", "Super", or empty/invalid (defaults to 0)
-        # Use the standard formula for both standard and super
         # Check for both lowercase and capitalized versions
+        # Format with line breaks and indentation for readability
         shares_formula = (
-            f"=IFERROR(IF(OR({type_cell_ref}=\"\", {type_cell_ref}=\"none\", {type_cell_ref}=\"None\", {type_cell_ref}=\"-\"), 0, {pro_rata_formula}), 0)"
+            f"=IFERROR("
+            f"IF("
+            f"OR({type_cell_ref}=\"\", {type_cell_ref}=\"none\", {type_cell_ref}=\"None\", {type_cell_ref}=\"-\"), "
+            f"0, "
+            f"{pro_rata_formula}"
+            f"), "
+            f"0"
+            f")"
         )
         sheet.write_formula(row, shares_col, shares_formula,
                             self.formats.get('table_number'))
 
-        # Price Per Share column: reference from rounds sheet
-        round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
-        price_per_share_ref = f"{round_name_key}_PricePerShare"
-        pps_formula = f"=IFERROR({price_per_share_ref}, 0)"
+        # Price Per Share column: calculate from pre-round valuation cap divided by pre-round shares
+        pps_formula = f"=IFERROR({pre_money_valuation_ref} / {pre_round_shares_ref}, 0)"
         sheet.write_formula(row, pps_col, pps_formula,
                             self.formats.get('table_currency'))
 
-        # Investment Amount column: Price Per Share * Pro Rata Shares
+        # Investment Amount column: Price Per Share * Pro-rata Shares
         shares_col_letter = self._col_letter(shares_col)
         shares_cell_ref = f"{shares_col_letter}{row + 1}"
         pps_col_letter = self._col_letter(pps_col)
@@ -625,23 +748,216 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         else:
             return investment_col + 1
 
+    def _create_effective_pct_formula(
+        self,
+        type_cell_ref: str,
+        pct_cell_ref: str,
+        exercise_type_cell_ref: str,
+        partial_amount_cell_ref: str,
+        partial_pct_cell_ref: str,
+        post_money_valuation_ref: str,
+        current_ownership_pct_ref: str,
+        prev_round_ownership_pct_ref: str,
+        price_per_share_ref: str,
+        pre_round_shares_ref: str,
+        round_idx: int,
+        row: int,
+        first_holder_row: int,
+        last_holder_row: int
+    ) -> str:
+        """
+        Generate an easy-to-read Excel formula for the Effective % column.
+
+        - If full pro rata rights exercised:
+            - type == standard: prev round ownership %
+            - type == super: super pro rata % (from Super pro rata % column, only if provided in input)
+        - Else if partial rights exercised:
+            - type == standard: partial ownership % (min(partial %, prev round ownership %) or capped by partial amount if specified)
+            - type == super: (min(partial %, super pro rata %) or capped by partial amount if specified)
+        - If type is 'none' or cell is empty, return ""
+
+        Note: Uses previous round ownership % for standard type calculations.
+        For super type, uses Super pro rata % column value (only filled when provided in input).
+        For partial amount calculations, uses current ownership % (after current round shares).
+        """
+
+        # Logical conditions for Excel
+        is_none = f"OR({type_cell_ref}=\"\", {type_cell_ref}=\"none\", {type_cell_ref}=\"-\", {type_cell_ref}=\"None\", UPPER(TRIM({type_cell_ref}))=\"NONE\")"
+        is_standard = f"OR({type_cell_ref}=\"standard\", {type_cell_ref}=\"Standard\", UPPER(TRIM({type_cell_ref}))=\"STANDARD\")"
+        is_super = f"OR({type_cell_ref}=\"super\", {type_cell_ref}=\"Super\", UPPER(TRIM({type_cell_ref}))=\"SUPER\")"
+
+        # For full exercises: use previous round ownership % for standard, super pro rata % for super (if provided)
+        # For super: only use pct_cell_ref if it's not blank, otherwise return empty
+        pro_rata_pct_expr = (
+            f"IF(\n"
+            f"    {is_standard}, {prev_round_ownership_pct_ref},\n"
+            f"    IF({is_super}, IF(NOT(ISBLANK({pct_cell_ref})), {pct_cell_ref}, \"\"), \"\")\n"
+            f")"
+        )
+
+        # Check exercise type (case-insensitive)
+        is_full = f"OR(UPPER(TRIM({exercise_type_cell_ref}))=\"FULL\", {exercise_type_cell_ref}=\"Full\")"
+        is_partial = f"OR(UPPER(TRIM({exercise_type_cell_ref}))=\"PARTIAL\", {exercise_type_cell_ref}=\"Partial\")"
+
+        # Whether a partial % is entered
+        has_partial_pct = f"AND(NOT(ISBLANK({partial_pct_cell_ref})), {partial_pct_cell_ref}<>0)"
+
+        # Whether a partial $ amount is entered
+        has_partial_amount = f"AND(NOT(ISBLANK({partial_amount_cell_ref})), {partial_amount_cell_ref}<>0)"
+        # For partial amount: add current ownership % (after current round shares) to the partial amount percentage
+        partial_amount_pct_from_valuation = f"IFERROR({partial_amount_cell_ref}/{post_money_valuation_ref}, 0)"
+        partial_amount_pct_expr = f"IF({has_partial_amount}, {current_ownership_pct_ref} + {partial_amount_pct_from_valuation}, 999999)"
+
+        # For partial exercises:
+        # - standard: MIN(partial_pct, prev_round_ownership_pct) then cap by (current_ownership_pct + partial_amount_pct) if partial_amount specified
+        # - super: MIN(partial_pct, super_pro_rata_pct) then cap by (current_ownership_pct + partial_amount_pct) if partial_amount specified
+        # If partial_pct is not specified, use a large number so MIN will use the pro_rata_pct
+        # (or if partial_amount is specified, it will be capped by that)
+        partial_pct_value = f"IF({has_partial_pct}, {partial_pct_cell_ref}, 999999)"
+
+        # Calculate MIN(partial_pct, pro_rata_pct) for each type
+        # Use previous round ownership % for standard (not current ownership %)
+        # For super: use pct_cell_ref if not blank, otherwise use a large number (will be capped by partial_amount if specified)
+        partial_standard_expr = f"MIN({partial_pct_value}, {prev_round_ownership_pct_ref})"
+        partial_super_expr = f"MIN({partial_pct_value}, IF(NOT(ISBLANK({pct_cell_ref})), {pct_cell_ref}, 999999))"
+
+        # Then cap by (current_ownership_pct + partial_amount_pct) if partial_amount is specified
+        partial_standard_final = f"MIN({partial_standard_expr}, {partial_amount_pct_expr})"
+        partial_super_final = f"MIN({partial_super_expr}, {partial_amount_pct_expr})"
+
+        # Compose the human-readable formula, pretty formatted
+        # First check exercise type: if Full, use full rights; if Partial, use partial calculations
+        formula = (
+            f"=IF(\n"
+            f"    {is_none}, \"\",\n"
+            f"    IF(\n"
+            f"        {is_full},\n"
+            f"        {pro_rata_pct_expr},\n"
+            f"        IF(\n"
+            f"            {is_partial},\n"
+            f"            IF(\n"
+            f"                {is_standard}, {partial_standard_final},\n"
+            f"                IF({is_super}, {partial_super_final}, \"\")\n"
+            f"            ),\n"
+            f"            \"\"\n"
+            f"        )\n"
+            f"    )\n"
+            f")"
+        )
+
+        return formula
+
+    def _get_sum_numerator_ref(
+        self,
+        round_idx: int,
+        first_holder_row: int,
+        last_holder_row: int,
+        V_ref: str,
+        P_ref: str
+    ) -> str:
+        """
+        Get reference to sum of numerator terms across all holders for the denominator calculation.
+
+        For each holder j, calculates:
+        min(S_a,j * partial_pct_j (if defined, else S_a,j), partial_amount_j / P (if defined, else S_a,j))
+
+        Where S_a,j = (target_pct_j * V) / P
+
+        Returns an Excel formula that sums this across all holders in the round.
+        """
+        sheet_name = self._get_sheet_name()
+
+        # Get column references for this round
+        type_col = self.padding_offset + 1 + 2 + (round_idx * 10)
+        pct_col = type_col + 1
+        partial_pct_col = type_col + 5
+        partial_amount_col = type_col + 4
+
+        type_col_letter = self._col_letter(type_col)
+        pct_col_letter = self._col_letter(pct_col)
+        partial_pct_col_letter = self._col_letter(partial_pct_col)
+        partial_amount_col_letter = self._col_letter(partial_amount_col)
+
+        # Get ownership % column reference (we'll need to calculate this per row)
+        # Ownership % is calculated as: (holder_shares_start + shares issued) / (pre_round_shares + total shares issued)
+        # For now, we'll reference the Super pro rata % column (though it's only filled for super type)
+        # and calculate ownership % for all holders
+
+        # Build ranges
+        type_range = f"'{sheet_name}'!{type_col_letter}{first_holder_row + 1}:{type_col_letter}{last_holder_row + 1}"
+        pct_range = f"'{sheet_name}'!{pct_col_letter}{first_holder_row + 1}:{pct_col_letter}{last_holder_row + 1}"
+        partial_pct_range = f"'{sheet_name}'!{partial_pct_col_letter}{first_holder_row + 1}:{partial_pct_col_letter}{last_holder_row + 1}"
+        partial_amount_range = f"'{sheet_name}'!{partial_amount_col_letter}{first_holder_row + 1}:{partial_amount_col_letter}{last_holder_row + 1}"
+
+        # For each holder, we need to calculate:
+        # 1. target_pct_j (based on type)
+        # 2. S_a,j = (target_pct_j * V) / P
+        # 3. min(S_a,j * partial_pct_j (if defined, else S_a,j), partial_amount_j / P (if defined, else S_a,j))
+
+        # This is complex to do in a single SUM formula. We'll use SUMPRODUCT with array operations.
+        # For standard: target_pct = ownership_pct (which is in pct_range)
+        # For super: target_pct = pct_range (which contains the absolute target percentage)
+        # For none: target_pct = 0
+
+        # Check if type is standard or super
+        is_standard_or_super = f"(UPPER({type_range})=\"STANDARD\") + (UPPER({type_range})=\"SUPER\")"
+
+        # For standard: target_pct = pct_range (which contains ownership %)
+        # For super: target_pct = pct_range (which contains the absolute target percentage)
+        # So for both, target_pct = pct_range when type is standard or super, else 0
+        target_pct_array = f"IF({is_standard_or_super}, {pct_range}, 0)"
+
+        # S_a,j = (target_pct_j * V) / P
+        S_a_array = f"IFERROR(({target_pct_array} * {V_ref}) / {P_ref}, 0)"
+
+        # Check if partial_pct is defined (not blank and not 0)
+        has_partial_pct_array = f"(NOT(ISBLANK({partial_pct_range})) * ({partial_pct_range}<>0))"
+        # S_a,j * partial_pct_j (if defined, else S_a,j)
+        S_a_with_partial_pct_array = f"IF({has_partial_pct_array}, {S_a_array} * {partial_pct_range}, {S_a_array})"
+
+        # Check if partial_amount is defined
+        has_partial_amount_array = f"(NOT(ISBLANK({partial_amount_range})) * ({partial_amount_range}<>0))"
+        # partial_amount_j / P (if defined, else S_a,j)
+        partial_amount_over_P_array = f"IFERROR({partial_amount_range} / {P_ref}, 0)"
+        partial_amount_term_array = f"IF({has_partial_amount_array}, {partial_amount_over_P_array}, {S_a_array})"
+
+        # min(S_a_with_partial_pct, partial_amount_term) for each holder
+        # Use IF to implement element-wise MIN: if S_a_with_partial_pct <= partial_amount_term, use S_a_with_partial_pct, else use partial_amount_term
+        min_array = f"IF({S_a_with_partial_pct_array} <= {partial_amount_term_array}, {S_a_with_partial_pct_array}, {partial_amount_term_array})"
+
+        # Sum across all holders (only for standard/super types)
+        # Multiply by is_standard_or_super to exclude "none" types
+        sum_formula = f"SUMPRODUCT({is_standard_or_super}, {min_array})"
+
+        return sum_formula
+
     def _create_pro_rata_formula(
         self,
         round_idx: int,
         holder_name: str,
         rounds: List[Dict[str, Any]],
         row: int,
-        pct_col: int,
+        type_cell_ref: str,
+        effective_pct_ref: str,
+        current_ownership_pct_ref: str,
+        pre_round_shares_ref: str,
         first_holder_row: int,
-        last_holder_row: int,
-        exercise_type: str = 'full',
-        partial_exercise_amount: Optional[float] = None,
-        partial_exercise_percentage: Optional[float] = None,
-        pps_col: Optional[int] = None
+        last_holder_row: int
     ) -> str:
-        """Create formula for pro rata shares (standard uses Pro Rata % cell as target).
-        
-        For partial exercises, applies caps based on partial_exercise_amount or partial_exercise_percentage.
+        """Create formula for Pro-rata Shares using target percentage.
+
+        Formula: shares = (target % * (shares prevRound + shares issued this round) / (1 - sum of target % in round)) - current shares
+
+        The target percentage is calculated the same way as in _create_effective_pct_formula:
+        - For "none": target_pct_i = 0
+        - For "standard": target_pct_i = ownership_pct_i
+        - For "super": target_pct_i = pct_cell_ref (which contains ownership_pct_i + super_pro_rata_pct_i)
+
+        Args:
+            type_cell_ref: Cell reference for Pro-rata Rights column
+            pct_cell_ref: Cell reference for Super pro rata % column
+            current_ownership_pct_ref: Formula reference for current ownership percentage
+            pre_round_shares_ref: Named range reference for pre-round shares
         """
         round_data = rounds[round_idx]
         round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
@@ -673,62 +989,33 @@ class ProRataSheetGenerator(BaseSheetGenerator):
             round_idx, holder_row)
         holder_shares_start_ref = f"({prev_total_ref} + {holder_base_shares_ref})"
 
-        # Target percentage is the Pro Rata % cell for this row
-        target_pct_col_letter = self._col_letter(pct_col)
-        holder_target_pct_ref = f"{target_pct_col_letter}{row + 1}"
-
-        # Aggregates across participants
-        sum_pro_rata_pct_ref = self._get_sum_pro_rata_pct_ref(
+        # Aggregates across participants - use target % instead of effective %
+        sum_target_pct_ref = self._get_sum_effective_pct_ref(
             round_idx, rounds, first_holder_row, last_holder_row)
         sum_current_shares_ref = self._get_sum_current_shares_ref(
             round_idx, rounds, first_holder_row, last_holder_row)
 
-        # Standard pro rata formula using unified form
-        full_shares_formula = ownership.create_pro_rata_shares_formula(
-            holder_target_pct_ref,
-            pre_round_shares_ref,
-            shares_issued_ref,
-            holder_shares_start_ref,
-            sum_pro_rata_pct_ref,
-            sum_current_shares_ref
-        ).lstrip('=')
-        
-        # Apply partial exercise caps if needed
-        if exercise_type == 'partial':
-            caps = []
-            
-            # Cap based on partial_exercise_amount (investment amount)
-            if partial_exercise_amount is not None and pps_col is not None:
-                pps_col_letter = self._col_letter(pps_col)
-                pps_cell_ref = f"{pps_col_letter}{row + 1}"
-                # Shares = investment_amount / price_per_share
-                amount_cap = f"IFERROR({partial_exercise_amount} / {pps_cell_ref}, 0)"
-                caps.append(amount_cap)
-            
-            # Cap based on partial_exercise_percentage (ownership percentage)
-            if partial_exercise_percentage is not None:
-                # Calculate total shares after pro-rata
-                numerator = f"({pre_round_shares_ref} + {shares_issued_ref} - {sum_current_shares_ref})"
-                denominator = f"(1 - {sum_pro_rata_pct_ref})"
-                total_shares = f"({numerator} * IFERROR(1 / {denominator}, 0))"
-                # Target shares for partial percentage
-                target_shares = f"({partial_exercise_percentage} * {total_shares})"
-                # Additional shares needed = target_shares - current_shares
-                percentage_cap = f"MAX(0, {target_shares} - {holder_shares_start_ref})"
-                caps.append(percentage_cap)
-            
-            # Apply MIN() to cap the shares if any caps are defined
-            if caps:
-                # Use MIN of full shares and all caps
-                all_caps = [full_shares_formula] + caps
-                formula = f"=MIN({', '.join(all_caps)})"
-            else:
-                # No caps defined, use full shares
-                formula = f"={full_shares_formula}"
-        else:
-            # Full exercise, no caps
-            formula = f"={full_shares_formula}"
-        
+        # Formula based on ownership.py reference:
+        # T = (P + B - C) / (1 - R)
+        # where P = pre_round_shares, B = shares_issued, C = sum_current_shares, R = sum_target_pct
+        numerator = f"({pre_round_shares_ref} + {shares_issued_ref} - {sum_current_shares_ref})"
+        denominator = f"(1 - {sum_target_pct_ref})"
+        total_shares = f"IFERROR({numerator} / {denominator}, 0)"
+
+        # Calculate target shares for this participant: target_pct * total_shares
+        target_shares = f"({effective_pct_ref} * {total_shares})"
+
+        # Calculate shares to purchase: target_shares - current_shares
+        shares_to_purchase = f"({target_shares} - {holder_shares_start_ref})"
+
+        # Final result: max(0, shares_to_purchase) to ensure non-negative
+        formula = (
+            f"=IFERROR(\n"
+            f"    MAX(0, {shares_to_purchase}),\n"
+            f"    0\n"
+            f")"
+        )
+
         return formula
 
     def _get_sum_pro_rata_pct_ref(
@@ -741,31 +1028,32 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         """
         Get reference to Excel formula that sums all pro rata percentages in this round.
 
-        The Pro Rata % column contains:
-        - For "standard": automatically calculated ownership % = holder_shares_start / pre_round_shares
-        - For "super": target ownership % (manual entry)
-        - For "none": empty or 0
+        The Super pro rata % column contains:
+        - For "super": fixed super pro rata % (only if provided in input)
+        - For "standard" or "none": empty
 
-        Returns an Excel SUM formula that sums all Pro Rata % values in this round's column.
-        This will be embedded in the pro rata shares calculation formulas.
+        Returns an Excel SUM formula that sums all Super pro rata % values in this round's column.
+        This will be embedded in the Pro-rata Shares calculation formulas.
         """
         # Build SUM over holder data rows directly so formulas are valid during row creation
         first_row = first_holder_row
         last_row = last_holder_row
 
-        # Pro Rata % column for this round
-        # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 6 (5 data columns + 1 separator)
-        type_col = self.padding_offset + 1 + 2 + (round_idx * 6)
+        # Super pro rata % column for this round
+        # Column structure: type, pct, exercise_type, partial_amount, partial_pct, effective_pct, shares, pps, investment, separator
+        # Each round has 10 columns (9 data + 1 separator)
+        # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 10
+        type_col = self.padding_offset + 1 + 2 + (round_idx * 10)
         pct_col = type_col + 1
         pct_col_letter = self._col_letter(pct_col)
 
-        # Create Excel SUM formula for the Pro Rata % column in this round
+        # Create Excel SUM formula for the Super pro rata % column in this round
         sheet_name = self._get_sheet_name()
         pct_range = f"'{sheet_name}'!{pct_col_letter}{first_row + 1}:{pct_col_letter}{last_row + 1}"
         sum_pro_rata_pct_formula = f"SUM({pct_range})"
         return sum_pro_rata_pct_formula
 
-    def _get_sum_pro_rata_pct_ref(
+    def _get_sum_effective_pct_ref(
         self,
         round_idx: int,
         rounds: List[Dict[str, Any]],
@@ -773,21 +1061,28 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         last_holder_row: int
     ) -> str:
         """
-        Get reference to Excel formula that sums only STANDARD pro rata percentages in this round.
-        Uses SUM over the Pro Rata Type column == "standard".
+        Get reference to the total row cell that contains the sum of effective percentages in this round.
+
+        The total row is at last_holder_row + 2, and the Effective % column is at col + 5.
+
+        Returns a cell reference to the total row's Effective % cell.
+        This will be embedded in the Pro-rata Shares calculation formulas.
         """
-        # Determine the type and pct column letters for this round
-        # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 6 (5 data columns + 1 separator)
-        type_col = self.padding_offset + 1 + 2 + (round_idx * 6)
-        pct_col = type_col + 1
-        pct_col_letter = self._col_letter(pct_col)
+        # Total row is at last_holder_row + 2 (spacing row before it)
+        total_row = last_holder_row + 2
 
-        first_row = first_holder_row
-        last_row = last_holder_row
+        # Effective % column for this round
+        # Column structure: type, pct, exercise_type, partial_amount, partial_pct, effective_pct, shares, pps, investment, separator
+        # Each round has 10 columns (9 data + 1 separator)
+        # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 10
+        type_col = self.padding_offset + 1 + 2 + (round_idx * 10)
+        effective_pct_col = type_col + 5
+        effective_pct_col_letter = self._col_letter(effective_pct_col)
 
+        # Reference the total row cell directly (Excel is 1-based, so add 1 to row)
         sheet_name = self._get_sheet_name()
-        pct_range = f"'{sheet_name}'!{pct_col_letter}{first_row + 1}:{pct_col_letter}{last_row + 1}"
-        return f"SUM({pct_range})"
+        total_cell_ref = f"'{sheet_name}'!{effective_pct_col_letter}{total_row + 1}"
+        return total_cell_ref
 
     def _get_sum_current_shares_ref(
         self,
@@ -798,20 +1093,26 @@ class ProRataSheetGenerator(BaseSheetGenerator):
     ) -> str:
         """
         Sum of current shares (pre-pro-rata) for STANDARD and SUPER rows in this round.
-        Concise single-formula form: SUMPRODUCT(--((type="standard")+(type="super")>0), progression + base_shares)
+        Simplified to check if type is not "None" and not empty.
+        Uses named range for holder names when available (Option 7).
         """
         # Build ranges
         sheet_name = self._get_sheet_name()
-        # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 6 (5 data columns + 1 separator)
-        type_col = self.padding_offset + 1 + 2 + (round_idx * 6)
+        # Column structure: type, pct, exercise_type, partial_amount, partial_pct, effective_pct, shares, pps, investment, separator
+        # Each round has 10 columns (9 data + 1 separator)
+        # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 10
+        type_col = self.padding_offset + 1 + 2 + (round_idx * 10)
         type_col_letter = self._col_letter(type_col)
         type_range = f"'{sheet_name}'!{type_col_letter}{first_holder_row + 1}:{type_col_letter}{last_holder_row + 1}"
 
         rounds_holder_range, rounds_shares_range = self._get_rounds_holder_and_shares_ranges(
             round_idx)
-        # Shareholders column is at padding_offset + 1 (within border)
-        holder_name_col_letter = self._col_letter(self.padding_offset + 1)
-        holder_name_range = f"'{sheet_name}'!{holder_name_col_letter}{first_holder_row + 1}:{holder_name_col_letter}{last_holder_row + 1}"
+        # Use named range for holder names if available (Option 7)
+        if round_idx in self.sumif_named_ranges:
+            holder_name_range = "ProRata_HolderNames"
+        else:
+            holder_name_col_letter = self._col_letter(self.padding_offset + 1)
+            holder_name_range = f"'{sheet_name}'!{holder_name_col_letter}{first_holder_row + 1}:{holder_name_col_letter}{last_holder_row + 1}"
         base_sum_array = f"SUMIF({rounds_holder_range}, {holder_name_range}, {rounds_shares_range})"
 
         # Progression range is 0 in the first round
@@ -822,17 +1123,98 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                 round_idx - 1, rounds)
             progression_range = f"'Cap Table'!{prev_round_total_col}{first_holder_row + 1}:{prev_round_total_col}{last_holder_row + 1}"
 
-        type_filter = f"(({type_range}=\"standard\")+({type_range}=\"super\")>0)"
+        type_filter = f"((UPPER({type_range})=\"STANDARD\") + (UPPER({type_range})=\"SUPER\")>0)"
         return f"SUMPRODUCT(--({type_filter}), {progression_range} + {base_sum_array})"
 
+    def _get_sum_current_ownership_pct_ref(
+        self,
+        round_idx: int,
+        rounds: List[Dict[str, Any]],
+        first_holder_row: int,
+        last_holder_row: int,
+        pre_round_shares_ref: str,
+        shares_issued_ref: str
+    ) -> str:
+        """
+        Get reference to Excel formula that calculates the sum of current ownership % for all holders in this round.
+
+        Current ownership % for each holder = (holder_shares_start + shares issued to holder) / (pre_round_shares + total shares issued)
+
+        Sum of current ownership % = sum(holder_shares_start + shares issued to holder) / (pre_round_shares + total shares issued)
+
+        This sums across all holders who have pro rata rights (STANDARD or SUPER).
+
+        Returns an Excel formula that calculates the sum of current ownership percentages.
+        """
+        # Get sum of (holder_shares_start + shares issued to holder) for all STANDARD and SUPER holders
+        # This is the same as sum_current_shares_ref
+        sum_current_shares_ref = self._get_sum_current_shares_ref(
+            round_idx, rounds, first_holder_row, last_holder_row)
+
+        # Sum of current ownership % = sum_current_shares / (pre_round_shares + total shares issued)
+        numerator = sum_current_shares_ref
+        denominator = f"({pre_round_shares_ref} + {shares_issued_ref})"
+
+        sum_current_ownership_pct_formula = f"IFERROR({numerator} / {denominator}, 0)"
+        return sum_current_ownership_pct_formula
+
+    def _create_sumif_named_ranges(
+        self,
+        rounds: List[Dict[str, Any]],
+        first_holder_row: int,
+        last_holder_row: int
+    ) -> None:
+        """
+        Create named ranges for SUMIF expressions per round (Option 7: Extract SUMIF to Named Range).
+
+        This creates a named range for the holder name range that can be reused in SUMIF formulas,
+        reducing formula complexity.
+        """
+        sheet_name = self._get_sheet_name()
+        holder_name_col_letter = self._col_letter(self.padding_offset + 1)
+        holder_name_range = f"'{sheet_name}'!{holder_name_col_letter}{first_holder_row + 1}:{holder_name_col_letter}{last_holder_row + 1}"
+
+        # Create a named range for the holder names range (used in SUMIF)
+        named_range_name = "ProRata_HolderNames"
+        try:
+            self.dlm.register_named_range(
+                named_range_name, sheet_name, first_holder_row, self.padding_offset + 1
+            )
+        except Exception:
+            pass
+        self.workbook.define_name(named_range_name, holder_name_range)
+
+        # Create named ranges for each round's SUMIF base formula
+        for round_idx, round_data in enumerate(rounds):
+            rounds_holder_range, rounds_shares_range = self._get_rounds_holder_and_shares_ranges(
+                round_idx)
+            round_name_key = self._sanitize_excel_name(
+                round_data.get('name', ''))
+
+            # Create named range for the SUMIF lookup ranges
+            sumif_base_name = f"{round_name_key}_ProRata_BaseShares"
+            # Store the ranges for use in formulas
+            self.sumif_named_ranges[round_idx] = {
+                'holder_range': rounds_holder_range,
+                'shares_range': rounds_shares_range,
+                'named_range_base': sumif_base_name
+            }
+
     def _get_holder_base_shares_ref(self, round_idx: int, holder_row_1_based: int) -> str:
-        """SUMIF over Rounds for base shares issued to the holder in this round."""
+        """
+        SUMIF over Rounds for base shares issued to the holder in this round.
+        For single holder lookup, we use the individual cell reference.
+        Named ranges are used in array operations (see _get_sum_current_shares_ref).
+        """
         rounds_holder_range, rounds_shares_range = self._get_rounds_holder_and_shares_ranges(
             round_idx)
         sheet_name = self._get_sheet_name()
         # Shareholders column is at padding_offset + 1 (within border)
         holder_name_col_letter = self._col_letter(self.padding_offset + 1)
         holder_name_cell = f"'{sheet_name}'!{holder_name_col_letter}{holder_row_1_based}"
+
+        # For single holder lookup, use the cell reference directly
+        # Named range is used for array operations in _get_sum_current_shares_ref
         return f"IFERROR(SUMIF({rounds_holder_range}, {holder_name_cell}, {rounds_shares_range}), 0)"
 
     def _get_rounds_holder_and_shares_ranges(self, round_idx: int) -> tuple:
@@ -869,6 +1251,14 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         col_idx = 2 + (round_idx * 5) + 4
         return self._col_letter(col_idx)
 
+    def _get_progression_percent_col(self, round_idx: int, rounds: List[Dict[str, Any]]) -> str:
+        """Get the column letter for the Percentage column of a round in progression sheet."""
+        # Each round has 4 columns: Start, New, Total, %
+        # % is 3 columns after Start
+        # Formula: col = 2 + (round_idx * 5) + 3 (for % column) + 2 (for Padding)
+        col_idx = 2 + (round_idx * 5) + 3 + 2
+        return self._col_letter(col_idx)
+
     def _write_total_row(
         self,
         sheet: xlsxwriter.worksheet.Worksheet,
@@ -891,15 +1281,20 @@ class ProRataSheetGenerator(BaseSheetGenerator):
 
         for round_idx, round_data in enumerate(rounds):
             is_last_round = (round_idx == len(rounds) - 1)
+            # Column structure: type, pct, exercise_type, partial_amount, partial_pct, effective_pct, shares, pps, investment, separator
             type_col = col
             pct_col = col + 1
-            shares_col = col + 2
-            pps_col = col + 3
-            investment_col = col + 4
-            separator_col = col + 5
+            exercise_type_col = col + 2  # Skip in total row
+            partial_amount_col = col + 3  # Skip in total row
+            partial_pct_col = col + 4  # Skip in total row
+            effective_pct_col = col + 5
+            shares_col = col + 6
+            pps_col = col + 7
+            investment_col = col + 8
+            separator_col = col + 9
 
             sheet.write(row, type_col, '', self.formats.get('total_text'))
-            # Sum all pro rata percentages for this round
+            # Sum all Super pro rata percentages for this round
             pct_col_letter = self._col_letter(pct_col)
             sheet.write_formula(
                 row, pct_col,
@@ -931,7 +1326,47 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                 }
             )
 
-            # Sum all pro rata shares for this round
+            # Sum all effective percentages for this round
+            effective_pct_col_letter = self._col_letter(effective_pct_col)
+            sheet.write_formula(
+                row, effective_pct_col,
+                f"=SUM({effective_pct_col_letter}{first_holder_row + 1}:{effective_pct_col_letter}{last_holder_row + 1})",
+                self.formats.get('total_percent')
+            )
+            # Highlight when total effective % >= 100% (red background)
+            sheet.conditional_format(
+                row, effective_pct_col, row, effective_pct_col,
+                {
+                    'type': 'cell',
+                    'criteria': '>=',
+                    'value': 1,
+                    'format': self.formats.get('error')
+                }
+            )
+
+            # Add data validation with error message for sum >= 100%
+            effective_pct_cell_ref = f"{effective_pct_col_letter}{row + 1}"
+            effective_sum_range = f"{effective_pct_col_letter}{first_holder_row + 1}:{effective_pct_col_letter}{last_holder_row + 1}"
+            sheet.data_validation(
+                row, effective_pct_col, row, effective_pct_col,
+                {
+                    'validate': 'custom',
+                    'value': f'={effective_sum_range}<1',
+                    'error_type': 'stop',
+                    'error_title': 'Invalid Effective Percentage',
+                    'error_message': 'The sum of effective percentages in this round cannot be 100% or greater. Please adjust the values.'
+                }
+            )
+
+            # Skip exercise_type, partial_amount, and partial_pct columns in total row
+            sheet.write(row, exercise_type_col, '',
+                        self.formats.get('total_text'))
+            sheet.write(row, partial_amount_col, '',
+                        self.formats.get('total_text'))
+            sheet.write(row, partial_pct_col, '',
+                        self.formats.get('total_text'))
+
+            # Sum all Pro-rata Shares for this round
             shares_col_letter = self._col_letter(shares_col)
             sheet.write_formula(
                 row, shares_col,
@@ -939,7 +1374,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                 self.formats.get('total_number')
             )
 
-            # Define a Named Range for this round's total pro rata shares so other sheets can reference it
+            # Define a Named Range for this round's total Pro-rata Shares so other sheets can reference it
             round_name_key = self._sanitize_excel_name(
                 round_data.get('name', ''))
             pr_total_named = f"{round_name_key}_ProRataShares"
@@ -979,14 +1414,16 @@ class ProRataSheetGenerator(BaseSheetGenerator):
         rounds: List[Dict[str, Any]],
         pro_rata_type_rows_by_round: Dict[int, List[int]]
     ):
-        """Add dropdown validation to Pro Rata Type columns."""
+        """Add dropdown validation to Pro-rata Rights columns."""
         for round_idx, rows in pro_rata_type_rows_by_round.items():
             if not rows:
                 continue
 
-            # Pro Rata Type column is the first column of each round section
-            # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 6 (5 data columns + 1 separator)
-            type_col = self.padding_offset + 1 + 2 + (round_idx * 6)
+            # Pro-rata Rights column is the first column of each round section
+            # Column structure: type, pct, exercise_type, partial_amount, partial_pct, effective_pct, shares, pps, investment, separator
+            # Each round has 10 columns (9 data + 1 separator)
+            # Column position: padding + 1 (inner padding) + 2 (Shareholders + Description) + round_idx * 10
+            type_col = self.padding_offset + 1 + 2 + (round_idx * 10)
 
             first_row = min(rows)
             last_row = max(rows)
@@ -999,7 +1436,7 @@ class ProRataSheetGenerator(BaseSheetGenerator):
                     'validate': 'list',
                     'source': ['None', 'Standard', 'Super'],
                     'error_type': 'stop',
-                    'error_title': 'Invalid Pro Rata Type',
+                    'error_title': 'Invalid Pro-rata Rights',
                     'error_message': 'Please select "None", "Standard", or "Super" from the dropdown.'
                 }
             )

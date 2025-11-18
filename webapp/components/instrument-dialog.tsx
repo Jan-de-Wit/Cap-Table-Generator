@@ -61,6 +61,7 @@ interface InstrumentDialogProps {
   originalProRataInstrument?: Instrument | null;
   originalProRataRoundIndex?: number | null;
   originalProRataRoundName?: string | null;
+  roundValuation?: number;
 }
 
 export function InstrumentDialog({
@@ -79,6 +80,7 @@ export function InstrumentDialog({
   originalProRataInstrument,
   originalProRataRoundIndex,
   originalProRataRoundName,
+  roundValuation,
 }: InstrumentDialogProps) {
   const [formData, setFormData] = React.useState<Partial<Instrument>>({});
   const [touchedFields, setTouchedFields] = React.useState<Set<string>>(
@@ -89,7 +91,10 @@ export function InstrumentDialog({
   const previousInstrumentRef = React.useRef<Instrument | null>(null);
 
   // Helper function to validate percentage
-  const validatePercentage = (percentage: number, fieldName: string): string | undefined => {
+  const validatePercentage = (
+    percentage: number,
+    fieldName: string
+  ): string | undefined => {
     if (percentage >= 100) {
       return `${fieldName} must be less than 100%`;
     }
@@ -104,77 +109,79 @@ export function InstrumentDialog({
     if (open) {
       // Check if instrument has changed by comparing JSON stringified versions
       // This handles deep equality checks for nested objects
-      const currentInstrumentStr = instrument ? JSON.stringify(instrument) : null;
+      const currentInstrumentStr = instrument
+        ? JSON.stringify(instrument)
+        : null;
       const previousInstrumentStr = previousInstrumentRef.current
         ? JSON.stringify(previousInstrumentRef.current)
         : null;
       const instrumentChanged = currentInstrumentStr !== previousInstrumentStr;
-      
+
       // Always update form data when instrument changes, even if dialog is already open
       if (instrument) {
         // Only update if instrument actually changed to avoid unnecessary re-renders
         if (instrumentChanged) {
-        previousInstrumentRef.current = instrument;
-        const initialData: Partial<Instrument> = { ...instrument };
-        // Ensure exercise_type defaults to "full" for pro-rata allocations
-        if (isProRata && !("exercise_type" in initialData)) {
-          (initialData as any).exercise_type = "full";
-        }
-        setFormData(initialData);
-        setClassName(instrument.class_name || "");
+          previousInstrumentRef.current = instrument;
+          const initialData: Partial<Instrument> = { ...instrument };
+          // Ensure exercise_type defaults to "full" for pro-rata allocations
+          if (isProRata && !("exercise_type" in initialData)) {
+            (initialData as any).exercise_type = "full";
+          }
+          setFormData(initialData);
+          setClassName(instrument.class_name || "");
           // Reset touched fields when instrument changes
           setTouchedFields(new Set());
         }
       } else {
         // Only reset if we don't have a previous instrument (i.e., dialog just opened)
         if (!previousInstrumentRef.current) {
-        previousInstrumentRef.current = null;
-        // Create empty instrument based on type
-        if (isProRata) {
-          setFormData({
-            holder_name: "",
-            class_name: "",
-            pro_rata_type: "standard",
-            exercise_type: "full",
-          });
-        } else {
-          setClassName("");
-          const base: Partial<Instrument> = {
-            holder_name: "",
-            class_name: "",
-          };
-          switch (calculationType) {
-            case "fixed_shares":
-              setFormData({ ...base, initial_quantity: 0 });
-              break;
-            case "target_percentage":
-              setFormData({ ...base, target_percentage: 0 });
-              break;
-            case "valuation_based":
-              setFormData({ ...base, investment_amount: 0 });
-              break;
-            case "convertible":
-              setFormData({
-                ...base,
-                investment_amount: 0,
-                interest_rate: 0,
-                payment_date: "",
-                expected_conversion_date: "",
-                interest_type: "simple",
-                discount_rate: 0,
-              });
-              break;
-            case "safe":
-              setFormData({
-                ...base,
-                investment_amount: 0,
-                expected_conversion_date: "",
-                discount_rate: 0,
-              });
-              break;
+          previousInstrumentRef.current = null;
+          // Create empty instrument based on type
+          if (isProRata) {
+            setFormData({
+              holder_name: "",
+              class_name: "",
+              pro_rata_type: "standard",
+              exercise_type: "full",
+            });
+          } else {
+            setClassName("");
+            const base: Partial<Instrument> = {
+              holder_name: "",
+              class_name: "",
+            };
+            switch (calculationType) {
+              case "fixed_shares":
+                setFormData({ ...base, initial_quantity: 0 });
+                break;
+              case "target_percentage":
+                setFormData({ ...base, target_percentage: 0 });
+                break;
+              case "valuation_based":
+                setFormData({ ...base, investment_amount: 0 });
+                break;
+              case "convertible":
+                setFormData({
+                  ...base,
+                  investment_amount: 0,
+                  interest_rate: 0,
+                  payment_date: "",
+                  expected_conversion_date: "",
+                  interest_type: "simple",
+                  discount_rate: 0,
+                });
+                break;
+              case "safe":
+                setFormData({
+                  ...base,
+                  investment_amount: 0,
+                  expected_conversion_date: "",
+                  discount_rate: 0,
+                });
+                break;
+            }
           }
         }
-      }
       }
     } else {
       // Reset ref when dialog closes
@@ -236,8 +243,13 @@ export function InstrumentDialog({
 
       // Validate exercise_type
       const exerciseType = (formData as any).exercise_type;
-      if (!exerciseType || (exerciseType !== "full" && exerciseType !== "partial")) {
-        errors.push("Exercise type is required and must be 'full' or 'partial'");
+      if (
+        !exerciseType ||
+        (exerciseType !== "full" && exerciseType !== "partial")
+      ) {
+        errors.push(
+          "Exercise type is required and must be 'full' or 'partial'"
+        );
       }
 
       // Validate partial exercise fields
@@ -407,11 +419,10 @@ export function InstrumentDialog({
     return errors;
   };
 
-  const validationErrors = React.useMemo(() => getValidationErrors(), [
-    formData,
-    calculationType,
-    isProRata,
-  ]);
+  const validationErrors = React.useMemo(
+    () => getValidationErrors(),
+    [formData, calculationType, isProRata]
+  );
 
   const handleSave = () => {
     if (validationErrors.length > 0) {
@@ -528,7 +539,8 @@ export function InstrumentDialog({
                   Basic Information
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Holder and class information cannot be changed when editing pro-rata rights
+                  Holder and class information cannot be changed when editing
+                  pro-rata rights
                 </p>
               </div>
               <div className="space-y-4">
@@ -576,36 +588,40 @@ export function InstrumentDialog({
                   </p>
                 </div>
                 <FieldWithHelp
-                  label="Pro-Rata Type"
+                  label="Pro-Rata Rights"
                   helpText="Standard: maintain ownership. Super: can exceed ownership up to specified percentage."
-                  htmlFor="pro-rata-type"
+                  htmlFor="pro-rata-rights"
                 >
                   <div className="flex items-center gap-2">
-                    <Select
-                      value={(formData as any).pro_rata_type || "standard"}
+                    <Input
+                      id="pro-rata-rights"
+                      type="text"
+                      value={
+                        (formData as any).pro_rata_type === "super" &&
+                        (formData as any).pro_rata_percentage !== undefined
+                          ? `Super (${decimalToPercentage(
+                              (formData as any).pro_rata_percentage
+                            ).toFixed(2)}%)`
+                          : (formData as any).pro_rata_type === "standard"
+                          ? "Standard"
+                          : "Standard"
+                      }
                       disabled
-                    >
-                      <SelectTrigger id="pro-rata-type" className="flex-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">Standard</SelectItem>
-                        <SelectItem value="super">Super</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      className="flex-1"
+                    />
                     {originalProRataInstrument && (
                       <Popover>
                         <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
                             className="h-10 cursor-pointer"
                             title="View original pro-rata settings"
-                      >
+                          >
                             <Info className="h-4 w-4 mr-1.5" />
                             View Original
-                      </Button>
+                          </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-80" align="end">
                           <div className="space-y-3">
@@ -614,12 +630,15 @@ export function InstrumentDialog({
                                 Original Pro-Rata Rights
                               </h4>
                               <p className="text-xs text-muted-foreground mb-3">
-                                These settings are defined in the original instrument and cannot be changed here.
+                                These settings are defined in the original
+                                instrument and cannot be changed here.
                               </p>
                             </div>
                             <div className="space-y-2 text-sm">
-                              {(originalProRataRoundName !== null && originalProRataRoundName !== undefined) ||
-                              (originalProRataRoundIndex !== null && originalProRataRoundIndex !== undefined) ? (
+                              {(originalProRataRoundName !== null &&
+                                originalProRataRoundName !== undefined) ||
+                              (originalProRataRoundIndex !== null &&
+                                originalProRataRoundIndex !== undefined) ? (
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">
                                     Round:
@@ -627,8 +646,10 @@ export function InstrumentDialog({
                                   <span className="font-medium">
                                     {originalProRataRoundName ||
                                       (originalProRataRoundIndex !== null &&
-                                        originalProRataRoundIndex !== undefined
-                                        ? `Round ${originalProRataRoundIndex + 1}`
+                                      originalProRataRoundIndex !== undefined
+                                        ? `Round ${
+                                            originalProRataRoundIndex + 1
+                                          }`
                                         : "—")}
                                   </span>
                                 </div>
@@ -646,39 +667,26 @@ export function InstrumentDialog({
                                   </div>
                                 )}
                               {originalProRataInstrument &&
-                                "pro_rata_rights" in originalProRataInstrument && (
+                                "pro_rata_rights" in
+                                  originalProRataInstrument && (
                                   <div className="flex justify-between">
                                     <span className="text-muted-foreground">
-                                      Pro-Rata Type:
+                                      Pro-Rata Rights:
                                     </span>
-                                    <span className="font-medium capitalize">
+                                    <span className="font-medium">
                                       {originalProRataInstrument.pro_rata_rights ===
-                                      "super"
-                                        ? "Super"
+                                        "super" &&
+                                      "pro_rata_percentage" in
+                                        originalProRataInstrument &&
+                                      originalProRataInstrument.pro_rata_percentage !==
+                                        undefined
+                                        ? `Super (${decimalToPercentage(
+                                            originalProRataInstrument.pro_rata_percentage
+                                          ).toFixed(2)}%)`
                                         : originalProRataInstrument.pro_rata_rights ===
                                           "standard"
                                         ? "Standard"
                                         : "None"}
-                                    </span>
-                                  </div>
-                                )}
-                              {originalProRataInstrument &&
-                                "pro_rata_rights" in originalProRataInstrument &&
-                                originalProRataInstrument.pro_rata_rights ===
-                                  "super" &&
-                                "pro_rata_percentage" in
-                                  originalProRataInstrument &&
-                                originalProRataInstrument.pro_rata_percentage !==
-                                  undefined && (
-                                  <div className="flex justify-between">
-                                    <span className="text-muted-foreground">
-                                      Max Percentage:
-                                    </span>
-                                    <span className="font-medium">
-                                      {decimalToPercentage(
-                                        originalProRataInstrument.pro_rata_percentage
-                                      ).toFixed(2)}
-                                      %
                                     </span>
                                   </div>
                                 )}
@@ -689,34 +697,6 @@ export function InstrumentDialog({
                     )}
                   </div>
                 </FieldWithHelp>
-                {(formData as any).pro_rata_type === "super" && (
-                  <FieldWithHelp
-                    label="Pro-Rata Percentage"
-                    helpText="Maximum ownership percentage for super pro-rata (0-100%)"
-                    htmlFor="pro-rata-percentage"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="pro-rata-percentage"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        value={
-                          (formData as any).pro_rata_percentage
-                            ? decimalToPercentage(
-                                (formData as any).pro_rata_percentage
-                              )
-                            : ""
-                        }
-                        disabled
-                        className="flex-1"
-                        placeholder="e.g., 15 for 15%"
-                      />
-                      <span className="text-muted-foreground">%</span>
-                    </div>
-                  </FieldWithHelp>
-                )}
               </div>
 
               <Separator />
@@ -758,58 +738,67 @@ export function InstrumentDialog({
                 </FieldWithHelp>
                 {(formData as any).exercise_type === "partial" && (
                   <>
-                    <FieldWithHelp
-                      label="Partial Exercise Amount"
-                      helpText="Maximum investment amount for partial exercise (optional if percentage is provided)"
-                      htmlFor="partial-exercise-amount"
-                      error={
-                        touchedFields.has("partial_exercise_amount") &&
-                        (formData as any).partial_exercise_amount !== undefined &&
-                        (formData as any).partial_exercise_amount <= 0
-                          ? "Partial exercise amount must be greater than 0"
-                          : undefined
-                      }
-                    >
-                      <Input
-                        id="partial-exercise-amount"
-                        type="text"
-                        value={
-                          (formData as any).partial_exercise_amount
-                            ? formatCurrency(
-                                (formData as any).partial_exercise_amount
+                    {roundValuation !== undefined &&
+                      roundValuation !== null &&
+                      roundValuation > 0 && (
+                        <FieldWithHelp
+                          label="Partial Exercise Amount"
+                          helpText="Maximum investment amount for partial exercise (optional if percentage is provided)"
+                          htmlFor="partial-exercise-amount"
+                          error={
+                            touchedFields.has("partial_exercise_amount") &&
+                            (formData as any).partial_exercise_amount !==
+                              undefined &&
+                            (formData as any).partial_exercise_amount <= 0
+                              ? "Partial exercise amount must be greater than 0"
+                              : undefined
+                          }
+                        >
+                          <Input
+                            id="partial-exercise-amount"
+                            type="text"
+                            value={
+                              (formData as any).partial_exercise_amount
+                                ? formatCurrency(
+                                    (formData as any).partial_exercise_amount
+                                  )
+                                : ""
+                            }
+                            onChange={(e) => {
+                              const parsed = parseFormattedNumber(
+                                e.target.value
+                              );
+                              updateField(
+                                "partial_exercise_amount",
+                                parsed > 0 ? parsed : undefined
+                              );
+                            }}
+                            onBlur={() =>
+                              setTouchedFields(
+                                (prev) =>
+                                  new Set([...prev, "partial_exercise_amount"])
                               )
-                            : ""
-                        }
-                        onChange={(e) => {
-                          const parsed = parseFormattedNumber(e.target.value);
-                          updateField(
-                            "partial_exercise_amount",
-                            parsed > 0 ? parsed : undefined
-                          );
-                        }}
-                        onBlur={() =>
-                          setTouchedFields(
-                            (prev) =>
-                              new Set([...prev, "partial_exercise_amount"])
-                          )
-                        }
-                        placeholder="e.g., $50,000"
-                        className={
-                          touchedFields.has("partial_exercise_amount") &&
-                          (formData as any).partial_exercise_amount !== undefined &&
-                          (formData as any).partial_exercise_amount <= 0
-                            ? "border-destructive ring-destructive/20"
-                            : ""
-                        }
-                      />
-                    </FieldWithHelp>
+                            }
+                            placeholder="e.g., $50,000"
+                            className={
+                              touchedFields.has("partial_exercise_amount") &&
+                              (formData as any).partial_exercise_amount !==
+                                undefined &&
+                              (formData as any).partial_exercise_amount <= 0
+                                ? "border-destructive ring-destructive/20"
+                                : ""
+                            }
+                          />
+                        </FieldWithHelp>
+                      )}
                     <FieldWithHelp
                       label="Partial Exercise Percentage"
                       helpText="Maximum ownership percentage for partial exercise (optional if amount is provided, 0-100%). Must be lower than super pro-rata percentage if set."
                       htmlFor="partial-exercise-percentage"
                       error={
                         touchedFields.has("partial_exercise_percentage") &&
-                        (formData as any).partial_exercise_percentage !== undefined
+                        (formData as any).partial_exercise_percentage !==
+                          undefined
                           ? (() => {
                               const percentageError = validatePercentage(
                                 decimalToPercentage(
@@ -818,15 +807,19 @@ export function InstrumentDialog({
                                 "Partial exercise percentage"
                               );
                               if (percentageError) return percentageError;
-                              
+
                               // Check if partial exercise percentage is lower than super pro-rata percentage
-                              const proRataType = (formData as any).pro_rata_type;
+                              const proRataType = (formData as any)
+                                .pro_rata_type;
                               if (
                                 proRataType === "super" &&
-                                (formData as any).pro_rata_percentage !== undefined
+                                (formData as any).pro_rata_percentage !==
+                                  undefined
                               ) {
-                                const partialPercentage = (formData as any).partial_exercise_percentage;
-                                const proRataPercentage = (formData as any).pro_rata_percentage;
+                                const partialPercentage = (formData as any)
+                                  .partial_exercise_percentage;
+                                const proRataPercentage = (formData as any)
+                                  .pro_rata_percentage;
                                 if (partialPercentage >= proRataPercentage) {
                                   return "Partial exercise percentage must be lower than super pro-rata percentage";
                                 }
@@ -882,15 +875,19 @@ export function InstrumentDialog({
                                 "Partial exercise percentage"
                               );
                               if (percentageError) return true;
-                              
+
                               // Check if partial exercise percentage is lower than super pro-rata percentage
-                              const proRataType = (formData as any).pro_rata_type;
+                              const proRataType = (formData as any)
+                                .pro_rata_type;
                               if (
                                 proRataType === "super" &&
-                                (formData as any).pro_rata_percentage !== undefined
+                                (formData as any).pro_rata_percentage !==
+                                  undefined
                               ) {
-                                const partialPercentage = (formData as any).partial_exercise_percentage;
-                                const proRataPercentage = (formData as any).pro_rata_percentage;
+                                const partialPercentage = (formData as any)
+                                  .partial_exercise_percentage;
+                                const proRataPercentage = (formData as any)
+                                  .pro_rata_percentage;
                                 if (partialPercentage >= proRataPercentage) {
                                   return true;
                                 }
@@ -911,155 +908,168 @@ export function InstrumentDialog({
             </>
           ) : (
             <>
-              {!editProRataOnly && (calculationType === "fixed_shares" ||
-                calculationType === "target_percentage" ||
-                calculationType === "valuation_based") && (
-                <>
-                  <Separator />
-                  {/* Investment Details Section */}
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground mb-1">
-                        Investment Details
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {calculationType === "fixed_shares"
-                          ? "Specify the number of shares to issue"
-                          : calculationType === "target_percentage"
-                          ? "Set the target ownership percentage"
-                          : "Enter the investment amount"}
-                      </p>
-                    </div>
-                    {calculationType === "fixed_shares" && (
-                      <FieldWithHelp
-                        label="Initial Quantity"
-                        helpText="The number of shares to issue"
-                        required
-                        htmlFor="initial-quantity"
-                      >
-                        <Input
-                          id="initial-quantity"
-                          type="text"
-                          value={
-                            (formData as any).initial_quantity
-                              ? formatNumber((formData as any).initial_quantity)
-                              : ""
-                          }
-                          onChange={(e) => {
-                            const parsed = parseFormattedNumber(e.target.value);
-                            updateField(
-                              "initial_quantity",
-                              parsed > 0 ? parsed : 0
-                            );
-                          }}
-                          onBlur={() =>
-                            setTouchedFields(
-                              (prev) => new Set([...prev, "initial_quantity"])
-                            )
-                          }
-                          placeholder="e.g., 1,000,000"
-                        />
-                      </FieldWithHelp>
-                    )}
-
-                    {calculationType === "target_percentage" && (
-                      <FieldWithHelp
-                        label="Target Percentage"
-                        helpText="Target ownership percentage (0-100%)"
-                        required
-                        error={
-                          touchedFields.has("target_percentage") &&
-                          (formData as any).target_percentage !== undefined
-                            ? validatePercentage(
-                                decimalToPercentage((formData as any).target_percentage),
-                                "Target percentage"
-                              )
-                            : undefined
-                        }
-                        htmlFor="target-percentage"
-                      >
-                        <div className="flex items-center gap-2">
+              {!editProRataOnly &&
+                (calculationType === "fixed_shares" ||
+                  calculationType === "target_percentage" ||
+                  calculationType === "valuation_based") && (
+                  <>
+                    <Separator />
+                    {/* Investment Details Section */}
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground mb-1">
+                          Investment Details
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          {calculationType === "fixed_shares"
+                            ? "Specify the number of shares to issue"
+                            : calculationType === "target_percentage"
+                            ? "Set the target ownership percentage"
+                            : "Enter the investment amount"}
+                        </p>
+                      </div>
+                      {calculationType === "fixed_shares" && (
+                        <FieldWithHelp
+                          label="Initial Quantity"
+                          helpText="The number of shares to issue"
+                          required
+                          htmlFor="initial-quantity"
+                        >
                           <Input
-                            id="target-percentage"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="100"
+                            id="initial-quantity"
+                            type="text"
                             value={
-                              (formData as any).target_percentage
-                                ? decimalToPercentage(
-                                    (formData as any).target_percentage
+                              (formData as any).initial_quantity
+                                ? formatNumber(
+                                    (formData as any).initial_quantity
                                   )
                                 : ""
                             }
                             onChange={(e) => {
-                              const percentage = e.target.value
-                                ? parseFloat(e.target.value)
-                                : 0;
+                              const parsed = parseFormattedNumber(
+                                e.target.value
+                              );
                               updateField(
-                                "target_percentage",
-                                percentageToDecimal(percentage)
+                                "initial_quantity",
+                                parsed > 0 ? parsed : 0
+                              );
+                            }}
+                            onBlur={() =>
+                              setTouchedFields(
+                                (prev) => new Set([...prev, "initial_quantity"])
+                              )
+                            }
+                            placeholder="e.g., 1,000,000"
+                          />
+                        </FieldWithHelp>
+                      )}
+
+                      {calculationType === "target_percentage" && (
+                        <FieldWithHelp
+                          label="Target Percentage"
+                          helpText="Target ownership percentage (0-100%)"
+                          required
+                          error={
+                            touchedFields.has("target_percentage") &&
+                            (formData as any).target_percentage !== undefined
+                              ? validatePercentage(
+                                  decimalToPercentage(
+                                    (formData as any).target_percentage
+                                  ),
+                                  "Target percentage"
+                                )
+                              : undefined
+                          }
+                          htmlFor="target-percentage"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Input
+                              id="target-percentage"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              value={
+                                (formData as any).target_percentage
+                                  ? decimalToPercentage(
+                                      (formData as any).target_percentage
+                                    )
+                                  : ""
+                              }
+                              onChange={(e) => {
+                                const percentage = e.target.value
+                                  ? parseFloat(e.target.value)
+                                  : 0;
+                                updateField(
+                                  "target_percentage",
+                                  percentageToDecimal(percentage)
+                                );
+                              }}
+                              onBlur={() =>
+                                setTouchedFields(
+                                  (prev) =>
+                                    new Set([...prev, "target_percentage"])
+                                )
+                              }
+                              className={
+                                touchedFields.has("target_percentage") &&
+                                (formData as any).target_percentage !==
+                                  undefined &&
+                                validatePercentage(
+                                  decimalToPercentage(
+                                    (formData as any).target_percentage
+                                  ),
+                                  "Target percentage"
+                                )
+                                  ? "border-destructive ring-destructive/20"
+                                  : ""
+                              }
+                              placeholder="e.g., 20 for 20%"
+                            />
+                            <span className="text-muted-foreground">%</span>
+                          </div>
+                        </FieldWithHelp>
+                      )}
+
+                      {calculationType === "valuation_based" && (
+                        <FieldWithHelp
+                          label="Investment Amount"
+                          helpText="The amount invested in this round"
+                          required
+                          htmlFor="investment-amount"
+                        >
+                          <Input
+                            id="investment-amount"
+                            type="text"
+                            value={
+                              (formData as any).investment_amount
+                                ? formatCurrency(
+                                    (formData as any).investment_amount
+                                  )
+                                : ""
+                            }
+                            onChange={(e) => {
+                              const parsed = parseFormattedNumber(
+                                e.target.value
+                              );
+                              updateField(
+                                "investment_amount",
+                                parsed > 0 ? parsed : 0
                               );
                             }}
                             onBlur={() =>
                               setTouchedFields(
                                 (prev) =>
-                                  new Set([...prev, "target_percentage"])
+                                  new Set([...prev, "investment_amount"])
                               )
                             }
-                            className={
-                              touchedFields.has("target_percentage") &&
-                              (formData as any).target_percentage !== undefined &&
-                              validatePercentage(
-                                decimalToPercentage((formData as any).target_percentage),
-                                "Target percentage"
-                              )
-                                ? "border-destructive ring-destructive/20"
-                                : ""
-                            }
-                            placeholder="e.g., 20 for 20%"
+                            placeholder="e.g., $2,000,000"
                           />
-                          <span className="text-muted-foreground">%</span>
-                        </div>
-                      </FieldWithHelp>
-                    )}
-
-                    {calculationType === "valuation_based" && (
-                      <FieldWithHelp
-                        label="Investment Amount"
-                        helpText="The amount invested in this round"
-                        required
-                        htmlFor="investment-amount"
-                      >
-                        <Input
-                          id="investment-amount"
-                          type="text"
-                          value={
-                            (formData as any).investment_amount
-                              ? formatCurrency(
-                                  (formData as any).investment_amount
-                                )
-                              : ""
-                          }
-                          onChange={(e) => {
-                            const parsed = parseFormattedNumber(e.target.value);
-                            updateField(
-                              "investment_amount",
-                              parsed > 0 ? parsed : 0
-                            );
-                          }}
-                          onBlur={() =>
-                            setTouchedFields(
-                              (prev) => new Set([...prev, "investment_amount"])
-                            )
-                          }
-                          placeholder="e.g., $2,000,000"
-                        />
-                      </FieldWithHelp>
-                    )}
-                  </div>
-                </>
-              )}
+                        </FieldWithHelp>
+                      )}
+                    </div>
+                  </>
+                )}
 
               {!editProRataOnly && calculationType === "convertible" && (
                 <>
@@ -1146,7 +1156,9 @@ export function InstrumentDialog({
                           touchedFields.has("interest_rate") &&
                           (formData as any).interest_rate !== undefined
                             ? validatePercentage(
-                                decimalToPercentage((formData as any).interest_rate),
+                                decimalToPercentage(
+                                  (formData as any).interest_rate
+                                ),
                                 "Interest rate"
                               )
                             : undefined
@@ -1185,7 +1197,9 @@ export function InstrumentDialog({
                               touchedFields.has("interest_rate") &&
                               (formData as any).interest_rate !== undefined &&
                               validatePercentage(
-                                decimalToPercentage((formData as any).interest_rate),
+                                decimalToPercentage(
+                                  (formData as any).interest_rate
+                                ),
                                 "Interest rate"
                               )
                                 ? "border-destructive ring-destructive/20"
@@ -1281,7 +1295,9 @@ export function InstrumentDialog({
                           touchedFields.has("discount_rate") &&
                           (formData as any).discount_rate !== undefined
                             ? validatePercentage(
-                                decimalToPercentage((formData as any).discount_rate),
+                                decimalToPercentage(
+                                  (formData as any).discount_rate
+                                ),
                                 "Discount rate"
                               )
                             : undefined
@@ -1320,7 +1336,9 @@ export function InstrumentDialog({
                               touchedFields.has("discount_rate") &&
                               (formData as any).discount_rate !== undefined &&
                               validatePercentage(
-                                decimalToPercentage((formData as any).discount_rate),
+                                decimalToPercentage(
+                                  (formData as any).discount_rate
+                                ),
                                 "Discount rate"
                               )
                                 ? "border-destructive ring-destructive/20"
@@ -1639,7 +1657,9 @@ export function InstrumentDialog({
                           touchedFields.has("pro_rata_percentage") &&
                           (formData as any).pro_rata_percentage !== undefined
                             ? validatePercentage(
-                                decimalToPercentage((formData as any).pro_rata_percentage),
+                                decimalToPercentage(
+                                  (formData as any).pro_rata_percentage
+                                ),
                                 "Super pro-rata percentage"
                               )
                             : undefined
@@ -1677,9 +1697,12 @@ export function InstrumentDialog({
                             }
                             className={
                               touchedFields.has("pro_rata_percentage") &&
-                              (formData as any).pro_rata_percentage !== undefined &&
+                              (formData as any).pro_rata_percentage !==
+                                undefined &&
                               validatePercentage(
-                                decimalToPercentage((formData as any).pro_rata_percentage),
+                                decimalToPercentage(
+                                  (formData as any).pro_rata_percentage
+                                ),
                                 "Super pro-rata percentage"
                               )
                                 ? "border-destructive ring-destructive/20"
@@ -1698,7 +1721,11 @@ export function InstrumentDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="cursor-pointer">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="cursor-pointer"
+          >
             Cancel
           </Button>
           <Button
