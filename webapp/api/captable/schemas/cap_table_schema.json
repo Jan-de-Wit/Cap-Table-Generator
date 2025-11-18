@@ -1,0 +1,527 @@
+{
+  "title": "Cap Table Schema",
+  "description": "Dynamic capitalization table with formula-driven calculations and round-based architecture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "holders", "rounds"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "2.0"
+    },
+    "holders": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Holder"
+      },
+      "description": "List of all holders with optional grouping for display"
+    },
+    "rounds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Round"
+      },
+      "description": "Financing rounds containing nested instruments"
+    }
+  },
+  "$defs": {
+    "Name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\n\\r]+$",
+      "description": "Unique name identifier"
+    },
+    "ProRataAllocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "holder_name",
+        "class_name",
+        "pro_rata_type",
+        "exercise_type"
+      ],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
+        },
+        "pro_rata_type": {
+          "type": "string",
+          "enum": ["standard", "super"],
+          "description": "Pro rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro rata rights (required when pro_rata_type is 'super')"
+        },
+        "exercise_type": {
+          "type": "string",
+          "enum": ["full", "partial"],
+          "description": "Exercise type: full (exercise full rights), partial (exercise rights up to a specified amount or percentage)"
+        },
+        "partial_exercise_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum investment amount for partial exercise (required when exercise_type is 'partial' and partial_exercise_percentage is not provided)"
+        },
+        "partial_exercise_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Maximum ownership percentage for partial exercise (required when exercise_type is 'partial' and partial_exercise_amount is not provided)"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "pro_rata_type": { "const": "super" } }
+          },
+          "then": {
+            "required": ["pro_rata_percentage"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "exercise_type": { "const": "partial" } }
+          },
+          "then": {
+            "anyOf": [
+              { "required": ["partial_exercise_amount"] },
+              { "required": ["partial_exercise_percentage"] }
+            ]
+          }
+        }
+      ]
+    },
+    "FixedSharesInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "initial_quantity"],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
+        },
+        "initial_quantity": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Number of shares"
+        },
+        "pro_rata_rights": {
+          "type": "string",
+          "enum": ["standard", "super"],
+          "description": "Optional pro-rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
+        }
+      }
+    },
+    "TargetPercentageInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "target_percentage"],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
+        },
+        "target_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage (as decimal, e.g., 0.20 for 20%)"
+        },
+        "pro_rata_rights": {
+          "type": "string",
+          "enum": ["standard", "super"],
+          "description": "Optional pro-rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
+        }
+      }
+    },
+    "ValuationBasedInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder_name", "class_name", "investment_amount"],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
+        },
+        "investment_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Investment amount"
+        },
+        "pro_rata_rights": {
+          "type": "string",
+          "enum": ["standard", "super"],
+          "description": "Optional pro-rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
+        }
+      }
+    },
+    "ConvertibleInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "holder_name",
+        "class_name",
+        "investment_amount",
+        "interest_rate",
+        "payment_date",
+        "expected_conversion_date",
+        "interest_type",
+        "discount_rate"
+      ],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
+        },
+        "investment_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Principal amount (investment amount)"
+        },
+        "interest_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Annual interest rate (as decimal, e.g., 0.08 for 8%)"
+        },
+        "payment_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Payment date (YYYY-MM-DD)"
+        },
+        "expected_conversion_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Expected conversion date (YYYY-MM-DD)"
+        },
+        "interest_type": {
+          "type": "string",
+          "enum": [
+            "simple",
+            "compound_yearly",
+            "compound_monthly",
+            "compound_daily",
+            "no_interest"
+          ],
+          "description": "Type of interest calculation"
+        },
+        "discount_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Discount rate (as decimal, e.g., 0.20 for 20%)"
+        },
+        "interest_start_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Deprecated: use payment_date instead. Kept for backward compatibility."
+        },
+        "interest_end_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Deprecated: use expected_conversion_date instead. Kept for backward compatibility."
+        },
+        "valuation_cap": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Optional per-instrument valuation cap. If not provided, uses the pre-conversion cap from the round parameters."
+        },
+        "valuation_cap_type": {
+          "type": "string",
+          "enum": [
+            "default",
+            "pre_conversion",
+            "post_conversion_own",
+            "post_conversion_total"
+          ],
+          "description": "Type of valuation cap: 'default' uses the round's pre-investment valuation (default option), 'pre_conversion' uses cap directly, 'post_conversion_own' subtracts only own conversion amount, 'post_conversion_total' subtracts round's total conversion amount."
+        },
+        "pro_rata_rights": {
+          "type": "string",
+          "enum": ["standard", "super"],
+          "description": "Optional pro-rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
+        }
+      }
+    },
+    "SafeInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "holder_name",
+        "class_name",
+        "investment_amount",
+        "expected_conversion_date",
+        "discount_rate"
+      ],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
+        },
+        "investment_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Principal amount (investment amount)"
+        },
+        "expected_conversion_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Expected conversion date (YYYY-MM-DD)"
+        },
+        "discount_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Discount rate (as decimal, e.g., 0.20 for 20%)"
+        },
+        "valuation_cap": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Optional per-instrument valuation cap. If not provided, uses the pre-conversion cap from the round parameters."
+        },
+        "valuation_cap_type": {
+          "type": "string",
+          "enum": [
+            "default",
+            "pre_conversion",
+            "post_conversion_own",
+            "post_conversion_total"
+          ],
+          "description": "Type of valuation cap: 'default' uses the round's pre-investment valuation (default option), 'pre_conversion' uses cap directly, 'post_conversion_own' subtracts only own conversion amount, 'post_conversion_total' subtracts round's total conversion amount."
+        },
+        "pro_rata_rights": {
+          "type": "string",
+          "enum": ["standard", "super"],
+          "description": "Optional pro-rata rights type: standard (maintain ownership), super (exceed ownership up to specified percentage)"
+        },
+        "pro_rata_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "pro_rata_rights": { "const": "super" } }
+          },
+          "then": {
+            "required": ["pro_rata_percentage"]
+          }
+        }
+      ]
+    },
+    "Holder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Name",
+          "description": "Unique holder name (used as reference in instruments)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description shown next to the holder name in Cap Table"
+        },
+        "group": {
+          "type": "string",
+          "description": "Optional group name for organizing holders in Excel output (e.g., 'Founders', 'Investors', 'Employees')"
+        }
+      }
+    },
+    "Round": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "round_date", "calculation_type"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Name"
+        },
+        "round_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Round closing date (YYYY-MM-DD)"
+        },
+        "calculation_type": {
+          "type": "string",
+          "enum": [
+            "fixed_shares",
+            "target_percentage",
+            "convertible",
+            "safe",
+            "valuation_based"
+          ],
+          "description": "Calculation method for all instruments in this round"
+        },
+        "valuation_basis": {
+          "type": "string",
+          "enum": ["pre_money", "post_money"],
+          "description": "Valuation basis for valuation_based, convertible, and safe calculation types. Determines how the valuation field is interpreted: if pre_money, valuation is pre-investment; if post_money, valuation is post-investment. The other valuation will be calculated using formulas."
+        },
+        "instruments": {
+          "type": "array",
+          "description": "Instruments issued in this round. Can include regular instruments (based on calculation_type) and ProRataAllocation instruments."
+        },
+        "valuation": {
+          "type": "number",
+          "description": "Valuation amount (for valuation_based, convertible, and safe rounds). Interpretation depends on valuation_basis: if pre_money, this is pre-investment valuation; if post_money, this is post-investment valuation. The other valuation will be calculated using formulas."
+        },
+        "conversion_round_ref": {
+          "type": "string",
+          "description": "Optional reference to a future valuation-based round (for convertible and safe calculation types). When provided, the conversion price will be calculated using that round's pre-investment valuation cap minus total conversion amount, with discount applied. If not provided, uses the valuation cap from the current round."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "calculation_type": { "const": "fixed_shares" } }
+          },
+          "then": {
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/FixedSharesInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "calculation_type": { "const": "target_percentage" }
+            }
+          },
+          "then": {
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/TargetPercentageInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "calculation_type": { "const": "valuation_based" } }
+          },
+          "then": {
+            "required": ["valuation_basis"],
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/ValuationBasedInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "calculation_type": { "const": "convertible" } }
+          },
+          "then": {
+            "required": ["valuation_basis"],
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/ConvertibleInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "calculation_type": { "const": "safe" } }
+          },
+          "then": {
+            "required": ["valuation_basis"],
+            "properties": {
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/SafeInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
