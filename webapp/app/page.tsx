@@ -429,7 +429,8 @@ export default function Home() {
     setIsGenerating(true);
     try {
       const data = buildCapTableData();
-      const response = await fetch("/api/generate-excel", {
+      const apiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000";
+      const response = await fetch(`${apiUrl}/generate-excel-raw`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -438,8 +439,15 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || "Failed to generate Excel");
+        let errorMessage = "Failed to generate Excel";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail?.error || errorData.error || errorMessage;
+        } catch {
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const blob = await response.blob();
