@@ -3,3 +3,4 @@ jsonschema
 fastapi
 uvicorn[standard]
 python-multipart
+mangum

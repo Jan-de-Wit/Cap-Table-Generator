@@ -1,0 +1,15 @@
+{
+  "buildCommand": "./build.sh",
+  "functions": {
+    "app.py": {
+      "runtime": "python",
+      "includeFiles": "src/**"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/app.py"
+    }
+  ]
+}
