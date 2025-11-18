@@ -67,26 +67,59 @@ def handler(request):
         # Verify INTERNAL_API_SECRET
         expected_secret = os.environ.get("INTERNAL_API_SECRET")
         if not expected_secret:
+            print("ERROR: INTERNAL_API_SECRET not configured", file=sys.stderr)
             return {
                 "statusCode": 500,
                 "headers": {"Content-Type": "application/json"},
                 "body": json.dumps({"error": "INTERNAL_API_SECRET not configured"}),
             }
         
+        print(f"DEBUG: Expected secret exists: {bool(expected_secret)}", file=sys.stderr)
+        print(f"DEBUG: Request type: {type(request)}", file=sys.stderr)
+        print(f"DEBUG: Request keys: {list(request.keys()) if isinstance(request, dict) else 'N/A'}", file=sys.stderr)
+        
         # Parse request body
         # Vercel Python functions receive request as a dict with "body" as a string
         # Handle different possible request formats
+        body = None
         if isinstance(request, dict):
+            # Check if body is base64 encoded (Vercel/Lambda format)
+            is_base64 = request.get("isBase64Encoded", False)
+            
             if "body" in request:
                 # Body is a string, parse it
                 body_str = request.get("body", "{}")
+                print(f"DEBUG: Body type: {type(body_str)}, isBase64Encoded: {is_base64}, Body preview: {str(body_str)[:100]}", file=sys.stderr)
+                
                 if isinstance(body_str, str):
-                    body = json.loads(body_str)
+                    if is_base64:
+                        # Body is base64 encoded
+                        try:
+                            decoded = base64.b64decode(body_str).decode("utf-8")
+                            body = json.loads(decoded)
+                            print("DEBUG: Body was base64 encoded and decoded", file=sys.stderr)
+                        except Exception as e:
+                            print(f"DEBUG: Failed to decode base64 body: {e}", file=sys.stderr)
+                            body = {}
+                    else:
+                        # Try to parse as JSON
+                        try:
+                            body = json.loads(body_str)
+                        except json.JSONDecodeError as e:
+                            print(f"DEBUG: Failed to parse body as JSON: {e}", file=sys.stderr)
+                            # Try base64 decode as fallback
+                            try:
+                                decoded = base64.b64decode(body_str).decode("utf-8")
+                                body = json.loads(decoded)
+                                print("DEBUG: Body was base64 encoded (fallback)", file=sys.stderr)
+                            except:
+                                print(f"DEBUG: Failed to parse body as JSON or base64", file=sys.stderr)
+                                body = {}
                 else:
                     # Body is already a dict
                     body = body_str
-            else:
-                # Request itself is the body
+            elif not body:
+                # Request itself might be the body (if no "body" key)
                 body = request
         elif hasattr(request, "get"):
             # Request-like object with get method
@@ -102,9 +135,31 @@ def handler(request):
             except:
                 body = {}
         
+        if not body:
+            print("ERROR: Failed to parse request body", file=sys.stderr)
+            return {
+                "statusCode": 400,
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps({"error": "Failed to parse request body"}),
+            }
+        
+        print(f"DEBUG: Body keys: {list(body.keys()) if isinstance(body, dict) else 'N/A'}", file=sys.stderr)
+        
         # Verify secret
         provided_secret = body.get("secret")
+        print(f"DEBUG: Provided secret exists: {bool(provided_secret)}", file=sys.stderr)
+        print(f"DEBUG: Secret match: {provided_secret == expected_secret}", file=sys.stderr)
+        
+        if not provided_secret:
+            print("ERROR: No secret provided in request", file=sys.stderr)
+            return {
+                "statusCode": 401,
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps({"error": "Unauthorized: No secret provided"}),
+            }
+        
         if provided_secret != expected_secret:
+            print(f"ERROR: Secret mismatch. Expected length: {len(expected_secret)}, Provided length: {len(provided_secret) if provided_secret else 0}", file=sys.stderr)
             return {
                 "statusCode": 401,
                 "headers": {"Content-Type": "application/json"},
