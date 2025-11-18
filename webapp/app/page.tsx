@@ -542,7 +542,9 @@ export default function Home() {
     }
 
     toast.success("JSON imported successfully", {
-      description: `Imported ${data.rounds?.length || 0} rounds and ${data.holders?.length || 0} holders.`,
+      description: `Imported ${data.rounds?.length || 0} rounds and ${
+        data.holders?.length || 0
+      } holders.`,
     });
   };
 

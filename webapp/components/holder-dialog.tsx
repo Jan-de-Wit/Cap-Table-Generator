@@ -68,11 +68,11 @@ export function HolderDialog({
     // Debounce validation
     const timeoutId = setTimeout(() => {
       const trimmedName = name.trim();
-      
+
       // Check for duplicate names (excluding current holder if editing)
       const isDuplicate = existingHolders.some(
-        (h) => 
-          h.name.toLowerCase() === trimmedName.toLowerCase() && 
+        (h) =>
+          h.name.toLowerCase() === trimmedName.toLowerCase() &&
           h.name !== holder?.name
       );
 
@@ -92,9 +92,7 @@ export function HolderDialog({
     const allGroups = new Set<string>([
       ...COMMON_GROUPS,
       ...usedGroups,
-      ...existingHolders
-        .map((h) => h.group)
-        .filter((g): g is string => !!g),
+      ...existingHolders.map((h) => h.group).filter((g): g is string => !!g),
     ]);
     // Add the currently typed group if it's not empty and not already in the list
     if (group.trim() && !allGroups.has(group.trim())) {
@@ -114,8 +112,8 @@ export function HolderDialog({
     // Final check for duplicate names (excluding current holder if editing)
     const trimmedName = name.trim();
     const isDuplicate = existingHolders.some(
-      (h) => 
-        h.name.toLowerCase() === trimmedName.toLowerCase() && 
+      (h) =>
+        h.name.toLowerCase() === trimmedName.toLowerCase() &&
         h.name !== holder?.name
     );
 
@@ -146,7 +144,7 @@ export function HolderDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
-            {isEditMode ? "Edit Holder" : "Create New Holder"}
+            {isEditMode ? "Edit Holder" : "Create new holder"}
           </DialogTitle>
           <DialogDescription>
             {isEditMode
@@ -209,10 +207,18 @@ export function HolderDialog({
           </FieldWithHelp>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="cursor-pointer">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="cursor-pointer"
+          >
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={!name.trim() || !!nameError} className="cursor-pointer">
+          <Button
+            onClick={handleSave}
+            disabled={!name.trim() || !!nameError}
+            className="cursor-pointer"
+          >
             {isEditMode ? "Save Changes" : "Create Holder"}
           </Button>
         </DialogFooter>
@@ -220,4 +226,3 @@ export function HolderDialog({
     </Dialog>
   );
 }
-

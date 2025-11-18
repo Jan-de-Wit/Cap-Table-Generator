@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { CheckIcon, ChevronsUpDown } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import * as React from "react";
+import { CheckIcon, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -11,21 +11,21 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command"
+} from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 
 interface ComboboxProps {
-  options: string[]
-  value?: string
-  onValueChange: (value: string) => void
-  placeholder?: string
-  searchPlaceholder?: string
-  emptyText?: string
-  allowCustom?: boolean
+  options: string[];
+  value?: string;
+  onValueChange: (value: string) => void;
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyText?: string;
+  allowCustom?: boolean;
 }
 
 export function Combobox({
@@ -37,38 +37,39 @@ export function Combobox({
   emptyText = "No option found.",
   allowCustom = true,
 }: ComboboxProps) {
-  const [open, setOpen] = React.useState(false)
-  const [searchValue, setSearchValue] = React.useState("")
+  const [open, setOpen] = React.useState(false);
+  const [searchValue, setSearchValue] = React.useState("");
 
   const filteredOptions = React.useMemo(() => {
-    if (!searchValue) return options
-    const lowerSearch = searchValue.toLowerCase()
-    return options.filter((opt) => opt.toLowerCase().includes(lowerSearch))
-  }, [options, searchValue])
+    if (!searchValue) return options;
+    const lowerSearch = searchValue.toLowerCase();
+    return options.filter((opt) => opt.toLowerCase().includes(lowerSearch));
+  }, [options, searchValue]);
 
   const handleSelect = (selectedValue: string) => {
     // CommandItem passes lowercase value, so we need to find the original case
-    const originalValue = options.find(
-      (opt) => opt.toLowerCase() === selectedValue.toLowerCase()
-    ) || selectedValue
-    onValueChange(originalValue === value ? "" : originalValue)
-    setOpen(false)
-    setSearchValue("")
-  }
+    const originalValue =
+      options.find(
+        (opt) => opt.toLowerCase() === selectedValue.toLowerCase()
+      ) || selectedValue;
+    onValueChange(originalValue === value ? "" : originalValue);
+    setOpen(false);
+    setSearchValue("");
+  };
 
   const handleCustomValue = () => {
     if (searchValue.trim() && allowCustom) {
-      onValueChange(searchValue.trim())
-      setOpen(false)
-      setSearchValue("")
+      onValueChange(searchValue.trim());
+      setOpen(false);
+      setSearchValue("");
     }
-  }
+  };
 
   React.useEffect(() => {
     if (!open) {
-      setSearchValue("")
+      setSearchValue("");
     }
-  }, [open])
+  }, [open]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -79,11 +80,17 @@ export function Combobox({
           aria-expanded={open}
           className="w-full justify-between cursor-pointer"
         >
-          <span className="truncate">{value || placeholder}</span>
+          <span className={cn("truncate", !value && "font-normal")}>
+            {value || placeholder}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0" align="start" style={{ width: "var(--radix-popover-trigger-width)" }}>
+      <PopoverContent
+        className="p-0"
+        align="start"
+        style={{ width: "var(--radix-popover-trigger-width)" }}
+      >
         <Command shouldFilter={false}>
           <CommandInput
             placeholder={searchPlaceholder}
@@ -97,7 +104,9 @@ export function Combobox({
             }}
           />
           <CommandList>
-            {filteredOptions.length === 0 && searchValue.trim() && allowCustom ? (
+            {filteredOptions.length === 0 &&
+            searchValue.trim() &&
+            allowCustom ? (
               <div className="p-2">
                 <div className="text-sm text-muted-foreground mb-2 px-2">
                   Press Enter to use "{searchValue}" or click below
@@ -124,28 +133,34 @@ export function Combobox({
                     <CheckIcon
                       className={cn(
                         "mr-2 h-4 w-4",
-                        value?.toLowerCase() === option.toLowerCase() ? "opacity-100" : "opacity-0"
+                        value?.toLowerCase() === option.toLowerCase()
+                          ? "opacity-100"
+                          : "opacity-0"
                       )}
                     />
                     {option}
                   </CommandItem>
                 ))}
-                {allowCustom && searchValue.trim() && !filteredOptions.some(opt => opt.toLowerCase() === searchValue.trim().toLowerCase()) && (
-                  <CommandItem
-                    value={searchValue.trim()}
-                    onSelect={handleCustomValue}
-                    className="border-t"
-                  >
-                    <CheckIcon className="mr-2 h-4 w-4 opacity-0" />
-                    Use "{searchValue.trim()}"
-                  </CommandItem>
-                )}
+                {allowCustom &&
+                  searchValue.trim() &&
+                  !filteredOptions.some(
+                    (opt) =>
+                      opt.toLowerCase() === searchValue.trim().toLowerCase()
+                  ) && (
+                    <CommandItem
+                      value={searchValue.trim()}
+                      onSelect={handleCustomValue}
+                      className="border-t"
+                    >
+                      <CheckIcon className="mr-2 h-4 w-4 opacity-0" />
+                      Use "{searchValue.trim()}"
+                    </CommandItem>
+                  )}
               </CommandGroup>
             )}
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
-  )
+  );
 }
-
