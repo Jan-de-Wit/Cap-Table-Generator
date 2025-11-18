@@ -27,7 +27,7 @@ echo "   Detected Python version: $PYTHON_VERSION"
 # Install Python dependencies
 echo "📦 Installing Python dependencies..."
 $PYTHON_CMD -m pip install --upgrade pip --quiet
-$PYTHON_CMD -m pip install -r requirements.txt --quiet --user
+$PYTHON_CMD -m pip install -r ../requirements.txt --quiet --user
 
 # Verify Python dependencies are installed
 echo "✅ Verifying Python dependencies..."
@@ -41,7 +41,6 @@ export PYTHON_CMD
 
 # Install Node.js dependencies and build Next.js
 echo "📦 Installing Node.js dependencies..."
-cd webapp
 npm install
 
 echo "🔨 Building Next.js application..."
