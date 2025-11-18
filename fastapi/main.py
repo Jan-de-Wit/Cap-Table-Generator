@@ -20,18 +20,18 @@ try:
     from captable import generate_from_data, CapTableGenerator
 except ImportError:
     # If not installed, add src directory to path
-    project_root = Path(__file__).parent
+    project_root = Path(__file__).parent.parent
     possible_src_paths = [
         project_root / "src",
         project_root.parent / "src",  # If app.py is in a subdirectory
         Path("/var/task/src"),  # Vercel serverless function location
     ]
-    
+
     for src_path in possible_src_paths:
         if src_path.exists() and (src_path / "captable").exists():
             sys.path.insert(0, str(src_path))
             break
-    
+
     # Try importing again
     try:
         from captable import generate_from_data, CapTableGenerator

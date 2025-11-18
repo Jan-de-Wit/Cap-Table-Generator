@@ -1,0 +1,5 @@
+xlsxwriter
+jsonschema
+fastapi
+uvicorn[standard]
+python-multipart
