@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd webapp && npm install && npm run build",
+  "buildCommand": "chmod +x build.sh && ./build.sh",
   "outputDirectory": "webapp/.next",
-  "installCommand": "cd webapp && npm install",
+  "installCommand": "echo 'Dependencies installed in build script'",
   "framework": "nextjs"
 }
 
