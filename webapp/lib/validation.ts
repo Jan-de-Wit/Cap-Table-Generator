@@ -22,7 +22,7 @@ export function validateRound(
   const errors: FieldError[] = [];
 
   if (!round.name || round.name.trim() === "") {
-    errors.push({ field: "name", message: "Give the round a name" });
+    errors.push({ field: "name", message: "Rounds must have a name" });
   } else if (allRounds && currentRoundIndex !== undefined) {
     // Check for duplicate round names (excluding current round)
     const duplicateIndex = allRounds.findIndex(
