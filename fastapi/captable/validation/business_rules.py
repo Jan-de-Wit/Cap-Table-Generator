@@ -39,6 +39,7 @@ class BusinessRulesValidator:
         errors.extend(self._validate_valuation_requirements(data))
         errors.extend(self._validate_interest_dates(data))
         errors.extend(self._validate_pro_rata_allocations(data))
+        errors.extend(self._validate_dilution_method(data))
         
         return errors
     
@@ -459,6 +460,50 @@ class BusinessRulesValidator:
                                     f"Round '{round_name}', Pro-rata Allocation {inst_idx} ({holder_name}): "
                                     f"Partial exercise percentage must be lower than super pro-rata percentage"
                                 )
+        
+        return errors
+    
+    def _validate_dilution_method(self, data: Dict[str, Any]) -> List[str]:
+        """
+        Validate dilution_method field on instruments if provided.
+        
+        Valid dilution methods:
+        - full_ratchet
+        - narrow_based_weighted_average
+        - broad_based_weighted_average
+        
+        Args:
+            data: Cap table JSON data
+            
+        Returns:
+            List of error messages
+        """
+        errors = []
+        rounds = data.get("rounds", [])
+        valid_dilution_methods = {
+            "full_ratchet",
+            "narrow_based_weighted_average",
+            "broad_based_weighted_average"
+        }
+        
+        for round_idx, round_data in enumerate(rounds):
+            round_name = round_data.get("name", f"Round {round_idx}")
+            instruments = round_data.get("instruments", [])
+            
+            for inst_idx, instrument in enumerate(instruments):
+                # Skip pro-rata allocations as they don't have dilution_method
+                if "pro_rata_type" in instrument:
+                    continue
+                    
+                dilution_method = instrument.get("dilution_method")
+                
+                if dilution_method is not None:
+                    if dilution_method not in valid_dilution_methods:
+                        holder_name = instrument.get("holder_name", "Unknown")
+                        errors.append(
+                            f"Round '{round_name}', Instrument '{holder_name}': Invalid dilution_method '{dilution_method}'. "
+                            f"Must be one of: {', '.join(sorted(valid_dilution_methods))}"
+                        )
         
         return errors
 

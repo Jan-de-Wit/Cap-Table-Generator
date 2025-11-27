@@ -78,6 +78,8 @@ interface SidebarProps {
     newGroup: string | undefined
   ) => void;
   onNavigateToError?: (roundIndex: number, field?: string) => void;
+  onUpdateRound?: (index: number, round: Round) => void;
+  forceVisible?: boolean;
 }
 
 export function Sidebar({
@@ -99,6 +101,8 @@ export function Sidebar({
   onReorderRounds,
   onMoveHolderToGroup,
   onNavigateToError,
+  onUpdateRound,
+  forceVisible = false,
 }: SidebarProps) {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [overId, setOverId] = React.useState<string | null>(null);
@@ -300,7 +304,7 @@ export function Sidebar({
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="hidden lg:block w-80 border-l bg-muted/20 flex flex-col h-screen sticky top-0">
+      <div className={`${forceVisible ? '' : 'hidden lg:block'} w-80 border-l bg-muted/20 flex flex-col ${forceVisible ? 'h-full' : 'h-screen sticky top-0'}`}>
         <div className="flex flex-col h-full">
           <div ref={sidebarWrapperRef} className="flex-1 overflow-hidden">
             <div ref={sidebarContentRef} className="p-3 space-y-5">
@@ -365,6 +369,7 @@ export function Sidebar({
                   </Button>
                 )}
               </div>
+
 
               {/* Holders Section */}
               <div className="space-y-3 border-t pt-5">
@@ -1003,6 +1008,7 @@ function DraggableRoundSidebar({
     </div>
   );
 }
+
 
 // Error Summary Component
 function ErrorSummary({

@@ -19,6 +19,8 @@ import {
   FileText,
   Users,
   Upload,
+  Menu,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -37,9 +39,67 @@ export default function Home() {
   const [editingHolder, setEditingHolder] = React.useState<Holder | null>(null);
   const [holderDialogOpen, setHolderDialogOpen] = React.useState(false);
   const [jsonImportDialogOpen, setJsonImportDialogOpen] = React.useState(false);
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [selectedRoundIndex, setSelectedRoundIndex] = React.useState<
     number | null
   >(null);
+
+  // Helper function to find the next valuation-based round after a given round index
+  const findNextValuationBasedRound = (
+    rounds: Round[],
+    currentIndex: number
+  ): Round | null => {
+    for (let i = currentIndex + 1; i < rounds.length; i++) {
+      if (rounds[i].calculation_type === "valuation_based") {
+        return rounds[i];
+      }
+    }
+    return null;
+  };
+
+  // Helper function to update conversion_round_ref for all convertible/SAFE rounds
+  const updateConversionRoundRefs = (roundsToUpdate: Round[]): Round[] => {
+    return roundsToUpdate.map((round, index) => {
+      // Only process convertible and SAFE rounds
+      if (
+        round.calculation_type !== "convertible" &&
+        round.calculation_type !== "safe"
+      ) {
+        return round;
+      }
+
+      // Find the next valuation-based round
+      const nextValuationRound = findNextValuationBasedRound(
+        roundsToUpdate,
+        index
+      );
+
+      // If a next valuation-based round exists, set conversion_round_ref
+      if (nextValuationRound && nextValuationRound.name) {
+        // Only update if not already set correctly
+        if (round.conversion_round_ref !== nextValuationRound.name) {
+          return {
+            ...round,
+            conversion_round_ref: nextValuationRound.name,
+          };
+        }
+      } else if (round.conversion_round_ref) {
+        // If there's no next valuation-based round but conversion_round_ref is set,
+        // check if the referenced round still exists
+        const referencedRound = roundsToUpdate.find(
+          (r) => r.name === round.conversion_round_ref
+        );
+        if (!referencedRound) {
+          return {
+            ...round,
+            conversion_round_ref: undefined,
+          };
+        }
+      }
+
+      return round;
+    });
+  };
 
   // Infer new holders from rounds (only add if they don't exist)
   React.useEffect(() => {
@@ -72,7 +132,8 @@ export default function Home() {
       instruments: [],
     };
     const newIndex = rounds.length;
-    setRounds([...rounds, newRound]);
+    const updatedRounds = updateConversionRoundRefs([...rounds, newRound]);
+    setRounds(updatedRounds);
     setSelectedRoundIndex(newIndex);
 
     toast.success("Round added", {
@@ -83,7 +144,8 @@ export default function Home() {
   const updateRound = (index: number, round: Round) => {
     const updated = [...rounds];
     updated[index] = round;
-    setRounds(updated);
+    const updatedWithRefs = updateConversionRoundRefs(updated);
+    setRounds(updatedWithRefs);
   };
 
   const deleteRound = (index: number) => {
@@ -95,7 +157,9 @@ export default function Home() {
     const previousSelectedIndex = selectedRoundIndex;
 
     // Perform deletion
-    setRounds(rounds.filter((_, i) => i !== index));
+    const filteredRounds = rounds.filter((_, i) => i !== index);
+    const updatedWithRefs = updateConversionRoundRefs(filteredRounds);
+    setRounds(updatedWithRefs);
 
     // Update selected round index
     if (selectedRoundIndex === index) {
@@ -224,7 +288,8 @@ export default function Home() {
       };
     });
 
-    setRounds(cleanedRounds);
+    const updatedWithRefs = updateConversionRoundRefs(cleanedRounds);
+    setRounds(updatedWithRefs);
 
     // Update selected round index after reordering
     if (selectedRoundIndex === startIndex) {
@@ -534,7 +599,9 @@ export default function Home() {
 
     // Set the imported data
     setHolders(data.holders || []);
-    setRounds(data.rounds || []);
+    const importedRounds = data.rounds || [];
+    const updatedWithRefs = updateConversionRoundRefs(importedRounds);
+    setRounds(updatedWithRefs);
 
     // Select the first round if available
     if (data.rounds && data.rounds.length > 0) {
@@ -554,8 +621,18 @@ export default function Home() {
         <div className="w-full max-w-3xl mx-auto p-3 sm:p-5 lg:p-6">
           {/* Header */}
           <div className="mb-6 pt-4">
-            <div className="mb-6 flex items-center gap-2  ">
+            <div className="mb-6 flex items-center gap-2 justify-between">
               <p className="text-lg font-semibold">zebra.legal</p>
+              {/* Mobile menu button */}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="lg:hidden"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
             </div>
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight pt-4">
               Cap Table Generator
@@ -794,12 +871,16 @@ export default function Home() {
           )}
         </div>
       </div>
+      {/* Desktop Sidebar */}
       <Sidebar
         holders={holders}
         rounds={rounds}
         validations={validations}
         selectedRoundIndex={selectedRoundIndex}
-        onSelectRound={setSelectedRoundIndex}
+        onSelectRound={(index) => {
+          setSelectedRoundIndex(index);
+          setSidebarOpen(false); // Close mobile drawer when selecting
+        }}
         onEditHolder={handleEditHolder}
         onEditRound={handleEditRound}
         onDeleteHolder={deleteHolder}
@@ -813,7 +894,61 @@ export default function Home() {
         onReorderRounds={reorderRounds}
         onMoveHolderToGroup={moveHolderToGroup}
         onNavigateToError={handleNavigateToError}
+        onUpdateRound={updateRound}
       />
+      {/* Mobile Sidebar Drawer */}
+      {sidebarOpen && (
+        <div className="lg:hidden fixed inset-0 z-50">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
+          {/* Drawer */}
+          <div className="absolute right-0 top-0 bottom-0 w-80 bg-muted/20 border-l flex flex-col h-full animate-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold">Menu</h2>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <div className="w-full">
+                <Sidebar
+                  holders={holders}
+                  rounds={rounds}
+                  validations={validations}
+                  selectedRoundIndex={selectedRoundIndex}
+                  onSelectRound={(index) => {
+                    setSelectedRoundIndex(index);
+                    setSidebarOpen(false); // Close drawer when selecting
+                  }}
+                  onEditHolder={handleEditHolder}
+                  onEditRound={handleEditRound}
+                  onDeleteHolder={deleteHolder}
+                  onDeleteRound={deleteRound}
+                  onAddRound={addRound}
+                  onAddHolder={handleAddHolderFromSidebar}
+                  onDownloadExcel={handleDownloadExcel}
+                  onCopyJson={handleCopyJson}
+                  onDownloadJson={handleDownloadJson}
+                  canDownload={canDownload}
+                  onReorderRounds={reorderRounds}
+                  onMoveHolderToGroup={moveHolderToGroup}
+                  onNavigateToError={handleNavigateToError}
+                  onUpdateRound={updateRound}
+                  forceVisible={true}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <HolderDialog
         open={holderDialogOpen}
         onOpenChange={(open: boolean) => {

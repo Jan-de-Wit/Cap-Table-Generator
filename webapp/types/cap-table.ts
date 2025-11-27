@@ -7,6 +7,11 @@ export type CalculationType =
 
 export type ValuationBasis = "pre_money" | "post_money";
 
+export type DilutionMethod = 
+  | "full_ratchet"
+  | "narrow_based_weighted_average"
+  | "broad_based_weighted_average";
+
 export type ProRataType = "standard" | "super";
 
 export type InterestType = 
@@ -28,6 +33,7 @@ export interface FixedSharesInstrument {
   initial_quantity: number;
   pro_rata_rights?: "standard" | "super";
   pro_rata_percentage?: number;
+  dilution_method?: DilutionMethod;
 }
 
 export interface TargetPercentageInstrument {
@@ -36,6 +42,7 @@ export interface TargetPercentageInstrument {
   target_percentage: number;
   pro_rata_rights?: "standard" | "super";
   pro_rata_percentage?: number;
+  dilution_method?: DilutionMethod;
 }
 
 export interface ValuationBasedInstrument {
@@ -44,6 +51,7 @@ export interface ValuationBasedInstrument {
   investment_amount: number;
   pro_rata_rights?: "standard" | "super";
   pro_rata_percentage?: number;
+  dilution_method?: DilutionMethod;
 }
 
 export interface ConvertibleInstrument {
@@ -59,6 +67,7 @@ export interface ConvertibleInstrument {
   valuation_cap_type?: "default" | "pre_conversion" | "post_conversion_own" | "post_conversion_total";
   pro_rata_rights?: "standard" | "super";
   pro_rata_percentage?: number;
+  dilution_method?: DilutionMethod;
 }
 
 export interface SafeInstrument {
@@ -71,6 +80,7 @@ export interface SafeInstrument {
   valuation_cap_type?: "default" | "pre_conversion" | "post_conversion_own" | "post_conversion_total";
   pro_rata_rights?: "standard" | "super";
   pro_rata_percentage?: number;
+  dilution_method?: DilutionMethod;
 }
 
 export interface ProRataAllocation {

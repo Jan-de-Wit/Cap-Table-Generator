@@ -127,6 +127,15 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
+        },
+        "dilution_method": {
+          "type": "string",
+          "enum": [
+            "full_ratchet",
+            "narrow_based_weighted_average",
+            "broad_based_weighted_average"
+          ],
+          "description": "Optional dilution protection method for this instrument"
         }
       }
     },
@@ -159,6 +168,15 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
+        },
+        "dilution_method": {
+          "type": "string",
+          "enum": [
+            "full_ratchet",
+            "narrow_based_weighted_average",
+            "broad_based_weighted_average"
+          ],
+          "description": "Optional dilution protection method for this instrument"
         }
       }
     },
@@ -190,6 +208,15 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
+        },
+        "dilution_method": {
+          "type": "string",
+          "enum": [
+            "full_ratchet",
+            "narrow_based_weighted_average",
+            "broad_based_weighted_average"
+          ],
+          "description": "Optional dilution protection method for this instrument"
         }
       }
     },
@@ -288,6 +315,15 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
+        },
+        "dilution_method": {
+          "type": "string",
+          "enum": [
+            "full_ratchet",
+            "narrow_based_weighted_average",
+            "broad_based_weighted_average"
+          ],
+          "description": "Optional dilution protection method for this instrument"
         }
       }
     },
@@ -351,6 +387,15 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Target ownership percentage for super pro-rata rights (required when pro_rata_rights is 'super')"
+        },
+        "dilution_method": {
+          "type": "string",
+          "enum": [
+            "full_ratchet",
+            "narrow_based_weighted_average",
+            "broad_based_weighted_average"
+          ],
+          "description": "Optional dilution protection method for this instrument"
         }
       },
       "allOf": [

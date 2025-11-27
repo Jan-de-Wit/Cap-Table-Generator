@@ -46,6 +46,27 @@ export function validateRound(
     });
   }
 
+  // Validate dilution_method on instruments if provided
+  round.instruments.forEach((instrument, index) => {
+    if (
+      "dilution_method" in instrument &&
+      instrument.dilution_method !== undefined &&
+      instrument.dilution_method !== null
+    ) {
+      const validDilutionMethods = [
+        "full_ratchet",
+        "narrow_based_weighted_average",
+        "broad_based_weighted_average",
+      ];
+      if (!validDilutionMethods.includes(instrument.dilution_method)) {
+        errors.push({
+          field: `instruments[${index}].dilution_method`,
+          message: `Invalid dilution method. Must be one of: ${validDilutionMethods.join(", ")}`,
+        });
+      }
+    }
+  });
+
   const needsValuationBasis = [
     "valuation_based",
     "convertible",
