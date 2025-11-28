@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckIcon, ChevronsUpDown } from "lucide-react";
+import { CheckIcon, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +63,12 @@ export function Combobox({
       setOpen(false);
       setSearchValue("");
     }
+  };
+
+  const handleClear = () => {
+    onValueChange("");
+    setOpen(false);
+    setSearchValue("");
   };
 
   React.useEffect(() => {
@@ -156,6 +162,18 @@ export function Combobox({
                       Use "{searchValue.trim()}"
                     </CommandItem>
                   )}
+              </CommandGroup>
+            )}
+            {value && (
+              <CommandGroup>
+                <CommandItem
+                  value="__clear__"
+                  onSelect={handleClear}
+                  className="text-muted-foreground border-t"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Clear selection
+                </CommandItem>
               </CommandGroup>
             )}
           </CommandList>

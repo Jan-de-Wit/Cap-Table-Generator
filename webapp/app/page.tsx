@@ -30,9 +30,16 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Round, Holder, CapTableData } from "@/types/cap-table";
-import { validateRound } from "@/lib/validation";
+import {
+  useLocalStoragePersistence,
+  loadFromLocalStorage,
+} from "@/lib/use-local-storage";
+import { useValidation } from "@/lib/use-validation";
+import { useRounds } from "@/lib/use-rounds";
+import { useHolders } from "@/lib/use-holders";
 
 export default function Home() {
+  // Initialize state - always start empty to avoid hydration mismatch
   const [rounds, setRounds] = React.useState<Round[]>([]);
   const [holders, setHolders] = React.useState<Holder[]>([]);
   const [isGenerating, setIsGenerating] = React.useState(false);
@@ -43,401 +50,59 @@ export default function Home() {
   const [selectedRoundIndex, setSelectedRoundIndex] = React.useState<
     number | null
   >(null);
+  const [isMounted, setIsMounted] = React.useState(false);
 
-  // Helper function to find the next valuation-based round after a given round index
-  const findNextValuationBasedRound = (
-    rounds: Round[],
-    currentIndex: number
-  ): Round | null => {
-    for (let i = currentIndex + 1; i < rounds.length; i++) {
-      if (rounds[i].calculation_type === "valuation_based") {
-        return rounds[i];
-      }
-    }
-    return null;
-  };
-
-  // Helper function to update conversion_round_ref for all convertible/SAFE rounds
-  const updateConversionRoundRefs = (roundsToUpdate: Round[]): Round[] => {
-    return roundsToUpdate.map((round, index) => {
-      // Only process convertible and SAFE rounds
-      if (
-        round.calculation_type !== "convertible" &&
-        round.calculation_type !== "safe"
-      ) {
-        return round;
-      }
-
-      // Find the next valuation-based round
-      const nextValuationRound = findNextValuationBasedRound(
-        roundsToUpdate,
-        index
-      );
-
-      // If a next valuation-based round exists, set conversion_round_ref
-      if (nextValuationRound && nextValuationRound.name) {
-        // Only update if not already set correctly
-        if (round.conversion_round_ref !== nextValuationRound.name) {
-          return {
-            ...round,
-            conversion_round_ref: nextValuationRound.name,
-          };
-        }
-      } else if (round.conversion_round_ref) {
-        // If there's no next valuation-based round but conversion_round_ref is set,
-        // check if the referenced round still exists
-        const referencedRound = roundsToUpdate.find(
-          (r) => r.name === round.conversion_round_ref
-        );
-        if (!referencedRound) {
-          return {
-            ...round,
-            conversion_round_ref: undefined,
-          };
-        }
-      }
-
-      return round;
-    });
-  };
-
-  // Infer new holders from rounds (only add if they don't exist)
+  // Load from localStorage after mount to avoid hydration mismatch
   React.useEffect(() => {
-    setHolders((prev) => {
-      const holderNames = new Set(prev.map((h) => h.name));
-      const newHolders: Holder[] = [];
-
-      rounds.forEach((round) => {
-        round.instruments.forEach((instrument) => {
-          if ("holder_name" in instrument && instrument.holder_name) {
-            if (!holderNames.has(instrument.holder_name)) {
-              newHolders.push({
-                name: instrument.holder_name,
-              });
-              holderNames.add(instrument.holder_name);
-            }
-          }
-        });
-      });
-
-      return newHolders.length > 0 ? [...prev, ...newHolders] : prev;
-    });
-  }, [rounds]); // Only depend on rounds, not holders to avoid infinite loop
-
-  const addRound = () => {
-    const newRound: Round = {
-      name: "",
-      round_date: new Date().toISOString().split("T")[0],
-      calculation_type: "fixed_shares",
-      instruments: [],
-    };
-    const newIndex = rounds.length;
-    const updatedRounds = updateConversionRoundRefs([...rounds, newRound]);
-    setRounds(updatedRounds);
-    setSelectedRoundIndex(newIndex);
-
-    toast.success("Round added", {
-      description: `Round ${newIndex + 1} has been created.`,
-    });
-  };
-
-  const updateRound = (index: number, round: Round) => {
-    const updated = [...rounds];
-    updated[index] = round;
-    const updatedWithRefs = updateConversionRoundRefs(updated);
-    setRounds(updatedWithRefs);
-  };
-
-  const deleteRound = (index: number) => {
-    const deletedRound = rounds[index];
-    const roundName = deletedRound.name || `Round ${index + 1}`;
-
-    // Store state for undo
-    const previousRounds = [...rounds];
-    const previousSelectedIndex = selectedRoundIndex;
-
-    // Perform deletion
-    const filteredRounds = rounds.filter((_, i) => i !== index);
-    const updatedWithRefs = updateConversionRoundRefs(filteredRounds);
-    setRounds(updatedWithRefs);
-
-    // Update selected round index
-    if (selectedRoundIndex === index) {
-      // If we deleted the selected round, select the previous one or first one
-      if (rounds.length > 1) {
-        setSelectedRoundIndex(index > 0 ? index - 1 : 0);
-      } else {
-        setSelectedRoundIndex(null);
+    setIsMounted(true);
+    const saved = loadFromLocalStorage();
+    if (saved) {
+      if (saved.rounds && saved.rounds.length > 0) {
+        setRounds(saved.rounds);
+        setSelectedRoundIndex(0); // Select first round if data exists
       }
-    } else if (selectedRoundIndex !== null && selectedRoundIndex > index) {
-      // If we deleted a round before the selected one, adjust the index
-      setSelectedRoundIndex(selectedRoundIndex - 1);
-    }
-
-    // Show toast with undo
-    toast(`"${roundName}" has been removed.`, {
-      description: 'Accident? Hit "Undo" to restore.',
-      action: {
-        label: "Undo",
-        onClick: () => {
-          setRounds(previousRounds);
-          setSelectedRoundIndex(previousSelectedIndex);
-          toast.success("Round restored", {
-            description: `"${roundName}" has been restored.`,
-          });
-        },
-      },
-    });
-  };
-
-  const deleteHolder = (holderName: string) => {
-    const deletedHolder = holders.find((h) => h.name === holderName);
-    if (!deletedHolder) return;
-
-    // Store state for undo
-    const previousHolders = [...holders];
-    const previousRounds = rounds.map((round) => ({
-      ...round,
-      instruments: [...round.instruments],
-    }));
-
-    // Remove holder from holders list
-    setHolders(holders.filter((h) => h.name !== holderName));
-
-    // Remove all instruments that reference this holder from all rounds
-    setRounds(
-      rounds.map((round) => ({
-        ...round,
-        instruments: round.instruments.filter(
-          (inst) => !("holder_name" in inst && inst.holder_name === holderName)
-        ),
-      }))
-    );
-
-    // Show toast with undo
-    toast(`"${holderName}" has been removed.`, {
-      description:
-        "The holder and all associated instruments have been removed.",
-      action: {
-        label: "Undo",
-        onClick: () => {
-          setHolders(previousHolders);
-          setRounds(previousRounds);
-          toast.success("Holder restored", {
-            description: `"${holderName}" and all instruments have been restored.`,
-          });
-        },
-      },
-    });
-  };
-
-  const reorderRounds = (startIndex: number, endIndex: number) => {
-    if (startIndex === endIndex) return;
-
-    const newRounds = Array.from(rounds);
-    const [removed] = newRounds.splice(startIndex, 1);
-    newRounds.splice(endIndex, 0, removed);
-
-    // Remove invalid pro-rata allocations after reordering
-    // A pro-rata allocation is invalid if the holder doesn't have shares in previous rounds
-    const cleanedRounds = newRounds.map((round, roundIndex) => {
-      // Check if there are previous rounds
-      if (roundIndex === 0) {
-        // First round can't have pro-rata allocations
-        return {
-          ...round,
-          instruments: round.instruments.filter(
-            (inst) => !("pro_rata_type" in inst)
-          ),
-        };
-      }
-
-      // Collect all holders who have shares in previous rounds
-      const holdersWithShares = new Set<string>();
-      for (let i = 0; i < roundIndex; i++) {
-        newRounds[i]?.instruments.forEach((instrument) => {
-          // Only count regular instruments, not pro-rata allocations
-          if (
-            "holder_name" in instrument &&
-            instrument.holder_name &&
-            !("pro_rata_type" in instrument)
-          ) {
-            holdersWithShares.add(instrument.holder_name);
-          }
-        });
-      }
-
-      // Filter out pro-rata allocations for holders without shares in previous rounds
-      const validInstruments = round.instruments.filter((instrument) => {
-        // Keep all non-pro-rata instruments
-        if (!("pro_rata_type" in instrument)) {
-          return true;
-        }
-
-        // For pro-rata allocations, check if holder has shares in previous rounds
-        if ("holder_name" in instrument && instrument.holder_name) {
-          return holdersWithShares.has(instrument.holder_name);
-        }
-
-        return false;
-      });
-
-      return {
-        ...round,
-        instruments: validInstruments,
-      };
-    });
-
-    const updatedWithRefs = updateConversionRoundRefs(cleanedRounds);
-    setRounds(updatedWithRefs);
-
-    // Update selected round index after reordering
-    if (selectedRoundIndex === startIndex) {
-      setSelectedRoundIndex(endIndex);
-    } else if (selectedRoundIndex !== null) {
-      // Adjust selected index if it's affected by the reorder
-      if (startIndex < selectedRoundIndex && endIndex >= selectedRoundIndex) {
-        setSelectedRoundIndex(selectedRoundIndex - 1);
-      } else if (
-        startIndex > selectedRoundIndex &&
-        endIndex <= selectedRoundIndex
-      ) {
-        setSelectedRoundIndex(selectedRoundIndex + 1);
+      if (saved.holders && saved.holders.length > 0) {
+        setHolders(saved.holders);
       }
     }
-  };
+  }, []);
 
-  const moveHolderToGroup = (
-    holderName: string,
-    newGroup: string | undefined
-  ) => {
-    const holder = holders.find((h) => h.name === holderName);
-    if (holder) {
-      updateHolder(holderName, { ...holder, group: newGroup });
-    }
-  };
-
-  const addHolder = (holder: Holder) => {
-    if (!holders.find((h) => h.name === holder.name)) {
-      setHolders([...holders, holder]);
-      toast.success("Holder added", {
-        description: `"${holder.name}" has been created.`,
-      });
-    }
-  };
-
-  const updateHolder = (oldName: string, updatedHolder: Holder) => {
-    // Update holder in the holders list
-    const updatedHolders = holders.map((h) =>
-      h.name === oldName ? updatedHolder : h
-    );
-    setHolders(updatedHolders);
-
-    // Update all references to this holder in rounds
-    const updatedRounds = rounds.map((round) => ({
-      ...round,
-      instruments: round.instruments.map((inst) => {
-        if ("holder_name" in inst && inst.holder_name === oldName) {
-          return { ...inst, holder_name: updatedHolder.name };
-        }
-        return inst;
-      }),
-    }));
-    setRounds(updatedRounds);
-  };
-
-  // Get used groups from all holders
-  const usedGroups = React.useMemo(() => {
-    const groups = new Set<string>();
-    holders.forEach((holder) => {
-      if (holder.group) {
-        groups.add(holder.group);
-      }
-    });
-    return Array.from(groups);
+  // Use refs to access current state in callbacks
+  const roundsRef = React.useRef(rounds);
+  const holdersRef = React.useRef(holders);
+  
+  React.useEffect(() => {
+    roundsRef.current = rounds;
+  }, [rounds]);
+  
+  React.useEffect(() => {
+    holdersRef.current = holders;
   }, [holders]);
 
-  // Get used class names from all rounds
-  const usedClassNames = React.useMemo(() => {
-    const classNames = new Set<string>();
-    rounds.forEach((round) => {
-      round.instruments.forEach((instrument) => {
-        if ("class_name" in instrument && instrument.class_name) {
-          classNames.add(instrument.class_name);
-        }
-      });
-    });
-    return Array.from(classNames).sort();
-  }, [rounds]);
+  // Use custom hooks for state management
+  const roundsManager = useRounds(
+    rounds,
+    setRounds,
+    selectedRoundIndex,
+    setSelectedRoundIndex
+  );
 
-  const handleEditHolder = (holder: Holder) => {
-    setEditingHolder(holder);
-    setHolderDialogOpen(true);
-  };
+  const holdersManager = useHolders(holders, setHolders, rounds, setRounds);
 
-  const handleEditRound = (index: number) => {
-    // Select the round first
-    setSelectedRoundIndex(index);
-    // Scroll to the round after a short delay
-    setTimeout(() => {
-      const element = document.getElementById(`round-${index}`);
-      element?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 100);
-  };
+  // Use optimized validation hook
+  const {
+    validations,
+    validationSummary,
+    isRoundValid,
+    getFieldErrors,
+  } = useValidation(rounds, { incremental: true });
 
-  const handleNavigateToError = (roundIndex: number, field?: string) => {
-    // Select the round first
-    setSelectedRoundIndex(roundIndex);
-    // Scroll to the round after a short delay
-    setTimeout(() => {
-      const element = document.getElementById(`round-${roundIndex}`);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-
-        // If a specific field is provided, try to focus on it
-        if (field) {
-          // Try to find the field input by ID or data attribute
-          setTimeout(() => {
-            // Field names might be like "name", "round_date", "instruments[0].holder_name", etc.
-            const fieldId = field.includes("[")
-              ? undefined // Complex nested fields are harder to target
-              : `round-${roundIndex}-${field}`;
-
-            if (fieldId) {
-              const fieldElement = document.getElementById(fieldId);
-              if (fieldElement) {
-                fieldElement.focus();
-                fieldElement.scrollIntoView({
-                  behavior: "smooth",
-                  block: "center",
-                });
-              }
-            }
-          }, 300);
-        }
-      }
-    }, 100);
-  };
-
-  const handleSaveHolder = (holder: Holder) => {
-    if (editingHolder) {
-      updateHolder(editingHolder.name, holder);
-    } else {
-      addHolder(holder);
+  // Build cap table data for persistence
+  const capTableData = React.useMemo((): CapTableData | null => {
+    if (rounds.length === 0 && holders.length === 0) {
+      return null;
     }
-    setHolderDialogOpen(false);
-    setEditingHolder(null);
-  };
-
-  const handleAddHolderFromSidebar = () => {
-    setEditingHolder(null);
-    setHolderDialogOpen(true);
-  };
-
-  const buildCapTableData = (): CapTableData => {
     // Filter out pro_rata_rights from instruments when not exercised
-    // A pro_rata_right is considered exercised if there's a corresponding pro_rata allocation
-    // in any later round for the same holder
     const processedRounds = rounds.map((round, roundIndex) => {
       const processedInstruments = round.instruments.map((instrument) => {
         // Remove React component-specific fields that shouldn't be in the schema
@@ -494,12 +159,126 @@ export default function Home() {
       holders,
       rounds: processedRounds,
     };
-  };
+  }, [rounds, holders]);
 
-  const handleDownloadExcel = async () => {
+  // Persist to localStorage
+  useLocalStoragePersistence(capTableData, { enabled: true, debounceMs: 500 });
+
+  // Extract operations from hooks
+  const {
+    addRound,
+    updateRound,
+    deleteRound,
+    reorderRounds,
+    updateConversionRefs,
+  } = roundsManager;
+
+  const {
+    addHolder,
+    updateHolder,
+    deleteHolder,
+    moveHolderToGroup,
+  } = holdersManager;
+
+  // Get used groups from all holders
+  const usedGroups = React.useMemo(() => {
+    const groups = new Set<string>();
+    holders.forEach((holder) => {
+      if (holder.group) {
+        groups.add(holder.group);
+      }
+    });
+    return Array.from(groups);
+  }, [holders]);
+
+  // Get used class names from all rounds
+  const usedClassNames = React.useMemo(() => {
+    const classNames = new Set<string>();
+    rounds.forEach((round) => {
+      round.instruments.forEach((instrument) => {
+        if ("class_name" in instrument && instrument.class_name) {
+          classNames.add(instrument.class_name);
+        }
+      });
+    });
+    return Array.from(classNames).sort();
+  }, [rounds]);
+
+  const handleEditHolder = React.useCallback((holder: Holder) => {
+    setEditingHolder(holder);
+    setHolderDialogOpen(true);
+  }, []);
+
+  const handleEditRound = React.useCallback((index: number) => {
+    // Select the round first
+    setSelectedRoundIndex(index);
+    // Scroll to the round after a short delay
+    setTimeout(() => {
+      const element = document.getElementById(`round-${index}`);
+      element?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  }, []);
+
+  const handleNavigateToError = React.useCallback(
+    (roundIndex: number, field?: string) => {
+      // Select the round first
+      setSelectedRoundIndex(roundIndex);
+      // Scroll to the round after a short delay
+      setTimeout(() => {
+        const element = document.getElementById(`round-${roundIndex}`);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+
+          // If a specific field is provided, try to focus on it
+          if (field) {
+            // Try to find the field input by ID or data attribute
+            setTimeout(() => {
+              // Field names might be like "name", "round_date", "instruments[0].holder_name", etc.
+              const fieldId = field.includes("[")
+                ? undefined // Complex nested fields are harder to target
+                : `round-${roundIndex}-${field}`;
+
+              if (fieldId) {
+                const fieldElement = document.getElementById(fieldId);
+                if (fieldElement) {
+                  fieldElement.focus();
+                  fieldElement.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                  });
+                }
+              }
+            }, 300);
+          }
+        }
+      }, 100);
+    },
+    []
+  );
+
+  const handleSaveHolder = React.useCallback(
+    (holder: Holder) => {
+      if (editingHolder) {
+        updateHolder(editingHolder.name, holder);
+      } else {
+        addHolder(holder);
+      }
+      setHolderDialogOpen(false);
+      setEditingHolder(null);
+    },
+    [editingHolder, updateHolder, addHolder]
+  );
+
+  const handleAddHolderFromSidebar = React.useCallback(() => {
+    setEditingHolder(null);
+    setHolderDialogOpen(true);
+  }, []);
+
+  const handleDownloadExcel = React.useCallback(async () => {
+    if (!capTableData) return;
+
     setIsGenerating(true);
     try {
-      const data = buildCapTableData();
       const apiUrl =
         process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000";
       const response = await fetch(`${apiUrl}/generate-excel`, {
@@ -507,7 +286,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(capTableData),
       });
 
       if (!response.ok) {
@@ -544,18 +323,17 @@ export default function Home() {
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [capTableData]);
 
-  const validations = React.useMemo(
-    () => rounds.map((round, index) => validateRound(round, rounds, index)),
-    [rounds]
+  const canDownload = React.useMemo(
+    () => validationSummary.isValid && rounds.length > 0,
+    [validationSummary.isValid, rounds.length]
   );
 
-  const canDownload = rounds.length > 0 && validations.every((v) => v.isValid);
+  const handleCopyJson = React.useCallback(() => {
+    if (!capTableData) return;
 
-  const handleCopyJson = () => {
-    const data = buildCapTableData();
-    const jsonString = JSON.stringify(data, null, 2);
+    const jsonString = JSON.stringify(capTableData, null, 2);
     navigator.clipboard
       .writeText(jsonString)
       .then(() => {
@@ -569,11 +347,12 @@ export default function Home() {
           description: "Failed to copy JSON to clipboard",
         });
       });
-  };
+  }, [capTableData]);
 
-  const handleDownloadJson = () => {
-    const data = buildCapTableData();
-    const jsonString = JSON.stringify(data, null, 2);
+  const handleDownloadJson = React.useCallback(() => {
+    if (!capTableData) return;
+
+    const jsonString = JSON.stringify(capTableData, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -586,34 +365,46 @@ export default function Home() {
     toast.success("JSON file downloaded", {
       description: "Your cap table has been saved as JSON.",
     });
-  };
+  }, [capTableData]);
 
-  const handleImportJson = (data: CapTableData) => {
-    // Validate that we're importing into an empty state
-    if (rounds.length > 0 || holders.length > 0) {
-      toast.error("Cannot import JSON", {
-        description: "Please clear existing data before importing.",
+  const handleImportJson = React.useCallback(
+    (data: CapTableData) => {
+      // Check current state using refs
+      if (roundsRef.current.length > 0 || holdersRef.current.length > 0) {
+        toast.error("Cannot import JSON", {
+          description: "Please clear existing data before importing.",
+        });
+        return;
+      }
+
+      // Set the imported data
+      const importedRounds = data.rounds || [];
+      const updatedWithRefs = updateConversionRefs(importedRounds);
+      
+      setHolders(data.holders || []);
+      setRounds(updatedWithRefs);
+
+      // Select the first round if available
+      if (data.rounds && data.rounds.length > 0) {
+        setSelectedRoundIndex(0);
+      }
+
+      toast.success("JSON imported successfully", {
+        description: `Imported ${data.rounds?.length || 0} rounds and ${
+          data.holders?.length || 0
+        } holders.`,
       });
-      return;
-    }
+    },
+    [updateConversionRefs]
+  );
 
-    // Set the imported data
-    setHolders(data.holders || []);
-    const importedRounds = data.rounds || [];
-    const updatedWithRefs = updateConversionRoundRefs(importedRounds);
-    setRounds(updatedWithRefs);
-
-    // Select the first round if available
-    if (data.rounds && data.rounds.length > 0) {
-      setSelectedRoundIndex(0);
-    }
-
-    toast.success("JSON imported successfully", {
-      description: `Imported ${data.rounds?.length || 0} rounds and ${
-        data.holders?.length || 0
-      } holders.`,
-    });
-  };
+  const handleSelectRound = React.useCallback(
+    (index: number) => {
+      setSelectedRoundIndex(index);
+      setSidebarOpen(false); // Close mobile drawer when selecting
+    },
+    []
+  );
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -877,10 +668,7 @@ export default function Home() {
         rounds={rounds}
         validations={validations}
         selectedRoundIndex={selectedRoundIndex}
-        onSelectRound={(index) => {
-          setSelectedRoundIndex(index);
-          setSidebarOpen(false); // Close mobile drawer when selecting
-        }}
+        onSelectRound={handleSelectRound}
         onEditHolder={handleEditHolder}
         onEditRound={handleEditRound}
         onDeleteHolder={deleteHolder}
@@ -924,10 +712,7 @@ export default function Home() {
                   rounds={rounds}
                   validations={validations}
                   selectedRoundIndex={selectedRoundIndex}
-                  onSelectRound={(index) => {
-                    setSelectedRoundIndex(index);
-                    setSidebarOpen(false); // Close drawer when selecting
-                  }}
+                  onSelectRound={handleSelectRound}
                   onEditHolder={handleEditHolder}
                   onEditRound={handleEditRound}
                   onDeleteHolder={deleteHolder}
@@ -986,7 +771,7 @@ function RoundsList({
 }: {
   rounds: Round[];
   holders: Holder[];
-  validations: ReturnType<typeof validateRound>[];
+  validations: import("@/lib/validation").RoundValidation[];
   usedGroups: string[];
   usedClassNames: string[];
   onUpdate: (index: number, round: Round) => void;

@@ -7,8 +7,10 @@ import json
 import sys
 from typing import Dict, Any, Optional
 from pathlib import Path
-from .validation import validate_cap_table
+from .validation import validate_cap_table, CapTableValidator
 from .excel import ExcelGenerator
+from .errors import ExcelGenerationError
+from .monitoring import PerformanceTracker
 
 
 class CapTableGenerator:
@@ -34,6 +36,7 @@ class CapTableGenerator:
         
         self.validation_errors = []
         self.is_valid = False
+        self.performance_tracker = PerformanceTracker()
         
     def validate(self) -> bool:
         """
@@ -42,7 +45,8 @@ class CapTableGenerator:
         Returns:
             True if valid, False otherwise
         """
-        self.is_valid, self.validation_errors = validate_cap_table(self.data)
+        with self.performance_tracker.track("validation"):
+            self.is_valid, self.validation_errors = validate_cap_table(self.data)
         return self.is_valid
     
     def generate_excel(self, output_path: str, force: bool = False) -> str:
@@ -66,11 +70,15 @@ class CapTableGenerator:
             
             if not self.is_valid:
                 error_msg = "Cap table data is invalid:\n" + "\n".join(self.validation_errors)
-                raise ValueError(error_msg)
+                raise ExcelGenerationError(
+                    error_msg,
+                    details={"validation_errors": self.validation_errors}
+                )
         
-        # Generate Excel
-        generator = ExcelGenerator(self.data, output_path)
-        result_path = generator.generate()
+        # Generate Excel with performance tracking
+        with self.performance_tracker.track("excel_generation"):
+            generator = ExcelGenerator(self.data, output_path)
+            result_path = generator.generate()
         
         return result_path
     

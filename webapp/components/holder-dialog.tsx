@@ -178,7 +178,7 @@ export function HolderDialog({
 
           <FieldWithHelp
             label="Group"
-            helpText="Optional classification for organizing holders (e.g., Founders, Investors, ESOP)"
+            helpText="Optional classification for organizing holders (e.g., Founders, Investors, ESOP). Clear the selection to remove a holder from their group."
             htmlFor="holder-group"
           >
             <Combobox

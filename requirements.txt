@@ -3,3 +3,7 @@ jsonschema
 fastapi
 uvicorn[standard]
 python-multipart
+pydantic-settings
+openpyxl
+pytest
+pytest-asyncio

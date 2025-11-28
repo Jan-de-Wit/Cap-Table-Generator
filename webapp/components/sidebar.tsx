@@ -31,6 +31,7 @@ import {
   ChevronDown,
   Trash2,
   AlertTriangle,
+  UserMinus,
 } from "lucide-react";
 import type { Holder, Round } from "@/types/cap-table";
 import {
@@ -304,7 +305,13 @@ export function Sidebar({
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className={`${forceVisible ? '' : 'hidden lg:block'} w-80 border-l bg-muted/20 flex flex-col ${forceVisible ? 'h-full' : 'h-screen sticky top-0'}`}>
+      <div
+        className={`${
+          forceVisible ? "" : "hidden lg:block"
+        } w-80 border-l bg-muted/20 flex flex-col ${
+          forceVisible ? "h-full" : "h-screen sticky top-0"
+        }`}
+      >
         <div className="flex flex-col h-full">
           <div ref={sidebarWrapperRef} className="flex-1 overflow-hidden">
             <div ref={sidebarContentRef} className="p-3 space-y-5">
@@ -370,7 +377,6 @@ export function Sidebar({
                 )}
               </div>
 
-
               {/* Holders Section */}
               <div className="space-y-3 border-t pt-5">
                 <div className="flex items-center gap-2">
@@ -406,6 +412,12 @@ export function Sidebar({
                             holder={holder}
                             onEdit={onEditHolder}
                             onDelete={onDeleteHolder}
+                            onUngroup={
+                              onMoveHolderToGroup
+                                ? () =>
+                                    onMoveHolderToGroup(holder.name, undefined)
+                                : undefined
+                            }
                             isDragging={activeId === `holder-${holder.name}`}
                             groupName={groupName}
                             activeId={activeId}
@@ -440,6 +452,7 @@ export function Sidebar({
                             holder={holder}
                             onEdit={onEditHolder}
                             onDelete={onDeleteHolder}
+                            onUngroup={undefined}
                             isDragging={activeId === `holder-${holder.name}`}
                             groupName="ungrouped"
                             activeId={activeId}
@@ -520,6 +533,7 @@ function DraggableHolder({
   holder,
   onEdit,
   onDelete,
+  onUngroup,
   isDragging: externalIsDragging,
   groupName,
   activeId,
@@ -527,6 +541,7 @@ function DraggableHolder({
   holder: Holder;
   onEdit?: (holder: Holder) => void;
   onDelete?: (holderName: string) => void;
+  onUngroup?: () => void;
   isDragging?: boolean;
   groupName?: string;
   activeId?: string | null;
@@ -1008,7 +1023,6 @@ function DraggableRoundSidebar({
     </div>
   );
 }
-
 
 // Error Summary Component
 function ErrorSummary({
