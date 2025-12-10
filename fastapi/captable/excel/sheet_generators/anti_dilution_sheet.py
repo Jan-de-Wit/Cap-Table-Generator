@@ -149,9 +149,9 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
         for round_data in rounds:
             instruments = round_data.get('instruments', [])
             for instrument in instruments:
-                    holder_name = instrument.get('holder_name')
-                    if holder_name:
-                        holders_set.add(holder_name)
+                holder_name = instrument.get('holder_name')
+                if holder_name:
+                    holders_set.add(holder_name)
 
         # Build holder-to-group mapping from holders array
         holder_to_group = {}
@@ -217,7 +217,7 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
                     2, '', self.formats.get('header'))
 
         # Use utility function to write round headers
-        subheaders = ['Anti-Dilution Method', 'Original Price', 'Adjusted Price',
+        subheaders = ['Anti-Dilution Method', 'Original Price', 'Current Price',
                       'Original Shares', 'Adjusted Shares', 'Additional Shares']
         self.write_round_headers(
             sheet,
@@ -406,8 +406,9 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
 
         # Get original round where anti-dilution rights were received
         # Use the original_investment_round field from the instrument
-        original_investment_round_name = primary_instrument.get('original_investment_round')
-        
+        original_investment_round_name = primary_instrument.get(
+            'original_investment_round')
+
         if original_investment_round_name:
             # Find the round by name
             anti_dilution_rights_round_idx = None
@@ -415,20 +416,23 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
                 if rnd.get('name') == original_investment_round_name:
                     anti_dilution_rights_round_idx = idx
                     break
-            
+
             if anti_dilution_rights_round_idx is not None:
                 # Get the actual price per share from the round where anti-dilution rights were received
                 # Use the named range for PricePerShare from the Rounds sheet
-                anti_dilution_round_name_key = self._sanitize_excel_name(original_investment_round_name)
+                anti_dilution_round_name_key = self._sanitize_excel_name(
+                    original_investment_round_name)
                 original_price_formula = f"=IFERROR({anti_dilution_round_name_key}_PricePerShare, 0)"
             else:
                 # Round name not found, fallback to previous round
                 if round_idx > 0:
                     prev_round = rounds[round_idx - 1]
-                    prev_round_name_key = self._sanitize_excel_name(prev_round.get('name', ''))
+                    prev_round_name_key = self._sanitize_excel_name(
+                        prev_round.get('name', ''))
                     original_price_formula = f"=IFERROR({prev_round_name_key}_PricePerShare, 0)"
                 else:
-                    round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
+                    round_name_key = self._sanitize_excel_name(
+                        round_data.get('name', ''))
                     original_price_formula = f"=IFERROR({round_name_key}_PricePerShare, 0)"
         else:
             # Fallback: try to find using old method if original_investment_round not provided
@@ -442,21 +446,23 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
                 original_price_formula = f"=IFERROR({anti_dilution_round_name_key}_PricePerShare, 0)"
             elif round_idx > 0:
                 prev_round = rounds[round_idx - 1]
-                prev_round_name_key = self._sanitize_excel_name(prev_round.get('name', ''))
+                prev_round_name_key = self._sanitize_excel_name(
+                    prev_round.get('name', ''))
                 original_price_formula = f"=IFERROR({prev_round_name_key}_PricePerShare, 0)"
             else:
-                round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
+                round_name_key = self._sanitize_excel_name(
+                    round_data.get('name', ''))
                 original_price_formula = f"=IFERROR({round_name_key}_PricePerShare, 0)"
 
         sheet.write_formula(row, original_price_col, original_price_formula,
                             self.formats.get('table_currency'))
 
-        # Adjusted price = current round's price per share
+        # Current price = current round's price per share
         round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
         pre_money_valuation_ref = f"{round_name_key}_PreMoneyValuation"
         pre_round_shares_ref = f"{round_name_key}_PreRoundShares"
-        adjusted_price_formula = f"=IFERROR({pre_money_valuation_ref} / {pre_round_shares_ref}, 0)"
-        sheet.write_formula(row, adjusted_price_col, adjusted_price_formula,
+        current_price_formula = f"=IFERROR({pre_money_valuation_ref} / {pre_round_shares_ref}, 0)"
+        sheet.write_formula(row, adjusted_price_col, current_price_formula,
                             self.formats.get('table_currency'))
 
         # Original shares = holder's total shares at the end of the round where anti-dilution rights were received
@@ -474,7 +480,7 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
                 if rnd.get('name') == original_investment_round_name:
                     anti_dilution_rights_round_idx = idx
                     break
-        
+
         # If anti-dilution rights were granted in the current round or we can't find them, use previous round's total
         if anti_dilution_rights_round_idx is not None and anti_dilution_rights_round_idx < round_idx:
             # Get holder's total shares at end of anti-dilution rights round (from Cap Table sheet)
@@ -482,8 +488,10 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
             # Total column is 4 columns after Start column
             # Start column for round N is at: 2 + (N * 5)
             # So Total column for round N is at: 2 + (N * 5) + 4
-            anti_dilution_round_total_col_idx = 2 + (anti_dilution_rights_round_idx * 5) + 4
-            anti_dilution_round_total_col = self._col_letter(anti_dilution_round_total_col_idx)
+            anti_dilution_round_total_col_idx = 2 + \
+                (anti_dilution_rights_round_idx * 5) + 4
+            anti_dilution_round_total_col = self._col_letter(
+                anti_dilution_round_total_col_idx)
             holder_name_col = self._col_letter(self.padding_offset + 1)
             holder_name_escaped = f'"{holder_name}"'
             original_shares_formula = f"=IFERROR(SUMIF('Cap Table'!{holder_name_col}:{holder_name_col}, {holder_name_escaped}, 'Cap Table'!{anti_dilution_round_total_col}:{anti_dilution_round_total_col}), 0)"
@@ -502,34 +510,45 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
                 if table_name:
                     holder_col_ref = f"{table_name}[[#All],[Holder Name]]"
                     shares_col_ref = f"{table_name}[[#All],[Shares]]"
-                    holder_col_letter = self._col_letter(self.padding_offset + 1)
+                    holder_col_letter = self._col_letter(
+                        self.padding_offset + 1)
                     rounds_shares = f"SUMIF({holder_col_ref}, {holder_col_letter}{row + 1}, {shares_col_ref})"
                 else:
                     holder_range = f"Rounds!{range_info['holder_col']}{range_info['start_row']}:{range_info['holder_col']}{range_info['end_row']}"
                     shares_range = f"Rounds!{range_info['shares_col']}{range_info['start_row']}:{range_info['shares_col']}{range_info['end_row']}"
-                    holder_col_letter = self._col_letter(self.padding_offset + 1)
+                    holder_col_letter = self._col_letter(
+                        self.padding_offset + 1)
                     rounds_shares = f'SUMIF({holder_range}, {holder_col_letter}{row + 1}, {shares_range})'
             else:
                 rounds_shares = "0"
-            pro_rata_shares_col = self._get_pro_rata_shares_col(round_idx, rounds)
+            pro_rata_shares_col = self._get_pro_rata_shares_col(
+                round_idx, rounds)
             pro_rata_shares = f"'Pro Rata Allocations'!{pro_rata_shares_col}{row + 1}"
             original_shares_formula = f"=ROUND({rounds_shares} + {pro_rata_shares}, 0)"
 
         sheet.write_formula(row, original_shares_col, original_shares_formula,
                             self.formats.get('table_number'))
 
-        # Adjusted shares = (initial shares * (original price / current price)) - shares issued in earlier anti-dilution rounds
+        # Adjusted shares calculation depends on dilution method
         # Initial shares = original shares from the anti-dilution rights round
         original_shares_cell = f"{self._col_letter(original_shares_col)}{row + 1}"
         original_price_cell = f"{self._col_letter(original_price_col)}{row + 1}"
-        adjusted_price_cell = f"{self._col_letter(adjusted_price_col)}{row + 1}"
-        
-        # Calculate multiplier: original price / current price
-        price_multiplier = f"IFERROR({original_price_cell} / {adjusted_price_cell}, 1)"
-        
-        # Calculate shares with multiplier: initial shares * (original price / current price)
+        current_price_cell = f"{self._col_letter(adjusted_price_col)}{row + 1}"
+
+        # For broad-based weighted average: use average of original and current price
+        # For other methods: use original price / current price
+        if dilution_method == 'broad_based_weighted_average':
+            # Calculate average price: (original_price + current_price) / 2
+            average_price = f"IFERROR(({original_price_cell} + {current_price_cell}) / 2, {current_price_cell})"
+            # Calculate multiplier: original price / average price
+            price_multiplier = f"IFERROR({original_price_cell} / {average_price}, 1)"
+        else:
+            # Standard calculation: original price / current price
+            price_multiplier = f"IFERROR({original_price_cell} / {current_price_cell}, 1)"
+
+        # Calculate shares with multiplier: initial shares * price_multiplier
         multiplied_shares = f"({original_shares_cell} * {price_multiplier})"
-        
+
         # Sum additional shares from earlier anti-dilution rounds (Additional Shares column)
         # Each round has 6 columns + 1 separator = 7 columns total
         # Start column for round N: padding_offset + 1 + 2 + (N * 7)
@@ -538,28 +557,31 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
         for prev_round_idx in range(round_idx):
             # Additional Shares column for round N: start_col + 5
             # Start col = padding_offset + 1 + 2 + (N * 7)
-            prev_round_start_col_idx = self.padding_offset + 1 + 2 + (prev_round_idx * 7)
+            prev_round_start_col_idx = self.padding_offset + \
+                1 + 2 + (prev_round_idx * 7)
             prev_additional_shares_col_idx = prev_round_start_col_idx + 5
-            prev_additional_shares_col = self._col_letter(prev_additional_shares_col_idx)
-            earlier_anti_dilution_shares.append(f"'Anti-Dilution Allocations'!{prev_additional_shares_col}{row + 1}")
-        
+            prev_additional_shares_col = self._col_letter(
+                prev_additional_shares_col_idx)
+            earlier_anti_dilution_shares.append(
+                f"'Anti-Dilution Allocations'!{prev_additional_shares_col}{row + 1}")
+
         if earlier_anti_dilution_shares:
             # Sum all earlier anti-dilution shares
             earlier_shares_sum = " + ".join(earlier_anti_dilution_shares)
             earlier_shares_ref = f"IFERROR({earlier_shares_sum}, 0)"
         else:
             earlier_shares_ref = "0"
-        
-        # Adjusted shares = multiplied shares - earlier anti-dilution shares
-        adjusted_shares_formula = f"=MAX(0, ROUND({multiplied_shares} - {earlier_shares_ref}, 0))"
+
+        # Adjusted shares = multiplied shares (without subtracting earlier anti-dilution shares)
+        adjusted_shares_formula = f"=MAX(0, ROUND({multiplied_shares}, 0))"
 
         sheet.write_formula(row, adjusted_shares_col, adjusted_shares_formula,
                             self.formats.get('table_number'))
 
-        # Additional shares = adjusted shares - original shares
+        # Additional shares = adjusted shares - original shares - earlier anti-dilution shares
         adjusted_shares_cell = f"{self._col_letter(adjusted_shares_col)}{row + 1}"
         original_shares_cell = f"{self._col_letter(original_shares_col)}{row + 1}"
-        additional_shares_formula = f"=MAX(0, ROUND({adjusted_shares_cell} - {original_shares_cell}, 0))"
+        additional_shares_formula = f"=MAX(0, ROUND({adjusted_shares_cell} - {original_shares_cell} - {earlier_shares_ref}, 0))"
         sheet.write_formula(row, additional_shares_col, additional_shares_formula,
                             self.formats.get('table_number'))
 
@@ -607,7 +629,7 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
     def _is_anti_dilution_allocation(self, instrument: Dict[str, Any]) -> bool:
         """
         Check if an instrument is a standalone anti-dilution allocation (not an investment instrument).
-        
+
         Anti-dilution allocations only have holder_name, class_name, and dilution_method.
         Investment instruments have additional fields like investment_amount, principal, etc.
         """
@@ -639,7 +661,7 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
         # Search backwards from current round to find the EARLIEST investment instrument
         # with anti-dilution rights (not just an anti-dilution allocation)
         earliest_round_idx = None
-        
+
         for prev_round_idx in range(current_round_idx - 1, -1, -1):
             prev_round = rounds[prev_round_idx]
             instruments = prev_round.get('instruments', [])
@@ -647,7 +669,7 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
                 # Skip anti-dilution allocations - we want the original investment instrument
                 if self._is_anti_dilution_allocation(instrument):
                     continue
-                    
+
                 # Check if this is an investment instrument with anti-dilution rights
                 if (instrument.get('holder_name') == holder_name and
                         instrument.get('dilution_method') == dilution_method):
@@ -680,13 +702,16 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
         - narrow_based_weighted_average: Weighted average using only preferred shares
         - broad_based_weighted_average: Weighted average using all outstanding shares
 
-        Formula for weighted average:
-        Adjusted Price = (CP0 × OS0 + PP × NS) / (OS0 + NS)
+        Formula for weighted average (standard formula):
+        CP₂ = CP₁ × (A + B) / (A + C)
         Where:
-        - CP0 = Original conversion price (from original round)
-        - OS0 = Outstanding shares before new issuance (preferred only for narrow, all for broad)
+        - CP₁ = Original conversion price (from original_investment_round)
+        - A = Outstanding shares before new issuance (preferred only for narrow, all for broad)
+        - B = Total consideration from new issuance / CP₁ = (PP × NS) / CP₁
+        - C = New shares issued in current round (NS)
         - PP = Price per share of new issuance (current round)
-        - NS = New shares issued in current round
+
+        This is mathematically equivalent to: (CP₁ × A + PP × NS) / (A + NS)
         """
         round_data = rounds[round_idx]
         round_name_key = self._sanitize_excel_name(round_data.get('name', ''))
@@ -719,50 +744,70 @@ class AntiDilutionSheetGenerator(BaseSheetGenerator):
             return f"=IF({current_round_price_ref} < {original_price_ref}, IFERROR({current_round_price_ref}, {original_price_ref}), {original_price_ref})"
 
         elif dilution_method in ['narrow_based_weighted_average', 'broad_based_weighted_average']:
-            # Weighted average: Adjusted Price = (CP0 × OS0 + PP × NS) / (OS0 + NS)
-            # Only applies when new price is lower than original price
+            # Weighted average anti-dilution formula: CP₂ = CP₁ × (A + B) / (A + C)
+            # Where:
+            #   CP₁ = Original conversion price (from original_investment_round)
+            #   A = Outstanding shares before new issuance
+            #   B = Total consideration from new issuance / CP₁
+            #   C = New shares issued in current round
+            # Only applies when new price is lower than original price (down round)
 
-            # Find original round where instrument was issued
-            original_round_idx = self._find_original_instrument_round(
-                holder_name, holder_instrument, rounds, round_idx
-            )
+            # Use original_investment_round field from the instrument
+            original_investment_round_name = holder_instrument.get(
+                'original_investment_round')
+
+            if original_investment_round_name:
+                # Find the round by name
+                original_round_idx = None
+                for idx, rnd in enumerate(rounds):
+                    if rnd.get('name') == original_investment_round_name:
+                        original_round_idx = idx
+                        break
+            else:
+                # Fallback: try to find using old method
+                original_round_idx = self._find_original_instrument_round(
+                    holder_name, holder_instrument, rounds, round_idx
+                )
 
             if original_round_idx is None:
                 # If we can't find the original round, fall back to current price
                 return f"=IFERROR({current_round_price_ref}, 0)"
 
-            # Get original round's price per share (CP0)
+            # Get original round's price per share (CP₁)
             original_round = rounds[original_round_idx]
             original_round_name_key = self._sanitize_excel_name(
                 original_round.get('name', ''))
-            original_round_pre_money_ref = f"{original_round_name_key}_PreMoneyValuation"
-            original_round_pre_shares_ref = f"{original_round_name_key}_PreRoundShares"
-            original_price_ref = f"{original_round_pre_money_ref} / {original_round_pre_shares_ref}"
+            original_round_price_ref = f"{original_round_name_key}_PricePerShare"
+            original_price_ref = f"IFERROR({original_round_price_ref}, 0)"
 
-            # Get outstanding shares before current round (OS0)
-            # For narrow-based: only preferred shares (we'll use PreRoundShares as approximation)
+            # Get outstanding shares before current round (A)
+            # For narrow-based: only preferred shares (use PreRoundShares as approximation)
             # For broad-based: all outstanding shares (PreRoundShares)
-            # Note: In practice, narrow-based should only count preferred, but we'll use PreRoundShares
-            # as a reasonable approximation since we don't track share classes separately in PreRoundShares
+            # Note: In practice, narrow-based should only count preferred, but we use PreRoundShares
+            # as a reasonable approximation since we don't track share classes separately
             outstanding_shares_ref = current_round_pre_shares_ref
 
-            # Get new shares issued in current round (NS)
-            # This is the sum of shares from the rounds sheet for this round
+            # Get new shares issued in current round (C)
             new_shares_ref = self._get_new_shares_issued_ref(round_idx, rounds)
 
             # Current round price per share (PP)
             new_price_ref = current_round_price_ref
 
-            # Calculate weighted average: (CP0 × OS0 + PP × NS) / (OS0 + NS)
-            # Only apply if new price < original price (anti-dilution only triggers on down rounds)
-            numerator = f"({original_price_ref} * {outstanding_shares_ref} + {new_price_ref} * {new_shares_ref})"
-            denominator = f"({outstanding_shares_ref} + {new_shares_ref})"
-            weighted_avg_price = f"IFERROR({numerator} / {denominator}, {original_price_ref})"
+            # Calculate B = Total consideration from new issuance / CP₁
+            # Total consideration = PP × NS
+            total_consideration = f"({new_price_ref} * {new_shares_ref})"
+            b_value = f"IFERROR({total_consideration} / {original_price_ref}, 0)"
 
-            # Use MIN to ensure we don't adjust upward (only downward adjustments)
+            # Calculate weighted average: CP₁ × (A + B) / (A + C)
+            # Only apply if new price < original price (anti-dilution only triggers on down rounds)
+            numerator = f"({outstanding_shares_ref} + {b_value})"
+            denominator = f"({outstanding_shares_ref} + {new_shares_ref})"
+            weighted_avg_price = f"IFERROR({original_price_ref} * {numerator} / {denominator}, {original_price_ref})"
+
+            # Use conditional to ensure we don't adjust upward (only downward adjustments)
             # If new price >= original price, use original price (no adjustment)
             # If new price < original price, use the weighted average
-            return f"=IF({new_price_ref} < {original_price_ref}, {weighted_avg_price}, {original_price_ref})"
+            return f"=IF({new_price_ref} < {original_price_ref}, IFERROR({weighted_avg_price}, {original_price_ref}), {original_price_ref})"
 
         elif dilution_method == 'percentage_based':
             # Percentage-based: Maintains ownership percentage rather than adjusting price

@@ -22,6 +22,10 @@
     {
       "name": "Series C Investor",
       "group": "Investors"
+    },
+    {
+      "name": "Series D iNvestor",
+      "group": "Founders"
     }
   ],
   "rounds": [
@@ -64,7 +68,7 @@
         {
           "holder_name": "Series A Investor",
           "class_name": "Common",
-          "dilution_method": "full_ratchet",
+          "dilution_method": "broad_based_weighted_average",
           "original_investment_round": "Series A"
         }
       ],
@@ -84,7 +88,27 @@
         {
           "holder_name": "Series A Investor",
           "class_name": "Common",
-          "dilution_method": "full_ratchet",
+          "dilution_method": "broad_based_weighted_average",
+          "original_investment_round": "Series A"
+        }
+      ],
+      "valuation_basis": "pre_money",
+      "valuation": 10000000
+    },
+    {
+      "name": "Series D",
+      "round_date": "2025-12-10",
+      "calculation_type": "valuation_based",
+      "instruments": [
+        {
+          "holder_name": "Series D iNvestor",
+          "class_name": "Common",
+          "investment_amount": 2000000
+        },
+        {
+          "holder_name": "Series A Investor",
+          "class_name": "Common",
+          "dilution_method": "broad_based_weighted_average",
           "original_investment_round": "Series A"
         }
       ],

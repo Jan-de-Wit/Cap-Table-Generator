@@ -524,12 +524,13 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         # Column 1: Inner padding (border_start_col)
         # Column 2: Shareholders (padding_offset + 1)
         # Column 3: Description (padding_offset + 2)
-        # Each round: Anti-Dilution Method, Original Price, Adjusted Price, Original Shares, Adjusted Shares, Additional Shares, Investment Amount, Separator
-        # Additional Shares is 5 columns after the start of each round
-        # Start of round: padding_offset + 1 + 2 + (round_idx * 8)
-        # Additional Shares: padding_offset + 1 + 2 + (round_idx * 8) + 5
+        # Each round: Anti-Dilution Method, Original Price, Adjusted Price, Original Shares, Adjusted Shares, Additional Shares, Separator
+        # Each round has 7 columns total (6 data columns + 1 separator)
+        # Additional Shares is 5 columns after the start of each round (0-indexed: Method=0, Original Price=1, Adjusted Price=2, Original Shares=3, Adjusted Shares=4, Additional Shares=5)
+        # Start of round: padding_offset + 1 + 2 + (round_idx * 7)
+        # Additional Shares: padding_offset + 1 + 2 + (round_idx * 7) + 5
         padding_offset = 1  # Anti-Dilution sheet has padding_offset = 1
-        col_idx = padding_offset + 1 + 2 + (round_idx * 8) + 5
+        col_idx = padding_offset + 1 + 2 + (round_idx * 7) + 5
         return self._col_letter(col_idx)
     
     def _get_shares_header(self, calc_type: str) -> str:

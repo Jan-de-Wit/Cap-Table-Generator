@@ -237,11 +237,60 @@ export default function Home() {
     // Expand anti-dilution instruments to future rounds as separate AntiDilutionAllocation instruments
     // First, we need to look at the original rounds (before processing) to get anti_dilution_rounds info
     const expandedRounds = processedRounds.map((round, roundIndex) => {
+      // Start with any existing anti-dilution allocations that are already in processedRounds
+      // These come from rounds that were loaded from localStorage/import
+      const existingAntiDilutionAllocations = round.instruments.filter(
+        (inst) =>
+          "dilution_method" in inst &&
+          !("anti_dilution_rounds" in inst) &&
+          "holder_name" in inst &&
+          "class_name" in inst &&
+          "original_investment_round" in inst
+      );
+
+      // New allocations to add from expansion logic
       const antiDilutionInstruments: any[] = [];
 
       // Helper function to check if a round type supports price-based anti-dilution
       const supportsPriceBasedAntiDilution = (calcType: string): boolean => {
         return !["fixed_shares", "target_percentage"].includes(calcType);
+      };
+
+      // Helper function to check if an anti-dilution allocation already exists
+      // Check against existing allocations and also check if we've already added it to antiDilutionInstruments
+      const hasExistingAntiDilutionAllocation = (
+        holderName: string,
+        className: string,
+        dilutionMethod: string,
+        originalInvestmentRound: string
+      ): boolean => {
+        // Check in existing allocations from processedRounds
+        const existsInExisting = existingAntiDilutionAllocations.some(
+          (existingInst) => {
+            return (
+              existingInst.holder_name === holderName &&
+              existingInst.class_name === className &&
+              existingInst.dilution_method === dilutionMethod &&
+              existingInst.original_investment_round === originalInvestmentRound
+            );
+          }
+        );
+
+        if (existsInExisting) {
+          return true;
+        }
+
+        // Check if we've already added it to antiDilutionInstruments in this iteration
+        const existsInNew = antiDilutionInstruments.some((newInst) => {
+          return (
+            newInst.holder_name === holderName &&
+            newInst.class_name === className &&
+            newInst.dilution_method === dilutionMethod &&
+            newInst.original_investment_round === originalInvestmentRound
+          );
+        });
+
+        return existsInNew;
       };
 
       // Look through all previous rounds in the original data to find instruments with anti-dilution protection
@@ -258,7 +307,20 @@ export default function Home() {
             return;
           }
 
+          // Skip anti-dilution allocations (they are already expanded, don't expand them again)
+          if (
+            "dilution_method" in instrument &&
+            !("anti_dilution_rounds" in instrument) &&
+            "holder_name" in instrument &&
+            "class_name" in instrument &&
+            "original_investment_round" in instrument
+          ) {
+            return;
+          }
+
           // Check if instrument has anti-dilution protection
+          // Note: anti_dilution_rounds defaults to "infinite" if not set, so we check if dilution_method exists
+          // If dilution_method exists, anti-dilution protection applies (even if anti_dilution_rounds is not explicitly set)
           if (
             "dilution_method" in instrument &&
             instrument.dilution_method &&
@@ -268,7 +330,11 @@ export default function Home() {
             instrument.class_name
           ) {
             const dilutionMethod = instrument.dilution_method;
-            const antiDilutionRounds = (instrument as any).anti_dilution_rounds;
+            // Get anti_dilution_rounds - defaults to "infinite" if not set
+            const antiDilutionRounds =
+              "anti_dilution_rounds" in instrument
+                ? (instrument as any).anti_dilution_rounds
+                : undefined; // undefined means infinite
 
             // Determine how many rounds ahead this applies to
             let roundsAhead: number;
@@ -306,12 +372,22 @@ export default function Home() {
                       roundsAhead === Infinity ||
                       applicableRoundsCounted <= roundsAhead
                     ) {
-                      antiDilutionInstruments.push({
-                        holder_name: instrument.holder_name,
-                        class_name: instrument.class_name,
-                        dilution_method: instrument.dilution_method,
-                        original_investment_round: prevRound.name,
-                      });
+                      // Check if this anti-dilution allocation already exists before adding
+                      if (
+                        !hasExistingAntiDilutionAllocation(
+                          instrument.holder_name,
+                          instrument.class_name,
+                          instrument.dilution_method,
+                          prevRound.name
+                        )
+                      ) {
+                        antiDilutionInstruments.push({
+                          holder_name: instrument.holder_name,
+                          class_name: instrument.class_name,
+                          dilution_method: instrument.dilution_method,
+                          original_investment_round: prevRound.name,
+                        });
+                      }
                     }
                     break;
                   }
@@ -326,21 +402,48 @@ export default function Home() {
                 roundsAhead === Infinity ||
                 roundsSinceOriginal <= roundsAhead
               ) {
-                antiDilutionInstruments.push({
-                  holder_name: instrument.holder_name,
-                  class_name: instrument.class_name,
-                  dilution_method: instrument.dilution_method,
-                  original_investment_round: prevRound.name,
-                });
+                // Check if this anti-dilution allocation already exists before adding
+                if (
+                  !hasExistingAntiDilutionAllocation(
+                    instrument.holder_name,
+                    instrument.class_name,
+                    instrument.dilution_method,
+                    prevRound.name
+                  )
+                ) {
+                  antiDilutionInstruments.push({
+                    holder_name: instrument.holder_name,
+                    class_name: instrument.class_name,
+                    dilution_method: instrument.dilution_method,
+                    original_investment_round: prevRound.name,
+                  });
+                }
               }
             }
           }
         });
       }
 
+      // Separate regular instruments from anti-dilution allocations
+      const regularInstruments = round.instruments.filter(
+        (inst) =>
+          !(
+            "dilution_method" in inst &&
+            !("anti_dilution_rounds" in inst) &&
+            "holder_name" in inst &&
+            "class_name" in inst &&
+            "original_investment_round" in inst
+          )
+      );
+
+      // Combine: regular instruments + existing allocations + new allocations
       return {
         ...round,
-        instruments: [...round.instruments, ...antiDilutionInstruments],
+        instruments: [
+          ...regularInstruments,
+          ...existingAntiDilutionAllocations,
+          ...antiDilutionInstruments,
+        ],
       };
     });
 
@@ -351,8 +454,33 @@ export default function Home() {
     };
   }, [rounds, holders]);
 
-  // Persist to localStorage
-  useLocalStoragePersistence(capTableData, { enabled: true, debounceMs: 500 });
+  // Persist raw rounds and holders to localStorage (not processed capTableData)
+  // This preserves anti_dilution_rounds so badges and expansion work correctly on reload
+  const rawDataForPersistence = React.useMemo((): CapTableData | null => {
+    if (rounds.length === 0 && holders.length === 0) {
+      return null;
+    }
+    // Create a simple structure with raw rounds and holders for persistence
+    // This preserves anti_dilution_rounds in original instruments
+    return {
+      schema_version: "2.0",
+      holders,
+      rounds: rounds.map((round) => ({
+        ...round,
+        instruments: round.instruments.map((instrument) => {
+          // Remove React component-specific fields but keep all other fields including anti_dilution_rounds
+          const { displayIndex, actualIndex, hasError, ...cleanInstrument } =
+            instrument as any;
+          return cleanInstrument;
+        }),
+      })),
+    };
+  }, [rounds, holders]);
+
+  useLocalStoragePersistence(rawDataForPersistence, {
+    enabled: true,
+    debounceMs: 500,
+  });
 
   // Extract operations from hooks
   const {
