@@ -22,6 +22,10 @@ interface RoundFormProps {
   onUpdateRound?: (roundIndex: number, round: Round) => void;
   onDelete?: () => void;
   validation?: RoundValidation;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 export function RoundForm({
@@ -37,6 +41,10 @@ export function RoundForm({
   onUpdateRound,
   onDelete,
   validation,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }: RoundFormProps) {
   const [touchedFields, setTouchedFields] = React.useState<Set<string>>(
     new Set()
@@ -135,6 +143,90 @@ export function RoundForm({
   };
 
   const handleSaveInstrument = (instrument: Instrument) => {
+    // Check if this is an anti-dilution instrument (has dilution_method)
+    const hasDilutionMethod =
+      "dilution_method" in instrument &&
+      instrument.dilution_method !== undefined &&
+      instrument.dilution_method !== null;
+
+    // If adding a new anti-dilution instrument, check for duplicates
+    if (hasDilutionMethod && editingInstrument && !editingInstrument.instrument) {
+      const holderName =
+        "holder_name" in instrument && instrument.holder_name
+          ? instrument.holder_name
+          : null;
+
+      if (holderName) {
+        // Check if holder already has an anti-dilution instrument in this round
+        const existingAntiDilutionIndex = round.instruments.findIndex(
+          (inst, idx) => {
+            // Skip pro-rata allocations
+            if ("pro_rata_type" in inst) {
+              return false;
+            }
+            // Check if this is an anti-dilution instrument for the same holder
+            return (
+              "holder_name" in inst &&
+              inst.holder_name === holderName &&
+              "dilution_method" in inst &&
+              inst.dilution_method !== undefined &&
+              inst.dilution_method !== null
+            );
+          }
+        );
+
+        if (existingAntiDilutionIndex !== -1) {
+          toast.error("Duplicate anti-dilution instrument", {
+            description: `Holder "${holderName}" already has an anti-dilution instrument in this round. Each holder can have only one anti-dilution instrument per round.`,
+          });
+          return; // Don't add the instrument
+        }
+      }
+    }
+
+    // Also check when updating an existing instrument to anti-dilution
+    if (
+      hasDilutionMethod &&
+      editingInstrument &&
+      editingInstrument.instrument
+    ) {
+      const holderName =
+        "holder_name" in instrument && instrument.holder_name
+          ? instrument.holder_name
+          : null;
+
+      if (holderName) {
+        // Check if holder already has another anti-dilution instrument in this round
+        const existingAntiDilutionIndex = round.instruments.findIndex(
+          (inst, idx) => {
+            // Skip the instrument being edited
+            if (idx === editingInstrument.index) {
+              return false;
+            }
+            // Skip pro-rata allocations
+            if ("pro_rata_type" in inst) {
+              return false;
+            }
+            // Check if this is an anti-dilution instrument for the same holder
+            return (
+              "holder_name" in inst &&
+              inst.holder_name === holderName &&
+              "dilution_method" in inst &&
+              inst.dilution_method !== undefined &&
+              inst.dilution_method !== null
+            );
+          }
+        );
+
+        if (existingAntiDilutionIndex !== -1) {
+          toast.error("Duplicate anti-dilution instrument", {
+            description: `Holder "${holderName}" already has another anti-dilution instrument in this round. Each holder can have only one anti-dilution instrument per round.`,
+          });
+          return; // Don't update the instrument
+        }
+      }
+    }
+
     if (editingInstrument) {
       // Check if we're editing an original instrument from a previous round
       if (
@@ -264,21 +356,23 @@ export function RoundForm({
         ? deletedInstrument.class_name
         : "Unknown class";
 
-    // Store state for undo
-    const previousInstruments = [...round.instruments];
+    // Store state for undo - create deep copy to avoid closure issues
+    const previousInstruments = round.instruments.map((inst) => ({ ...inst }));
 
     // Perform deletion
     updateRound({
       instruments: round.instruments.filter((_, i) => i !== index),
     });
 
-    // Show toast with undo
+    // Show toast with undo - capture values in closure with deep copy
+    const undoInstruments = previousInstruments.map((inst) => ({ ...inst }));
+    
     toast(`"${holderName}" - ${className} has been removed.`, {
       description: "Accident? Hit undo to restore.",
       action: {
         label: "Undo",
         onClick: () => {
-          updateRound({ instruments: previousInstruments });
+          updateRound({ instruments: undoInstruments });
           toast.success("Instrument restored", {
             description: `"${holderName}" - ${className} has been restored.`,
           });
@@ -434,9 +528,9 @@ export function RoundForm({
   ).size;
 
   return (
-    <div className="relative pb-50">
+    <div className="relative pb-50 min-h-[400px]">
       {/* Main Content Sections */}
-      <div className="space-y-8">
+      <div className="space-y-8 pb-16">
         {/* Round Parameters - Merged with round name editing */}
         <RoundParametersSection
           round={round}
@@ -592,6 +686,7 @@ export function RoundForm({
           roundValuation={round.valuation}
         />
       )}
+
     </div>
   );
 }

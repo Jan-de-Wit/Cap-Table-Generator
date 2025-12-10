@@ -226,3 +226,6 @@ def aggregate_errors(errors: List[CapTableError]) -> Dict[str, Any]:
         "all_errors": error_dicts
     }
 
+
+
+

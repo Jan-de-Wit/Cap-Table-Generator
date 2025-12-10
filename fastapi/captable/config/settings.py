@@ -49,3 +49,6 @@ def get_settings() -> Settings:
         _settings = Settings()
     return _settings
 
+
+
+

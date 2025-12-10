@@ -60,3 +60,6 @@ class ValidationRule(ABC):
             return self.rule_name not in config.disabled_rules
         return True
 
+
+
+

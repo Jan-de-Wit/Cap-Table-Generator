@@ -35,7 +35,8 @@ from .formatters import ExcelFormatters
 from .sheet_generators import (
     RoundsSheetGenerator,
     ProgressionSheetGenerator,
-    ProRataSheetGenerator
+    ProRataSheetGenerator,
+    AntiDilutionSheetGenerator
 )
 
 
@@ -71,6 +72,7 @@ class ExcelGenerator:
         1. Cap Table (SUMMARY VIEW - references Rounds sheet) - created first to appear first
         2. Rounds (SOURCE OF TRUTH - contains all instruments nested within rounds)
         3. Pro Rata Allocations (pro rata share calculations)
+        4. Anti-Dilution Allocations (anti-dilution share calculations, after pro rata)
 
         Returns:
             Path to generated Excel file
@@ -109,7 +111,16 @@ class ExcelGenerator:
         # Pass shares_issued references for each round
         self.sheets['Pro Rata Allocations'] = pro_rata_gen.generate()
 
-        # STEP 4: Populate Cap Table sheet (SUMMARY VIEW)
+        # STEP 4: Create Anti-Dilution Allocations sheet
+        # Lists all stakeholders per round with anti-dilution protection and calculates additional shares
+        # Anti-dilution calculations happen AFTER pro rata allocations are calculated
+        anti_dilution_gen = AntiDilutionSheetGenerator(
+            self.workbook, self.data, self.formats, self.dlm, self.formula_resolver
+        )
+        anti_dilution_gen.set_round_ranges(rounds_gen.get_round_ranges())
+        self.sheets['Anti-Dilution Allocations'] = anti_dilution_gen.generate()
+
+        # STEP 5: Populate Cap Table sheet (SUMMARY VIEW)
         # References instrument shares from Rounds sheet + Pro Rata Allocations sheet
         # Shows ownership evolution across rounds
         progression_gen = ProgressionSheetGenerator(

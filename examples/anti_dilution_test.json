@@ -1,0 +1,87 @@
+{
+    "schema_version": "2.0",
+    "holders": [
+      {
+        "name": "gerr"
+      },
+      {
+        "name": "joo"
+      },
+      {
+        "name": "ber"
+      },
+      {
+        "name": "empl"
+      }
+    ],
+    "rounds": [
+      {
+        "name": "Inc",
+        "round_date": "2025-11-30",
+        "calculation_type": "fixed_shares",
+        "instruments": [
+          {
+            "holder_name": "gerr",
+            "class_name": "c",
+            "initial_quantity": 50000
+          },
+          {
+            "holder_name": "joo",
+            "class_name": "c",
+            "initial_quantity": 55555
+          }
+        ]
+      },
+      {
+        "name": "Seri A",
+        "round_date": "2025-11-30",
+        "calculation_type": "fixed_shares",
+        "instruments": [
+          {
+            "holder_name": "ber",
+            "class_name": "c",
+            "initial_quantity": 55
+          },
+          {
+            "holder_name": "gerr",
+            "class_name": "c",
+            "dilution_method": "percentage_based"
+          },
+          {
+            "holder_name": "gerr",
+            "class_name": "c",
+            "dilution_method": "percentage_based"
+          }
+        ]
+      },
+      {
+        "name": "ESOP",
+        "round_date": "2025-11-30",
+        "calculation_type": "target_percentage",
+        "instruments": [
+          {
+            "holder_name": "empl",
+            "class_name": "c",
+            "target_percentage": 0.1
+          },
+          {
+            "holder_name": "gerr",
+            "class_name": "c",
+            "dilution_method": "percentage_based"
+          },
+          {
+            "holder_name": "gerr",
+            "class_name": "c",
+            "dilution_method": "percentage_based"
+          },
+          {
+            "holder_name": "gerr",
+            "class_name": "c",
+            "dilution_method": "percentage_based"
+          }
+        ]
+      }
+    ]
+  }
+
+

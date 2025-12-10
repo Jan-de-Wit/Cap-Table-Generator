@@ -21,6 +21,8 @@ import {
   Upload,
   Menu,
   X,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -37,6 +39,7 @@ import {
 import { useValidation } from "@/lib/use-validation";
 import { useRounds } from "@/lib/use-rounds";
 import { useHolders } from "@/lib/use-holders";
+import { useUndoRedo } from "@/lib/use-undo-redo";
 
 export default function Home() {
   // Initialize state - always start empty to avoid hydration mismatch
@@ -70,11 +73,11 @@ export default function Home() {
   // Use refs to access current state in callbacks
   const roundsRef = React.useRef(rounds);
   const holdersRef = React.useRef(holders);
-  
+
   React.useEffect(() => {
     roundsRef.current = rounds;
   }, [rounds]);
-  
+
   React.useEffect(() => {
     holdersRef.current = holders;
   }, [holders]);
@@ -90,12 +93,72 @@ export default function Home() {
   const holdersManager = useHolders(holders, setHolders, rounds, setRounds);
 
   // Use optimized validation hook
-  const {
-    validations,
-    validationSummary,
-    isRoundValid,
-    getFieldErrors,
-  } = useValidation(rounds, { incremental: true });
+  const { validations, validationSummary, isRoundValid, getFieldErrors } =
+    useValidation(rounds, { incremental: true });
+
+  // Undo/Redo functionality
+  const handleStateChange = React.useCallback(
+    (state: {
+      rounds: Round[];
+      holders: Holder[];
+      selectedRoundIndex: number | null;
+    }) => {
+      setRounds(state.rounds);
+      setHolders(state.holders);
+      setSelectedRoundIndex(state.selectedRoundIndex);
+    },
+    []
+  );
+
+  const undoRedo = useUndoRedo(
+    { rounds, holders, selectedRoundIndex },
+    handleStateChange,
+    { maxHistorySize: 50, debounceMs: 300 }
+  );
+
+  // Stable reference to saveState to avoid useEffect re-runs
+  const saveStateRef = React.useRef(undoRedo.saveState);
+  React.useEffect(() => {
+    saveStateRef.current = undoRedo.saveState;
+  }, [undoRedo.saveState]);
+
+  // Save state to history when rounds or holders change
+  // Skip saving on initial mount to avoid saving empty state
+  const isInitialMount = React.useRef(true);
+  const prevStateStringRef = React.useRef<string | null>(null);
+  const isSavingRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (isMounted && !isSavingRef.current) {
+      const currentState = { rounds, holders, selectedRoundIndex };
+      const currentStateString = JSON.stringify({
+        rounds: currentState.rounds,
+        holders: currentState.holders,
+        selectedRoundIndex: currentState.selectedRoundIndex,
+      });
+
+      // Skip if state hasn't actually changed (prevents duplicate saves from React strict mode)
+      if (prevStateStringRef.current === currentStateString) {
+        return;
+      }
+
+      prevStateStringRef.current = currentStateString;
+      isSavingRef.current = true;
+
+      if (isInitialMount.current) {
+        isInitialMount.current = false;
+        // Initialize history with current state on first mount
+        saveStateRef.current(currentState);
+      } else {
+        saveStateRef.current(currentState);
+      }
+
+      // Reset saving flag after a short delay
+      setTimeout(() => {
+        isSavingRef.current = false;
+      }, 50);
+    }
+  }, [rounds, holders, selectedRoundIndex, isMounted]);
 
   // Build cap table data for persistence
   const capTableData = React.useMemo((): CapTableData | null => {
@@ -103,15 +166,28 @@ export default function Home() {
       return null;
     }
     // Filter out pro_rata_rights from instruments when not exercised
+    // and expand anti-dilution instruments to future rounds
     const processedRounds = rounds.map((round, roundIndex) => {
       const processedInstruments = round.instruments.map((instrument) => {
         // Remove React component-specific fields that shouldn't be in the schema
         const { displayIndex, actualIndex, hasError, ...cleanInstrument } =
           instrument as any;
 
-        // Only process regular instruments (not pro-rata allocations)
+        // Only process regular instruments (not pro-rata or anti-dilution allocations)
         if ("pro_rata_type" in cleanInstrument) {
           return cleanInstrument; // Keep pro-rata allocations as-is (but cleaned)
+        }
+        // Anti-dilution allocations have holder_name, class_name, dilution_method, and original_investment_round
+        // They don't have anti_dilution_rounds (that's only in original instruments)
+        if (
+          "dilution_method" in cleanInstrument &&
+          !("anti_dilution_rounds" in cleanInstrument) &&
+          "holder_name" in cleanInstrument &&
+          "class_name" in cleanInstrument &&
+          "dilution_method" in cleanInstrument &&
+          "original_investment_round" in cleanInstrument
+        ) {
+          return cleanInstrument; // Keep anti-dilution allocations as-is
         }
 
         // Check if this instrument has pro_rata_rights
@@ -145,7 +221,11 @@ export default function Home() {
           }
         }
 
-        return cleanInstrument;
+        // Remove dilution_method and anti_dilution_rounds from original instruments
+        // These will be exported as separate AntiDilutionAllocation instruments
+        const { dilution_method, anti_dilution_rounds, ...rest } =
+          cleanInstrument as any;
+        return rest;
       });
 
       return {
@@ -154,10 +234,120 @@ export default function Home() {
       };
     });
 
+    // Expand anti-dilution instruments to future rounds as separate AntiDilutionAllocation instruments
+    // First, we need to look at the original rounds (before processing) to get anti_dilution_rounds info
+    const expandedRounds = processedRounds.map((round, roundIndex) => {
+      const antiDilutionInstruments: any[] = [];
+
+      // Helper function to check if a round type supports price-based anti-dilution
+      const supportsPriceBasedAntiDilution = (calcType: string): boolean => {
+        return !["fixed_shares", "target_percentage"].includes(calcType);
+      };
+
+      // Look through all previous rounds in the original data to find instruments with anti-dilution protection
+      for (
+        let prevRoundIndex = 0;
+        prevRoundIndex < roundIndex;
+        prevRoundIndex++
+      ) {
+        const prevRound = rounds[prevRoundIndex]; // Use original rounds to get anti_dilution_rounds
+
+        prevRound.instruments.forEach((instrument) => {
+          // Skip pro-rata allocations
+          if ("pro_rata_type" in instrument) {
+            return;
+          }
+
+          // Check if instrument has anti-dilution protection
+          if (
+            "dilution_method" in instrument &&
+            instrument.dilution_method &&
+            "holder_name" in instrument &&
+            instrument.holder_name &&
+            "class_name" in instrument &&
+            instrument.class_name
+          ) {
+            const dilutionMethod = instrument.dilution_method;
+            const antiDilutionRounds = (instrument as any).anti_dilution_rounds;
+
+            // Determine how many rounds ahead this applies to
+            let roundsAhead: number;
+            if (
+              antiDilutionRounds === "infinite" ||
+              antiDilutionRounds === undefined
+            ) {
+              roundsAhead = Infinity;
+            } else if (typeof antiDilutionRounds === "number") {
+              roundsAhead = antiDilutionRounds;
+            } else {
+              return; // Invalid value, skip
+            }
+
+            // For price-based methods (full_ratchet, weighted_average), skip rounds where they can't apply
+            // Count only rounds that support price-based anti-dilution
+            if (dilutionMethod !== "percentage_based") {
+              let applicableRoundsCounted = 0;
+
+              // Count forward from the original round, skipping rounds that don't support price-based
+              for (
+                let checkRoundIndex = prevRoundIndex + 1;
+                checkRoundIndex <= roundIndex;
+                checkRoundIndex++
+              ) {
+                const checkRound = processedRounds[checkRoundIndex];
+                const checkCalcType = checkRound.calculation_type;
+
+                if (supportsPriceBasedAntiDilution(checkCalcType)) {
+                  applicableRoundsCounted++;
+
+                  // If this is the current round and it supports price-based, check if we should add anti-dilution
+                  if (checkRoundIndex === roundIndex) {
+                    if (
+                      roundsAhead === Infinity ||
+                      applicableRoundsCounted <= roundsAhead
+                    ) {
+                      antiDilutionInstruments.push({
+                        holder_name: instrument.holder_name,
+                        class_name: instrument.class_name,
+                        dilution_method: instrument.dilution_method,
+                        original_investment_round: prevRound.name,
+                      });
+                    }
+                    break;
+                  }
+                }
+              }
+            } else {
+              // For percentage-based, count all rounds (including fixed_shares and target_percentage)
+              const roundsSinceOriginal = roundIndex - prevRoundIndex;
+
+              // Check if anti-dilution still applies to this round
+              if (
+                roundsAhead === Infinity ||
+                roundsSinceOriginal <= roundsAhead
+              ) {
+                antiDilutionInstruments.push({
+                  holder_name: instrument.holder_name,
+                  class_name: instrument.class_name,
+                  dilution_method: instrument.dilution_method,
+                  original_investment_round: prevRound.name,
+                });
+              }
+            }
+          }
+        });
+      }
+
+      return {
+        ...round,
+        instruments: [...round.instruments, ...antiDilutionInstruments],
+      };
+    });
+
     return {
       schema_version: "2.0",
       holders,
-      rounds: processedRounds,
+      rounds: expandedRounds,
     };
   }, [rounds, holders]);
 
@@ -173,12 +363,8 @@ export default function Home() {
     updateConversionRefs,
   } = roundsManager;
 
-  const {
-    addHolder,
-    updateHolder,
-    deleteHolder,
-    moveHolderToGroup,
-  } = holdersManager;
+  const { addHolder, updateHolder, deleteHolder, moveHolderToGroup } =
+    holdersManager;
 
   // Get used groups from all holders
   const usedGroups = React.useMemo(() => {
@@ -281,7 +467,7 @@ export default function Home() {
     try {
       const apiUrl =
         process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000";
-      const response = await fetch(`${apiUrl}/generate-excel`, {
+      const response = await fetch(`${apiUrl}/api/v1/generate-excel`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -371,16 +557,16 @@ export default function Home() {
     (data: CapTableData) => {
       // Check current state using refs
       if (roundsRef.current.length > 0 || holdersRef.current.length > 0) {
-        toast.error("Cannot import JSON", {
-          description: "Please clear existing data before importing.",
-        });
-        return;
+        // Reset current rounds
+        setRounds([]);
+        setHolders([]);
+        setSelectedRoundIndex(null);
       }
 
       // Set the imported data
       const importedRounds = data.rounds || [];
       const updatedWithRefs = updateConversionRefs(importedRounds);
-      
+
       setHolders(data.holders || []);
       setRounds(updatedWithRefs);
 
@@ -398,13 +584,10 @@ export default function Home() {
     [updateConversionRefs]
   );
 
-  const handleSelectRound = React.useCallback(
-    (index: number) => {
-      setSelectedRoundIndex(index);
-      setSidebarOpen(false); // Close mobile drawer when selecting
-    },
-    []
-  );
+  const handleSelectRound = React.useCallback((index: number) => {
+    setSelectedRoundIndex(index);
+    setSidebarOpen(false); // Close mobile drawer when selecting
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -425,7 +608,7 @@ export default function Home() {
                 <Menu className="h-5 w-5" />
               </Button>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight pt-4">
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
               Cap Table Generator
             </h1>
           </div>
@@ -434,27 +617,71 @@ export default function Home() {
           <div className="space-y-5">
             {rounds.length > 0 && (
               <div className="space-y-3 pb-2">
-                <div className="flex items-center gap-2 border-b border-border/50 pb-2.5">
-                  <h2 className="text-base font-semibold">
-                    {selectedRoundIndex !== null && rounds[selectedRoundIndex]
-                      ? `Editing: ${
-                          rounds[selectedRoundIndex].name ||
-                          `Round ${selectedRoundIndex + 1}`
-                        }`
-                      : "Select a Round"}
-                  </h2>
+                <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-semibold">
+                      {selectedRoundIndex !== null && rounds[selectedRoundIndex]
+                        ? `Editing: ${
+                            rounds[selectedRoundIndex].name ||
+                            `Round ${selectedRoundIndex + 1}`
+                          }`
+                        : "Select a Round"}
+                    </h2>
 
-                  {selectedRoundIndex !== null &&
-                    rounds[selectedRoundIndex] &&
-                    rounds[selectedRoundIndex].round_date && (
-                      <Badge variant="outline" className="text-xs">
-                        <span>
-                          {new Date(
-                            rounds[selectedRoundIndex].round_date
-                          ).toLocaleDateString()}
-                        </span>
-                      </Badge>
-                    )}
+                    {selectedRoundIndex !== null &&
+                      rounds[selectedRoundIndex] &&
+                      rounds[selectedRoundIndex].round_date && (
+                        <Badge variant="outline" className="text-xs">
+                          <span>
+                            {new Date(
+                              rounds[selectedRoundIndex].round_date
+                            ).toLocaleDateString()}
+                          </span>
+                        </Badge>
+                      )}
+                  </div>
+
+                  {/* Undo/Redo buttons */}
+                  <div className="flex items-center gap-2">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={undoRedo.undo}
+                            disabled={!undoRedo.canUndo}
+                            className="hidden sm:flex"
+                          >
+                            <Undo2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Undo (Ctrl+Z)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={undoRedo.redo}
+                            disabled={!undoRedo.canRedo}
+                            className="hidden sm:flex"
+                          >
+                            <Redo2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Redo (Ctrl+Shift+Z)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </div>
                 {/* Summary badges */}
                 {selectedRoundIndex !== null && rounds[selectedRoundIndex] && (
@@ -646,6 +873,10 @@ export default function Home() {
                 onUpdateHolder={updateHolder}
                 onDelete={deleteRound}
                 selectedRoundIndex={selectedRoundIndex}
+                onUndo={undoRedo.undo}
+                onRedo={undoRedo.redo}
+                canUndo={undoRedo.canUndo}
+                canRedo={undoRedo.canRedo}
               />
             )}
           </div>
@@ -768,6 +999,10 @@ function RoundsList({
   onUpdateHolder,
   onDelete,
   selectedRoundIndex,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }: {
   rounds: Round[];
   holders: Holder[];
@@ -779,6 +1014,10 @@ function RoundsList({
   onUpdateHolder: (oldName: string, holder: Holder) => void;
   onDelete: (index: number) => void;
   selectedRoundIndex: number | null;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }) {
   if (selectedRoundIndex === null || selectedRoundIndex >= rounds.length) {
     return null;
@@ -808,6 +1047,10 @@ function RoundsList({
           onUpdateRound={onUpdate}
           onDelete={() => onDelete(selectedRoundIndex)}
           validation={validation}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          canUndo={canUndo}
+          canRedo={canRedo}
         />
       </div>
     </div>

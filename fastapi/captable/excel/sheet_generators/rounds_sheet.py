@@ -327,11 +327,11 @@ class RoundsSheetGenerator(BaseSheetGenerator):
             constants_to_write.append(
                 ('Post-investment Valuation:', None, 'currency', 'Post-investment Valuation:'))
 
-            # Price Per Share (only for valuation_based rounds, not for convertible/safe)
-            if calc_type == 'valuation_based' and 'price_per_share' in round_data:
-                pps = round_data.get('price_per_share')
-                constants_to_write.append(
-                    ('Price Per Share:', pps, 'currency', 'Price Per Share:'))
+            # Price Per Share (for all rounds with valuation: valuation_based, convertible, safe)
+            # Always add Price Per Share field for rounds with valuation
+            pps = round_data.get('price_per_share')
+            constants_to_write.append(
+                ('Price Per Share:', pps, 'currency', 'Price Per Share:'))
 
         # Write first constant on the same row as round name (to the right)
         if constants_to_write:
@@ -374,8 +374,8 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 # Special handling for Price Per Share
                 pps = round_data.get('price_per_share')
 
-                if calc_type in ['convertible', 'safe']:
-                    # Price per share calculated from pre-investment valuation
+                if calc_type in ['convertible', 'safe', 'valuation_based']:
+                    # Price per share calculated from pre-investment valuation for all valuation types
                     pre_round_shares_ref = self._get_pre_round_shares_ref(
                         round_idx, round_data, all_rounds)
                     col_value_ref = self.padding_offset + \
@@ -388,16 +388,23 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                     pre_investment_ref = f"{col_letter}{pre_investment_row + 1}" if pre_investment_row is not None else "0"
 
                     # Price per share = Pre-investment Valuation / Pre-round Shares
-                    pps_formula = valuation.create_price_per_share_from_valuation_formula(
-                        pre_investment_ref, pre_round_shares_ref
-                    )
-                    sheet.write_formula(
-                        current_row, col_value, pps_formula, self.formats.get('currency'))
+                    # For valuation_based, use provided pps if available, otherwise calculate
+                    if calc_type == 'valuation_based' and pps is not None:
+                        # Use provided price per share value
+                        sheet.write(current_row, col_value, pps,
+                                    self.formats.get('currency'))
+                    else:
+                        # Calculate from pre-investment valuation
+                        pps_formula = valuation.create_price_per_share_from_valuation_formula(
+                            pre_investment_ref, pre_round_shares_ref
+                        )
+                        sheet.write_formula(
+                            current_row, col_value, pps_formula, self.formats.get('currency'))
                 else:
                     sheet.write(current_row, col_value, pps or 0,
                                 self.formats.get('currency'))
 
-                # Register named range
+                # Register named range (always create for rounds with valuation)
                 round_name_key = self._sanitize_excel_name(
                     round_data.get('name', ''))
                 col_letter = self._col_letter(col_value)

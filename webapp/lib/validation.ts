@@ -47,7 +47,15 @@ export function validateRound(
   }
 
   // Validate dilution_method on instruments if provided
+  // Track holders with anti-dilution instruments to ensure only one per holder per round
+  const holderAntiDilutionCount: Map<string, number[]> = new Map();
+
   round.instruments.forEach((instrument, index) => {
+    // Skip pro-rata allocations as they don't have dilution_method
+    if ("pro_rata_type" in instrument) {
+      return;
+    }
+
     if (
       "dilution_method" in instrument &&
       instrument.dilution_method !== undefined &&
@@ -57,13 +65,43 @@ export function validateRound(
         "full_ratchet",
         "narrow_based_weighted_average",
         "broad_based_weighted_average",
+        "percentage_based",
       ];
       if (!validDilutionMethods.includes(instrument.dilution_method)) {
         errors.push({
           field: `instruments[${index}].dilution_method`,
           message: `Invalid dilution method. Must be one of: ${validDilutionMethods.join(", ")}`,
         });
+      } else {
+        // Track this holder's anti-dilution instrument
+        const holderName =
+          "holder_name" in instrument && instrument.holder_name
+            ? instrument.holder_name
+            : null;
+        if (holderName) {
+          if (!holderAntiDilutionCount.has(holderName)) {
+            holderAntiDilutionCount.set(holderName, []);
+          }
+          holderAntiDilutionCount.get(holderName)!.push(index);
+        }
       }
+    }
+  });
+
+  // Check for multiple anti-dilution instruments per holder
+  holderAntiDilutionCount.forEach((indices, holderName) => {
+    if (indices.length > 1) {
+      errors.push({
+        field: `instruments`,
+        message: `Each holder can have only one anti-dilution instrument per round. Holder "${holderName}" has ${indices.length} anti-dilution instruments.`,
+      });
+      // Also add specific errors for each duplicate instrument
+      indices.slice(1).forEach((index) => {
+        errors.push({
+          field: `instruments[${index}].dilution_method`,
+          message: `Duplicate anti-dilution instrument for holder "${holderName}". Only one anti-dilution instrument per holder per round is allowed.`,
+        });
+      });
     }
   });
 

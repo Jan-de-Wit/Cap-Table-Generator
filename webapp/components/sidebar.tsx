@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useEffect, useRef } from "react";
 import Lenis from "lenis";
+import { getGlobalLenis } from "@/components/smooth-scroll";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -260,6 +261,106 @@ export function Sidebar({
     return holders.filter((h) => holderNames.has(h.name));
   };
 
+  const getAntiDilutionHolders = (round: Round, roundIndex: number): Holder[] => {
+    const holderNames = new Set<string>();
+    
+    // Helper function to check if a round type supports price-based anti-dilution
+    const supportsPriceBasedAntiDilution = (calcType: string): boolean => {
+      return !["fixed_shares", "target_percentage"].includes(calcType);
+    };
+    
+    // First, check if this round has AntiDilutionAllocation instruments (from export)
+    // AntiDilutionAllocation instruments only have holder_name, class_name, and dilution_method
+    round.instruments.forEach((instrument) => {
+      if (
+        "holder_name" in instrument &&
+        instrument.holder_name &&
+        "dilution_method" in instrument &&
+        instrument.dilution_method &&
+        !("anti_dilution_rounds" in instrument) &&
+        // Check if it's an AntiDilutionAllocation (only has 3 fields)
+        Object.keys(instrument).length === 3
+      ) {
+        holderNames.add(instrument.holder_name);
+      }
+    });
+
+    // Also check previous rounds for instruments with anti-dilution protection
+    // that apply to this round (for UI display before export)
+    for (let prevRoundIndex = 0; prevRoundIndex < roundIndex; prevRoundIndex++) {
+      const prevRound = rounds[prevRoundIndex];
+      
+      prevRound.instruments.forEach((instrument) => {
+        // Skip pro-rata allocations and anti-dilution allocations
+        if ("pro_rata_type" in instrument) {
+          return;
+        }
+        // Skip if it's already an AntiDilutionAllocation
+        if (
+          "dilution_method" in instrument &&
+          !("anti_dilution_rounds" in instrument) &&
+          Object.keys(instrument).length === 3
+        ) {
+          return;
+        }
+
+        // Check if instrument has anti-dilution protection
+        if (
+          "holder_name" in instrument &&
+          instrument.holder_name &&
+          "dilution_method" in instrument &&
+          instrument.dilution_method
+        ) {
+          const dilutionMethod = instrument.dilution_method;
+          const antiDilutionRounds = (instrument as any).anti_dilution_rounds;
+          
+          // Determine how many rounds ahead this applies to
+          let roundsAhead: number;
+          if (antiDilutionRounds === "infinite" || antiDilutionRounds === undefined) {
+            roundsAhead = Infinity;
+          } else if (typeof antiDilutionRounds === "number") {
+            roundsAhead = antiDilutionRounds;
+          } else {
+            return; // Invalid value, skip
+          }
+
+          // For price-based methods, only count rounds that support price-based anti-dilution
+          if (dilutionMethod !== "percentage_based") {
+            let applicableRoundsCounted = 0;
+            
+            // Count forward from the original round, skipping rounds that don't support price-based
+            for (let checkRoundIndex = prevRoundIndex + 1; checkRoundIndex <= roundIndex; checkRoundIndex++) {
+              const checkRound = rounds[checkRoundIndex];
+              const checkCalcType = checkRound.calculation_type;
+              
+              if (supportsPriceBasedAntiDilution(checkCalcType)) {
+                applicableRoundsCounted++;
+                
+                // If this is the current round and it supports price-based, check if we should show badge
+                if (checkRoundIndex === roundIndex) {
+                  if (roundsAhead === Infinity || applicableRoundsCounted <= roundsAhead) {
+                    holderNames.add(instrument.holder_name);
+                  }
+                  break;
+                }
+              }
+            }
+          } else {
+            // For percentage-based, count all rounds
+            const roundsSinceOriginal = roundIndex - prevRoundIndex;
+            
+            // Check if anti-dilution still applies to this round
+            if (roundsAhead === Infinity || roundsSinceOriginal <= roundsAhead) {
+              holderNames.add(instrument.holder_name);
+            }
+          }
+        }
+      });
+    }
+    
+    return holders.filter((h) => holderNames.has(h.name));
+  };
+
   // Initialize Lenis for sidebar smooth scrolling
   useEffect(() => {
     if (!sidebarWrapperRef.current || !sidebarContentRef.current) return;
@@ -291,11 +392,68 @@ export function Sidebar({
 
     requestAnimationFrame(raf);
 
+    // Pause global Lenis when interacting with sidebar
+    const wrapper = sidebarWrapperRef.current;
+    const globalLenis = getGlobalLenis();
+
+    // If sidebar is force-visible (expanded via hamburger), pause global Lenis immediately
+    if (forceVisible && globalLenis) {
+      globalLenis.stop();
+    }
+
+    const handleMouseEnter = () => {
+      if (globalLenis) {
+        globalLenis.stop();
+      }
+    };
+
+    const handleMouseLeave = () => {
+      // Only resume if sidebar is not force-visible (not in mobile drawer mode)
+      if (globalLenis && !forceVisible) {
+        globalLenis.start();
+      }
+    };
+
+    // Handle wheel events to prevent global Lenis from interfering
+    const handleWheel = (e: WheelEvent) => {
+      // Stop propagation to prevent global Lenis from handling this event
+      e.stopPropagation();
+    };
+
+    // Handle touch events for mobile
+    const handleTouchStart = (e: TouchEvent) => {
+      if (globalLenis) {
+        globalLenis.stop();
+      }
+      e.stopPropagation();
+    };
+
+    const handleTouchEnd = () => {
+      if (globalLenis && !forceVisible) {
+        globalLenis.start();
+      }
+    };
+
+    wrapper.addEventListener('mouseenter', handleMouseEnter);
+    wrapper.addEventListener('mouseleave', handleMouseLeave);
+    wrapper.addEventListener('wheel', handleWheel, { passive: false });
+    wrapper.addEventListener('touchstart', handleTouchStart, { passive: false });
+    wrapper.addEventListener('touchend', handleTouchEnd, { passive: false });
+
     return () => {
       lenis.destroy();
       lenisRef.current = null;
+      wrapper.removeEventListener('mouseenter', handleMouseEnter);
+      wrapper.removeEventListener('mouseleave', handleMouseLeave);
+      wrapper.removeEventListener('wheel', handleWheel);
+      wrapper.removeEventListener('touchstart', handleTouchStart);
+      wrapper.removeEventListener('touchend', handleTouchEnd);
+      // Make sure to resume global Lenis when sidebar is unmounted or forceVisible changes
+      if (globalLenis) {
+        globalLenis.start();
+      }
     };
-  }, []);
+  }, [forceVisible]);
 
   return (
     <DndContext
@@ -340,6 +498,7 @@ export function Sidebar({
                       {rounds.map((round, index) => {
                         const roundHolders = getRoundHolders(round);
                         const proRataHolders = getProRataHolders(round);
+                        const antiDilutionHolders = getAntiDilutionHolders(round, index);
                         const validation = validations?.[index];
                         const isSelected = selectedRoundIndex === index;
                         return (
@@ -350,6 +509,7 @@ export function Sidebar({
                             index={index}
                             roundHolders={roundHolders}
                             proRataHolders={proRataHolders}
+                            antiDilutionHolders={antiDilutionHolders}
                             validation={validation}
                             isSelected={isSelected}
                             onSelect={onSelectRound}
@@ -773,6 +933,7 @@ function DraggableRoundSidebar({
   index,
   roundHolders,
   proRataHolders,
+  antiDilutionHolders,
   validation,
   isSelected,
   onSelect,
@@ -785,6 +946,7 @@ function DraggableRoundSidebar({
   index: number;
   roundHolders: Holder[];
   proRataHolders: Holder[];
+  antiDilutionHolders: Holder[];
   validation?: RoundValidation;
   isSelected?: boolean;
   onSelect?: (index: number) => void;
@@ -995,6 +1157,26 @@ function DraggableRoundSidebar({
                         key={holder.name}
                         variant="outline"
                         className="text-xs py-0"
+                      >
+                        {holder.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {antiDilutionHolders.length > 0 && (
+                <div className="space-y-1.5 mt-2">
+                  <div className="text-xs font-medium text-muted-foreground">
+                    Anti-Dilution Protection{antiDilutionHolders.length !== 1 ? "s" : ""}{" "}
+                    ({antiDilutionHolders.length})
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {antiDilutionHolders.map((holder) => (
+                      <Badge
+                        key={holder.name}
+                        variant="outline"
+                        className="text-xs py-0 bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-300"
                       >
                         {holder.name}
                       </Badge>

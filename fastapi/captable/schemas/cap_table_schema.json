@@ -31,6 +31,40 @@
       "pattern": "^[^\\n\\r]+$",
       "description": "Unique name identifier"
     },
+    "AntiDilutionAllocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "holder_name",
+        "class_name",
+        "dilution_method",
+        "original_investment_round"
+      ],
+      "properties": {
+        "holder_name": {
+          "type": "string",
+          "description": "Reference to holder by name"
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Reference to security class by name"
+        },
+        "dilution_method": {
+          "type": "string",
+          "enum": [
+            "full_ratchet",
+            "narrow_based_weighted_average",
+            "broad_based_weighted_average",
+            "percentage_based"
+          ],
+          "description": "Anti-dilution protection method for this allocation"
+        },
+        "original_investment_round": {
+          "type": "string",
+          "description": "Name of the round where the original investment was made and anti-dilution rights were granted"
+        }
+      }
+    },
     "ProRataAllocation": {
       "type": "object",
       "additionalProperties": false,
@@ -133,9 +167,25 @@
           "enum": [
             "full_ratchet",
             "narrow_based_weighted_average",
-            "broad_based_weighted_average"
+            "broad_based_weighted_average",
+            "percentage_based"
           ],
           "description": "Optional dilution protection method for this instrument"
+        },
+        "anti_dilution_rounds": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["infinite"],
+              "description": "Anti-dilution protection applies to all future rounds"
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of future rounds this anti-dilution protection applies to"
+            }
+          ],
+          "description": "Optional: Number of future rounds (or 'infinite') that anti-dilution protection applies to. Defaults to 'infinite' if not specified."
         }
       }
     },
@@ -174,9 +224,25 @@
           "enum": [
             "full_ratchet",
             "narrow_based_weighted_average",
-            "broad_based_weighted_average"
+            "broad_based_weighted_average",
+            "percentage_based"
           ],
           "description": "Optional dilution protection method for this instrument"
+        },
+        "anti_dilution_rounds": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["infinite"],
+              "description": "Anti-dilution protection applies to all future rounds"
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of future rounds this anti-dilution protection applies to"
+            }
+          ],
+          "description": "Optional: Number of future rounds (or 'infinite') that anti-dilution protection applies to. Defaults to 'infinite' if not specified."
         }
       }
     },
@@ -214,9 +280,25 @@
           "enum": [
             "full_ratchet",
             "narrow_based_weighted_average",
-            "broad_based_weighted_average"
+            "broad_based_weighted_average",
+            "percentage_based"
           ],
           "description": "Optional dilution protection method for this instrument"
+        },
+        "anti_dilution_rounds": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["infinite"],
+              "description": "Anti-dilution protection applies to all future rounds"
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of future rounds this anti-dilution protection applies to"
+            }
+          ],
+          "description": "Optional: Number of future rounds (or 'infinite') that anti-dilution protection applies to. Defaults to 'infinite' if not specified."
         }
       }
     },
@@ -321,9 +403,25 @@
           "enum": [
             "full_ratchet",
             "narrow_based_weighted_average",
-            "broad_based_weighted_average"
+            "broad_based_weighted_average",
+            "percentage_based"
           ],
           "description": "Optional dilution protection method for this instrument"
+        },
+        "anti_dilution_rounds": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["infinite"],
+              "description": "Anti-dilution protection applies to all future rounds"
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of future rounds this anti-dilution protection applies to"
+            }
+          ],
+          "description": "Optional: Number of future rounds (or 'infinite') that anti-dilution protection applies to. Defaults to 'infinite' if not specified."
         }
       }
     },
@@ -393,9 +491,25 @@
           "enum": [
             "full_ratchet",
             "narrow_based_weighted_average",
-            "broad_based_weighted_average"
+            "broad_based_weighted_average",
+            "percentage_based"
           ],
           "description": "Optional dilution protection method for this instrument"
+        },
+        "anti_dilution_rounds": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["infinite"],
+              "description": "Anti-dilution protection applies to all future rounds"
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of future rounds this anti-dilution protection applies to"
+            }
+          ],
+          "description": "Optional: Number of future rounds (or 'infinite') that anti-dilution protection applies to. Defaults to 'infinite' if not specified."
         }
       },
       "allOf": [
@@ -459,7 +573,7 @@
         },
         "instruments": {
           "type": "array",
-          "description": "Instruments issued in this round. Can include regular instruments (based on calculation_type) and ProRataAllocation instruments."
+          "description": "Instruments issued in this round. Can include regular instruments (based on calculation_type), ProRataAllocation instruments, and AntiDilutionAllocation instruments."
         },
         "valuation": {
           "type": "number",
@@ -479,12 +593,13 @@
             "properties": {
               "instruments": {
                 "type": "array",
-                "items": {
-                  "oneOf": [
-                    { "$ref": "#/$defs/FixedSharesInstrument" },
-                    { "$ref": "#/$defs/ProRataAllocation" }
-                  ]
-                }
+                  "items": {
+                    "oneOf": [
+                      { "$ref": "#/$defs/FixedSharesInstrument" },
+                      { "$ref": "#/$defs/ProRataAllocation" },
+                      { "$ref": "#/$defs/AntiDilutionAllocation" }
+                    ]
+                  }
               }
             }
           }
@@ -502,7 +617,8 @@
                 "items": {
                   "oneOf": [
                     { "$ref": "#/$defs/TargetPercentageInstrument" },
-                    { "$ref": "#/$defs/ProRataAllocation" }
+                    { "$ref": "#/$defs/ProRataAllocation" },
+                    { "$ref": "#/$defs/AntiDilutionAllocation" }
                   ]
                 }
               }
@@ -521,7 +637,8 @@
                 "items": {
                   "oneOf": [
                     { "$ref": "#/$defs/ValuationBasedInstrument" },
-                    { "$ref": "#/$defs/ProRataAllocation" }
+                    { "$ref": "#/$defs/ProRataAllocation" },
+                    { "$ref": "#/$defs/AntiDilutionAllocation" }
                   ]
                 }
               }
@@ -540,7 +657,8 @@
                 "items": {
                   "oneOf": [
                     { "$ref": "#/$defs/ConvertibleInstrument" },
-                    { "$ref": "#/$defs/ProRataAllocation" }
+                    { "$ref": "#/$defs/ProRataAllocation" },
+                    { "$ref": "#/$defs/AntiDilutionAllocation" }
                   ]
                 }
               }
@@ -559,7 +677,8 @@
                 "items": {
                   "oneOf": [
                     { "$ref": "#/$defs/SafeInstrument" },
-                    { "$ref": "#/$defs/ProRataAllocation" }
+                    { "$ref": "#/$defs/ProRataAllocation" },
+                    { "$ref": "#/$defs/AntiDilutionAllocation" }
                   ]
                 }
               }

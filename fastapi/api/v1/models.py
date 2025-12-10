@@ -6,7 +6,7 @@ Request and response models for API v1.
 
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
-from fastapi.captable.constants import CALCULATION_TYPES, CURRENT_SCHEMA_VERSION
+from captable.constants import CALCULATION_TYPES, CURRENT_SCHEMA_VERSION
 
 
 class CapTableRequest(BaseModel):
@@ -137,4 +137,7 @@ class CompareResponse(BaseModel):
     are_identical: bool = Field(..., description="Whether cap tables are identical")
     differences: List[ComparisonDifference] = Field(default_factory=list, description="List of differences")
     summary: Optional[Dict[str, Any]] = Field(None, description="Comparison summary")
+
+
+
 

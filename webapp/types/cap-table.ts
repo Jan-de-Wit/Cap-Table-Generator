@@ -10,7 +10,8 @@ export type ValuationBasis = "pre_money" | "post_money";
 export type DilutionMethod = 
   | "full_ratchet"
   | "narrow_based_weighted_average"
-  | "broad_based_weighted_average";
+  | "broad_based_weighted_average"
+  | "percentage_based";
 
 export type ProRataType = "standard" | "super";
 
@@ -34,6 +35,7 @@ export interface FixedSharesInstrument {
   pro_rata_rights?: "standard" | "super";
   pro_rata_percentage?: number;
   dilution_method?: DilutionMethod;
+  anti_dilution_rounds?: number | "infinite";
 }
 
 export interface TargetPercentageInstrument {
@@ -43,6 +45,7 @@ export interface TargetPercentageInstrument {
   pro_rata_rights?: "standard" | "super";
   pro_rata_percentage?: number;
   dilution_method?: DilutionMethod;
+  anti_dilution_rounds?: number | "infinite";
 }
 
 export interface ValuationBasedInstrument {
@@ -52,6 +55,7 @@ export interface ValuationBasedInstrument {
   pro_rata_rights?: "standard" | "super";
   pro_rata_percentage?: number;
   dilution_method?: DilutionMethod;
+  anti_dilution_rounds?: number | "infinite";
 }
 
 export interface ConvertibleInstrument {
@@ -68,6 +72,7 @@ export interface ConvertibleInstrument {
   pro_rata_rights?: "standard" | "super";
   pro_rata_percentage?: number;
   dilution_method?: DilutionMethod;
+  anti_dilution_rounds?: number | "infinite";
 }
 
 export interface SafeInstrument {
@@ -81,6 +86,7 @@ export interface SafeInstrument {
   pro_rata_rights?: "standard" | "super";
   pro_rata_percentage?: number;
   dilution_method?: DilutionMethod;
+  anti_dilution_rounds?: number | "infinite";
 }
 
 export interface ProRataAllocation {
@@ -93,13 +99,21 @@ export interface ProRataAllocation {
   partial_exercise_percentage?: number;
 }
 
+export interface AntiDilutionAllocation {
+  holder_name: string;
+  class_name: string;
+  dilution_method: DilutionMethod;
+  original_investment_round: string;
+}
+
 export type Instrument = 
   | FixedSharesInstrument
   | TargetPercentageInstrument
   | ValuationBasedInstrument
   | ConvertibleInstrument
   | SafeInstrument
-  | ProRataAllocation;
+  | ProRataAllocation
+  | AntiDilutionAllocation;
 
 export interface Round {
   name: string;

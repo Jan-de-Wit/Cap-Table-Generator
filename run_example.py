@@ -1,21 +1,42 @@
 #!/usr/bin/env python3
 """
 Quick script to run the round-based example and generate Excel output.
+
+Usage:
+    python run_example.py [input_file.json] [output_file.xlsx]
+
+Examples:
+    python run_example.py examples/anti_dilution_test.json
+    python run_example.py examples/chatgpt.json output.xlsx
 """
 
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Add fastapi to path so we can import captable
+sys.path.insert(0, str(Path(__file__).parent / "fastapi"))
 
 try:
     from captable import generate_from_json
 
-    # Paths
-    input_file = Path(__file__).parent / "examples" / \
-        "chatgpt.json"
-    output_file = Path(__file__).parent / "output_v2.xlsx"
+    # Paths - allow command-line argument for input file
+    if len(sys.argv) > 1:
+        input_file = Path(sys.argv[1])
+        if not input_file.is_absolute():
+            input_file = Path(__file__).parent / input_file
+        if not input_file.exists():
+            print(f"❌ ERROR: Input file not found: {input_file}")
+            sys.exit(1)
+    else:
+        input_file = Path(__file__).parent / "examples" / "chatgpt.json"
+    
+    # Generate output filename from input filename
+    if len(sys.argv) > 2:
+        output_file = Path(sys.argv[2])
+        if not output_file.is_absolute():
+            output_file = Path(__file__).parent / output_file
+    else:
+        output_file = Path(__file__).parent / f"{input_file.stem}_output.xlsx"
 
     print("🚀 Generating Excel from round-based example...")
     print(f"📄 Input: {input_file}")

@@ -173,7 +173,7 @@ export function JsonImportDialog({
     try {
       const apiUrl =
         process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000";
-      const response = await fetch(`${apiUrl}/validate`, {
+      const response = await fetch(`${apiUrl}/api/v1/validate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

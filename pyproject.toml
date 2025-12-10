@@ -63,5 +63,5 @@ markers = [
     "slow: Slow running tests",
 ]
 
-[project.scripts]
-app = "app.py"
+# [project.scripts]
+# app = "fastapi.main:app"

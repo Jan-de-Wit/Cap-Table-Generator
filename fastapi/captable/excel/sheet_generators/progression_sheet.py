@@ -449,8 +449,14 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         pro_rata_start_col = self._get_pro_rata_shares_col(round_idx, rounds)
         pro_rata_shares = f"'Pro Rata Allocations'!{pro_rata_start_col}{row + 1}"
         
-        # Total new shares = rounds sheet shares + Pro-rata Shares
-        new_formula = f'=ROUND({rounds_shares} + {pro_rata_shares}, 0)'
+        # Get Anti-Dilution Shares from Anti-Dilution Allocations sheet
+        # Anti-dilution sheet has same row structure (holders in same order)
+        # Additional Shares column is 5 columns after the start of each round section
+        anti_dilution_shares_col = self._get_anti_dilution_shares_col(round_idx, rounds)
+        anti_dilution_shares = f"'Anti-Dilution Allocations'!{anti_dilution_shares_col}{row + 1}"
+        
+        # Total new shares = rounds sheet shares + Pro-rata Shares + Anti-Dilution Shares
+        new_formula = f'=ROUND({rounds_shares} + {pro_rata_shares} + {anti_dilution_shares}, 0)'
         sheet.write_formula(row, new_col, new_formula, self.formats.get('table_number'))
         
         # TOTAL: Start + New (rounded to integer)
@@ -509,6 +515,21 @@ class ProgressionSheetGenerator(BaseSheetGenerator):
         # Pro-rata Shares: padding_offset + 1 + 2 + (round_idx * 10) + 6
         padding_offset = 1  # Pro Rata sheet has padding_offset = 1
         col_idx = padding_offset + 1 + 2 + (round_idx * 10) + 6
+        return self._col_letter(col_idx)
+    
+    def _get_anti_dilution_shares_col(self, round_idx: int, rounds: List[Dict[str, Any]]) -> str:
+        """Get the column letter for Additional Shares in Anti-Dilution Allocations sheet."""
+        # Anti-Dilution Allocations sheet structure (with padding):
+        # Column 0: Outer padding
+        # Column 1: Inner padding (border_start_col)
+        # Column 2: Shareholders (padding_offset + 1)
+        # Column 3: Description (padding_offset + 2)
+        # Each round: Anti-Dilution Method, Original Price, Adjusted Price, Original Shares, Adjusted Shares, Additional Shares, Investment Amount, Separator
+        # Additional Shares is 5 columns after the start of each round
+        # Start of round: padding_offset + 1 + 2 + (round_idx * 8)
+        # Additional Shares: padding_offset + 1 + 2 + (round_idx * 8) + 5
+        padding_offset = 1  # Anti-Dilution sheet has padding_offset = 1
+        col_idx = padding_offset + 1 + 2 + (round_idx * 8) + 5
         return self._col_letter(col_idx)
     
     def _get_shares_header(self, calc_type: str) -> str:

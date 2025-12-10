@@ -60,17 +60,6 @@ from captable.constants import (
 )
 from captable.monitoring import PerformanceTracker
 from captable.reporting import ValidationReportGenerator
-from fastapi.captable.constants import (
-    CALCULATION_TYPES,
-    CURRENT_SCHEMA_VERSION,
-    CALC_TYPE_FIXED_SHARES,
-    CALC_TYPE_TARGET_PERCENTAGE,
-    CALC_TYPE_VALUATION_BASED,
-    CALC_TYPE_CONVERTIBLE,
-    CALC_TYPE_SAFE,
-)
-from fastapi.captable.monitoring import PerformanceTracker
-from fastapi.captable.reporting import ValidationReportGenerator
 
 router = APIRouter(prefix="/api/v1", tags=["v1"])
 

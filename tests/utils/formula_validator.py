@@ -78,3 +78,6 @@ class FormulaValidator:
         results = self.validate_formulas(sheet_name)
         return [r for r in results if not r["is_valid"]]
 
+
+
+

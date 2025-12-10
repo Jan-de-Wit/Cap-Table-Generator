@@ -26,12 +26,21 @@ import { FieldWithHelp } from "@/components/field-with-help";
 import { Combobox } from "@/components/ui/combobox";
 import { Separator } from "@/components/ui/separator";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { Info } from "lucide-react";
+import { Info, CheckIcon, ChevronsUpDown, X } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import type {
   Instrument,
   Holder,
@@ -47,6 +56,169 @@ import {
   percentageToDecimal,
   parseFormattedNumber,
 } from "@/lib/formatters";
+
+interface AntiDilutionRoundsComboboxProps {
+  value: string;
+  onValueChange: (value: string) => void;
+}
+
+function AntiDilutionRoundsCombobox({
+  value,
+  onValueChange,
+}: AntiDilutionRoundsComboboxProps) {
+  const [open, setOpen] = React.useState(false);
+  const [searchValue, setSearchValue] = React.useState("");
+
+  const displayValue = React.useMemo(() => {
+    if (!value || value === "") return "Select rounds...";
+    if (value === "infinite") return "Infinite";
+    return `${value} round${value === "1" ? "" : "s"}`;
+  }, [value]);
+
+  const handleSelect = (selectedValue: string) => {
+    if (selectedValue === "__clear__") {
+      onValueChange("");
+    } else if (selectedValue === "infinite") {
+      onValueChange("infinite");
+    } else {
+      // Validate it's a number
+      const numValue = parseInt(selectedValue, 10);
+      if (!isNaN(numValue) && numValue > 0) {
+        onValueChange(selectedValue);
+      }
+    }
+    setOpen(false);
+    setSearchValue("");
+  };
+
+  const handleCustomValue = () => {
+    if (searchValue.trim()) {
+      const trimmed = searchValue.trim();
+      if (trimmed.toLowerCase() === "infinite") {
+        onValueChange("infinite");
+      } else {
+        const numValue = parseInt(trimmed, 10);
+        if (!isNaN(numValue) && numValue > 0) {
+          onValueChange(String(numValue));
+        }
+      }
+      setOpen(false);
+      setSearchValue("");
+    }
+  };
+
+  const handleClear = () => {
+    onValueChange("");
+    setOpen(false);
+    setSearchValue("");
+  };
+
+  React.useEffect(() => {
+    if (!open) {
+      setSearchValue("");
+    }
+  }, [open]);
+
+  const isValidNumber = React.useMemo(() => {
+    if (!searchValue.trim()) return false;
+    const trimmed = searchValue.trim().toLowerCase();
+    if (trimmed === "infinite") return true;
+    const num = parseInt(trimmed, 10);
+    return !isNaN(num) && num > 0;
+  }, [searchValue]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between cursor-pointer"
+          id="anti-dilution-rounds"
+        >
+          <span className={cn("truncate", !value && "font-normal text-muted-foreground")}>
+            {displayValue}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="p-0"
+        align="start"
+        style={{ width: "var(--radix-popover-trigger-width)" }}
+      >
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Type a number or 'infinite'..."
+            value={searchValue}
+            onValueChange={setSearchValue}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && isValidNumber) {
+                e.preventDefault();
+                handleCustomValue();
+              }
+            }}
+          />
+          <CommandList>
+            {searchValue.trim() && isValidNumber && (
+              <CommandGroup>
+                {searchValue.trim().toLowerCase() === "infinite" ? (
+                  <CommandItem
+                    value="infinite"
+                    onSelect={() => handleSelect("infinite")}
+                  >
+                    <CheckIcon
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === "infinite" ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    Infinite
+                  </CommandItem>
+                ) : (
+                  <CommandItem
+                    value={searchValue.trim()}
+                    onSelect={handleCustomValue}
+                  >
+                    <CheckIcon className="mr-2 h-4 w-4 opacity-0" />
+                    Use "{searchValue.trim()}"
+                  </CommandItem>
+                )}
+              </CommandGroup>
+            )}
+            <CommandGroup>
+              <CommandItem
+                value="infinite"
+                onSelect={() => handleSelect("infinite")}
+              >
+                <CheckIcon
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    value === "infinite" ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                Infinite
+              </CommandItem>
+            </CommandGroup>
+            {value && (
+              <CommandGroup>
+                <CommandItem
+                  value="__clear__"
+                  onSelect={handleClear}
+                  className="text-muted-foreground border-t"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Clear selection
+                </CommandItem>
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 interface InstrumentDialogProps {
   open: boolean;
@@ -678,53 +850,98 @@ export function InstrumentDialog({
                     {(!["convertible", "safe"].includes(calculationType) ||
                       valuationCapEnabled) && (
                       <>
-                        <FieldWithHelp
-                          label="Dilution Method"
-                          helpText="Optional: Method for protecting against dilution in future rounds"
-                          htmlFor="dilution-method"
-                        >
-                          <Select
-                            value={(formData as any).dilution_method || "none"}
-                            onValueChange={(value: DilutionMethod | "none") => {
-                              updateField(
-                                "dilution_method",
-                                value === "none" ? undefined : value
-                              );
-                            }}
-                            disabled={
-                              ["convertible", "safe"].includes(
-                                calculationType
-                              ) && !valuationCapEnabled
+                        <div className="grid grid-cols-2 gap-4">
+                          <FieldWithHelp
+                            label="Dilution Method"
+                            helpText={
+                              ["fixed_shares", "target_percentage"].includes(calculationType)
+                                ? "Percentage-based anti-dilution protection (required for this round type)"
+                                : "Optional: Method for protecting against dilution in future rounds"
                             }
+                            htmlFor="dilution-method"
                           >
-                            <SelectTrigger id="dilution-method">
-                              <SelectValue placeholder="No dilution protection" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">
-                                No Dilution Protection
-                              </SelectItem>
-                              <SelectItem value="full_ratchet">
-                                Full Ratchet
-                              </SelectItem>
-                              <SelectItem value="narrow_based_weighted_average">
-                                Narrow-Based Weighted Average
-                              </SelectItem>
-                              <SelectItem value="broad_based_weighted_average">
-                                Broad-Based Weighted Average
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FieldWithHelp>
+                            <Select
+                              value={(formData as any).dilution_method || "none"}
+                              onValueChange={(value: DilutionMethod | "none") => {
+                                updateField(
+                                  "dilution_method",
+                                  value === "none" ? undefined : value
+                                );
+                              }}
+                              disabled={
+                                ["convertible", "safe"].includes(
+                                  calculationType
+                                ) && !valuationCapEnabled
+                              }
+                            >
+                              <SelectTrigger id="dilution-method">
+                                <SelectValue placeholder="No dilution protection" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  No Dilution Protection
+                                </SelectItem>
+                                {["fixed_shares", "target_percentage"].includes(calculationType) ? (
+                                  <SelectItem value="percentage_based">
+                                    Percentage-Based
+                                  </SelectItem>
+                                ) : (
+                                  <>
+                                    <SelectItem value="full_ratchet">
+                                      Full Ratchet
+                                    </SelectItem>
+                                    <SelectItem value="narrow_based_weighted_average">
+                                      Narrow-Based Weighted Average
+                                    </SelectItem>
+                                    <SelectItem value="broad_based_weighted_average">
+                                      Broad-Based Weighted Average
+                                    </SelectItem>
+                                  </>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </FieldWithHelp>
+                          {(formData as any).dilution_method && (
+                            <FieldWithHelp
+                              label="Anti-Dilution Rounds"
+                              helpText="Number of future rounds this anti-dilution protection applies to. Type a number or select 'infinite'."
+                              htmlFor="anti-dilution-rounds"
+                            >
+                              <AntiDilutionRoundsCombobox
+                                value={
+                                  (formData as any).anti_dilution_rounds === undefined
+                                    ? "infinite"
+                                    : (formData as any).anti_dilution_rounds === "infinite"
+                                    ? "infinite"
+                                    : String((formData as any).anti_dilution_rounds)
+                                }
+                                onValueChange={(value) => {
+                                  if (value === "" || value === undefined) {
+                                    updateField("anti_dilution_rounds", undefined);
+                                  } else if (value === "infinite") {
+                                    updateField("anti_dilution_rounds", "infinite");
+                                  } else {
+                                    const numValue = parseInt(value, 10);
+                                    if (!isNaN(numValue) && numValue > 0) {
+                                      updateField("anti_dilution_rounds", numValue);
+                                    }
+                                  }
+                                }}
+                              />
+                            </FieldWithHelp>
+                          )}
+                        </div>
                         {(formData as any).dilution_method && (
                           <p className="text-xs text-muted-foreground">
-                            {(formData as any).dilution_method ===
-                            "full_ratchet"
+                            {(formData as any).dilution_method === "full_ratchet"
                               ? "Maximum protection - adjusts conversion price to new issuance price"
-                              : (formData as any).dilution_method ===
-                                "narrow_based_weighted_average"
+                              : (formData as any).dilution_method === "narrow_based_weighted_average"
                               ? "Considers only common stock in calculation"
-                              : "Includes all fully diluted shares in calculation"}
+                              : (formData as any).dilution_method === "broad_based_weighted_average"
+                              ? "Includes all fully diluted shares in calculation"
+                              : (formData as any).dilution_method === "percentage_based"
+                              ? "Protects ownership percentage rather than price per share"
+                              : ""}
                           </p>
                         )}
                       </>

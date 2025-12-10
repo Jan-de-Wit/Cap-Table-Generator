@@ -97,12 +97,14 @@ export function useHolders(
         const deletedHolder = prevHolders.find((h) => h.name === holderName);
         if (!deletedHolder) return prevHolders;
 
-        // Store state for undo
-        const previousHolders = [...prevHolders];
+        // Store state for undo - create deep copies to avoid closure issues
+        const previousHolders = prevHolders.map((h) => ({ ...h }));
+        
         setRounds((prevRounds) => {
+          // Create deep copy of rounds for undo
           const previousRounds = prevRounds.map((round) => ({
             ...round,
-            instruments: [...round.instruments],
+            instruments: round.instruments.map((inst) => ({ ...inst })),
           }));
 
           // Remove all instruments that reference this holder from all rounds
@@ -114,15 +116,21 @@ export function useHolders(
             ),
           }));
 
-          // Show toast with undo
+          // Show toast with undo - capture values in closure
+          const undoHolders = previousHolders.map((h) => ({ ...h }));
+          const undoRounds = previousRounds.map((round) => ({
+            ...round,
+            instruments: round.instruments.map((inst) => ({ ...inst })),
+          }));
+          
           toast(`"${holderName}" has been removed.`, {
             description:
               "The holder and all associated instruments have been removed.",
             action: {
               label: "Undo",
               onClick: () => {
-                setHolders(previousHolders);
-                setRounds(previousRounds);
+                setHolders(undoHolders);
+                setRounds(undoRounds);
                 toast.success("Holder restored", {
                   description: `"${holderName}" and all instruments have been restored.`,
                 });

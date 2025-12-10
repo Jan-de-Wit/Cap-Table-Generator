@@ -122,8 +122,11 @@ export function useRounds(
         const deletedRound = prev[index];
         const roundName = deletedRound.name || `Round ${index + 1}`;
 
-        // Store state for undo
-        const previousRounds = [...prev];
+        // Store state for undo - create deep copies to avoid closure issues
+        const previousRounds = prev.map((round) => ({
+          ...round,
+          instruments: round.instruments.map((inst) => ({ ...inst })),
+        }));
         const previousSelectedIndex = selectedRoundIndex;
 
         // Perform deletion
@@ -143,14 +146,20 @@ export function useRounds(
           setSelectedRoundIndex(selectedRoundIndex - 1);
         }
 
-        // Show toast with undo
+        // Show toast with undo - capture values in closure with deep copies
+        const undoRounds = previousRounds.map((round) => ({
+          ...round,
+          instruments: round.instruments.map((inst) => ({ ...inst })),
+        }));
+        const undoSelectedIndex = previousSelectedIndex;
+        
         toast(`"${roundName}" has been removed.`, {
           description: 'Accident? Hit "Undo" to restore.',
           action: {
             label: "Undo",
             onClick: () => {
-              setRounds(previousRounds);
-              setSelectedRoundIndex(previousSelectedIndex);
+              setRounds(undoRounds);
+              setSelectedRoundIndex(undoSelectedIndex);
               toast.success("Round restored", {
                 description: `"${roundName}" has been restored.`,
               });

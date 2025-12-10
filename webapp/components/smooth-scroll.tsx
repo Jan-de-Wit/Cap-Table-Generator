@@ -3,6 +3,13 @@
 import { useEffect } from "react";
 import Lenis from "lenis";
 
+// Store global Lenis instance so other components can pause/resume it
+let globalLenisInstance: Lenis | null = null;
+
+export function getGlobalLenis(): Lenis | null {
+  return globalLenisInstance;
+}
+
 export function SmoothScroll() {
   useEffect(() => {
     const lenis = new Lenis({
@@ -20,6 +27,8 @@ export function SmoothScroll() {
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
     });
 
+    globalLenisInstance = lenis;
+
     function raf(time: number) {
       lenis.raf(time);
       requestAnimationFrame(raf);
@@ -29,6 +38,7 @@ export function SmoothScroll() {
 
     return () => {
       lenis.destroy();
+      globalLenisInstance = null;
     };
   }, []);
 
