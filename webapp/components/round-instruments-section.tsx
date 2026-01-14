@@ -127,7 +127,9 @@ export function RoundInstrumentsSection({
     if (field === "target_percentage") {
       if ("target_percentage" in instrument) {
         const isTopUp = (instrument as any).target_is_top_up || false;
-        const value = `${decimalToPercentage(instrument.target_percentage).toFixed(2)}%`;
+        const value = `${decimalToPercentage(
+          instrument.target_percentage
+        ).toFixed(2)}%`;
         return isTopUp ? `${value} (top-up)` : value;
       }
       return "—";
@@ -169,7 +171,7 @@ export function RoundInstrumentsSection({
     }
     if (field === "discount_rate") {
       return "discount_rate" in instrument
-        ? `${decimalToPercentage(instrument.discount_rate).toFixed(2)}%`
+        ? `${decimalToPercentage(instrument.discount_rate ?? 0).toFixed(2)}%`
         : "—";
     }
     if (field === "valuation_cap") {
@@ -212,27 +214,32 @@ export function RoundInstrumentsSection({
     }
     if (field === "pro_rata") {
       // Merged pro rata type and percentage
-      const hasRights = "pro_rata_rights" in instrument && instrument.pro_rata_rights;
-      const percentage = "pro_rata_percentage" in instrument && instrument.pro_rata_percentage !== undefined
-        ? instrument.pro_rata_percentage
-        : undefined;
-      
+      const hasRights =
+        "pro_rata_rights" in instrument && instrument.pro_rata_rights;
+      const percentage =
+        "pro_rata_percentage" in instrument &&
+        instrument.pro_rata_percentage !== undefined
+          ? instrument.pro_rata_percentage
+          : undefined;
+
       if (!hasRights) {
         return <span className="text-muted-foreground text-sm">None</span>;
       }
-      
+
       const rights = instrument.pro_rata_rights;
       const typeLabel = rights === "super" ? "Super" : "Standard";
-      const percentageLabel = percentage !== undefined
-        ? ` (${decimalToPercentage(percentage).toFixed(2)}%)`
-        : "";
-      
+      const percentageLabel =
+        percentage !== undefined
+          ? ` (${decimalToPercentage(percentage).toFixed(2)}%)`
+          : "";
+
       return (
         <Badge
           variant={rights === "super" ? "default" : "outline"}
           className="text-xs"
         >
-          {typeLabel}{percentageLabel}
+          {typeLabel}
+          {percentageLabel}
         </Badge>
       );
     }
@@ -873,97 +880,21 @@ export function RoundInstrumentsSection({
               }}
               style={{ display: "inline-block", minWidth: "100%" }}
             >
-            <Table className="min-w-full">
-              <TableHeader style={{ padding: 0, margin: 0 }}>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id} className="group">
-                    {headerGroup.headers.map((header) => {
-                      const isSticky = header.column.columnDef.meta?.sticky;
-                      const isActions = header.column.id === "actions";
-                      const isIndex = header.column.id === "index";
-                      return (
-                        <TableHead
-                          key={header.id}
-                          className={`${
-                            isActions || isIndex ? "" : "min-w-[120px]"
-                          } whitespace-nowrap ${
-                            isSticky ? "sticky right-0 z-20 p-0 m-0" : ""
-                          }`}
-                          style={
-                            isSticky && !isActions
-                              ? {
-                                  minWidth: "100px",
-                                }
-                              : undefined
-                          }
-                        >
-                          <div
-                            className={`h-full flex items-center relative ${
-                              isSticky
-                                ? `border-l border-border/50 ${
-                                    isActions
-                                      ? "pl-4 justify-start"
-                                      : "px-4"
-                                  }`
-                                : ""
-                            }`}
-                          >
-                            {isSticky && (
-                              <>
-                                <div className="absolute inset-0 bg-background group-hover:bg-gray-50 dark:group-hover:bg-gray-900 transition-colors" />
-                                <div className="relative z-10">
-                                  {header.isPlaceholder
-                                    ? null
-                                    : flexRender(
-                                        header.column.columnDef.header,
-                                        header.getContext()
-                                      )}
-                                </div>
-                              </>
-                            )}
-                            {!isSticky &&
-                              (header.isPlaceholder
-                                ? null
-                                : flexRender(
-                                    header.column.columnDef.header,
-                                    header.getContext()
-                                  ))}
-                          </div>
-                        </TableHead>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows.map((row) => {
-                  const rowHasError = row.original.hasError;
-                  const rowBgClass = rowHasError
-                    ? "bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-800"
-                    : "bg-background hover:bg-gray-50 dark:hover:bg-gray-900";
-                  const stickyBaseBg = rowHasError
-                    ? "bg-red-50 dark:bg-red-950/30"
-                    : "bg-background";
-                  const stickyHoverBg = rowHasError
-                    ? "group-hover:bg-red-100 dark:group-hover:bg-red-800"
-                    : "group-hover:bg-gray-50 dark:group-hover:bg-gray-900";
-                  return (
-                    <TableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
-                      className={`group transition-colors py-0 ${rowBgClass}`}
-                    >
-                      {row.getVisibleCells().map((cell) => {
-                        const isSticky = cell.column.columnDef.meta?.sticky;
-                        const isActions = cell.column.id === "actions";
-                        const isIndex = cell.column.id === "index";
+              <Table className="min-w-full">
+                <TableHeader style={{ padding: 0, margin: 0 }}>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id} className="group">
+                      {headerGroup.headers.map((header) => {
+                        const isSticky = header.column.columnDef.meta?.sticky;
+                        const isActions = header.column.id === "actions";
+                        const isIndex = header.column.id === "index";
                         return (
-                          <TableCell
-                            key={cell.id}
+                          <TableHead
+                            key={header.id}
                             className={`${
                               isActions || isIndex ? "" : "min-w-[120px]"
                             } whitespace-nowrap ${
-                              isSticky ? "sticky right-0 z-20 p-0 m-0" : "py-3"
+                              isSticky ? "sticky right-0 z-20 p-0 m-0" : ""
                             }`}
                             style={
                               isSticky && !isActions
@@ -974,43 +905,119 @@ export function RoundInstrumentsSection({
                             }
                           >
                             <div
-                              className={`h-full flex items-center ${
+                              className={`h-full flex items-center relative ${
                                 isSticky
-                                  ? `border-l border-border/50 py-3 relative ${
-                                      isActions
-                                        ? "pl-2 pr-2 justify-start"
-                                        : "px-4"
+                                  ? `border-l border-border/50 ${
+                                      isActions ? "pl-4 justify-start" : "px-4"
                                     }`
                                   : ""
                               }`}
                             >
                               {isSticky && (
                                 <>
-                                  <div
-                                    className={`absolute inset-0 ${stickyBaseBg} ${stickyHoverBg} transition-colors`}
-                                  />
+                                  <div className="absolute inset-0 bg-background group-hover:bg-gray-50 dark:group-hover:bg-gray-900 transition-colors" />
                                   <div className="relative z-10">
-                                    {flexRender(
-                                      cell.column.columnDef.cell,
-                                      cell.getContext()
-                                    )}
+                                    {header.isPlaceholder
+                                      ? null
+                                      : flexRender(
+                                          header.column.columnDef.header,
+                                          header.getContext()
+                                        )}
                                   </div>
                                 </>
                               )}
                               {!isSticky &&
-                                flexRender(
-                                  cell.column.columnDef.cell,
-                                  cell.getContext()
-                                )}
+                                (header.isPlaceholder
+                                  ? null
+                                  : flexRender(
+                                      header.column.columnDef.header,
+                                      header.getContext()
+                                    ))}
                             </div>
-                          </TableCell>
+                          </TableHead>
                         );
                       })}
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows.map((row) => {
+                    const rowHasError = row.original.hasError;
+                    const rowBgClass = rowHasError
+                      ? "bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-800"
+                      : "bg-background hover:bg-gray-50 dark:hover:bg-gray-900";
+                    const stickyBaseBg = rowHasError
+                      ? "bg-red-50 dark:bg-red-950/30"
+                      : "bg-background";
+                    const stickyHoverBg = rowHasError
+                      ? "group-hover:bg-red-100 dark:group-hover:bg-red-800"
+                      : "group-hover:bg-gray-50 dark:group-hover:bg-gray-900";
+                    return (
+                      <TableRow
+                        key={row.id}
+                        data-state={row.getIsSelected() && "selected"}
+                        className={`group transition-colors py-0 ${rowBgClass}`}
+                      >
+                        {row.getVisibleCells().map((cell) => {
+                          const isSticky = cell.column.columnDef.meta?.sticky;
+                          const isActions = cell.column.id === "actions";
+                          const isIndex = cell.column.id === "index";
+                          return (
+                            <TableCell
+                              key={cell.id}
+                              className={`${
+                                isActions || isIndex ? "" : "min-w-[120px]"
+                              } whitespace-nowrap ${
+                                isSticky
+                                  ? "sticky right-0 z-20 p-0 m-0"
+                                  : "py-3"
+                              }`}
+                              style={
+                                isSticky && !isActions
+                                  ? {
+                                      minWidth: "100px",
+                                    }
+                                  : undefined
+                              }
+                            >
+                              <div
+                                className={`h-full flex items-center ${
+                                  isSticky
+                                    ? `border-l border-border/50 py-3 relative ${
+                                        isActions
+                                          ? "pl-2 pr-2 justify-start"
+                                          : "px-4"
+                                      }`
+                                    : ""
+                                }`}
+                              >
+                                {isSticky && (
+                                  <>
+                                    <div
+                                      className={`absolute inset-0 ${stickyBaseBg} ${stickyHoverBg} transition-colors`}
+                                    />
+                                    <div className="relative z-10">
+                                      {flexRender(
+                                        cell.column.columnDef.cell,
+                                        cell.getContext()
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                                {!isSticky &&
+                                  flexRender(
+                                    cell.column.columnDef.cell,
+                                    cell.getContext()
+                                  )}
+                              </div>
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           </div>
         </div>

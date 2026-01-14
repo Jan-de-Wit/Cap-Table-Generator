@@ -70,7 +70,9 @@ export function validateRound(
       if (!validDilutionMethods.includes(instrument.dilution_method)) {
         errors.push({
           field: `instruments[${index}].dilution_method`,
-          message: `Invalid dilution method. Must be one of: ${validDilutionMethods.join(", ")}`,
+          message: `Invalid dilution method. Must be one of: ${validDilutionMethods.join(
+            ", "
+          )}`,
         });
       } else {
         // Track this holder's anti-dilution instrument
@@ -323,7 +325,10 @@ export function validateRound(
     }
 
     if ("discount_rate" in instrument) {
-      if (instrument.discount_rate < 0 || instrument.discount_rate >= 1) {
+      if (
+        instrument.discount_rate !== undefined &&
+        (instrument.discount_rate < 0 || instrument.discount_rate >= 1)
+      ) {
         errors.push({
           field: `${prefix}.discount_rate`,
           message: "Discount rate must be between 0 and 100%",
