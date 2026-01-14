@@ -206,7 +206,12 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "description": "Target ownership percentage (as decimal, e.g., 0.20 for 20%)"
+          "description": "Target ownership percentage (as decimal, e.g., 0.20 for 20%) or top-up percentage if target_is_top_up is true"
+        },
+        "target_is_top_up": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, target_percentage represents a percentage point increase on top of current ownership. If false, target_percentage represents the total ownership percentage after the round."
         },
         "pro_rata_rights": {
           "type": "string",
@@ -312,8 +317,7 @@
         "interest_rate",
         "payment_date",
         "expected_conversion_date",
-        "interest_type",
-        "discount_rate"
+        "interest_type"
       ],
       "properties": {
         "holder_name": {
@@ -593,13 +597,13 @@
             "properties": {
               "instruments": {
                 "type": "array",
-                  "items": {
-                    "oneOf": [
-                      { "$ref": "#/$defs/FixedSharesInstrument" },
-                      { "$ref": "#/$defs/ProRataAllocation" },
-                      { "$ref": "#/$defs/AntiDilutionAllocation" }
-                    ]
-                  }
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/FixedSharesInstrument" },
+                    { "$ref": "#/$defs/ProRataAllocation" },
+                    { "$ref": "#/$defs/AntiDilutionAllocation" }
+                  ]
+                }
               }
             }
           }

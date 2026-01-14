@@ -10,6 +10,7 @@ import { RoundForm } from "@/components/round-form";
 import { Sidebar } from "@/components/sidebar";
 import { HolderDialog } from "@/components/holder-dialog";
 import { JsonImportDialog } from "@/components/json-import-dialog";
+import { CurrencyDialog, type Currency } from "@/components/currency-dialog";
 import {
   Plus,
   Sparkles,
@@ -54,6 +55,7 @@ export default function Home() {
     number | null
   >(null);
   const [isMounted, setIsMounted] = React.useState(false);
+  const [currencyDialogOpen, setCurrencyDialogOpen] = React.useState(false);
 
   // Load from localStorage after mount to avoid hydration mismatch
   React.useEffect(() => {
@@ -588,56 +590,72 @@ export default function Home() {
     setHolderDialogOpen(true);
   }, []);
 
-  const handleDownloadExcel = React.useCallback(async () => {
+  const handleDownloadExcel = React.useCallback(() => {
     if (!capTableData) return;
-
-    setIsGenerating(true);
-    try {
-      const apiUrl =
-        process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000";
-      const response = await fetch(`${apiUrl}/api/v1/generate-excel`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(capTableData),
-      });
-
-      if (!response.ok) {
-        let errorMessage = "Failed to generate Excel";
-        try {
-          const errorData = await response.json();
-          errorMessage =
-            errorData.detail?.error || errorData.error || errorMessage;
-        } catch {
-          const errorText = await response.text();
-          errorMessage = errorText || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "cap-table.xlsx";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast.success("Excel file downloaded", {
-        description: "Your cap table has been exported successfully.",
-      });
-    } catch (error) {
-      console.error("Error generating Excel:", error);
-      toast.error("Download failed", {
-        description:
-          error instanceof Error ? error.message : "Unknown error occurred",
-      });
-    } finally {
-      setIsGenerating(false);
-    }
+    setCurrencyDialogOpen(true);
   }, [capTableData]);
+
+  const handleDownloadExcelWithCurrency = React.useCallback(
+    async (currency: Currency) => {
+      if (!capTableData) return;
+
+      const _targetInstruments =
+        capTableData.rounds?.flatMap(
+          (r) => r.instruments?.filter((i) => "target_percentage" in i) || []
+        ) || [];
+
+      setIsGenerating(true);
+      try {
+        const apiUrl =
+          process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000";
+
+        const response = await fetch(`${apiUrl}/api/v1/generate-excel`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...capTableData,
+            currency,
+          }),
+        });
+
+        if (!response.ok) {
+          let errorMessage = "Failed to generate Excel";
+          try {
+            const errorData = await response.json();
+            errorMessage =
+              errorData.detail?.error || errorData.error || errorMessage;
+          } catch {
+            errorMessage = response.statusText || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "cap-table.xlsx";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success("Excel file downloaded", {
+          description: "Your cap table has been exported successfully.",
+        });
+      } catch (error) {
+        console.error("Error generating Excel:", error);
+        toast.error("Download failed", {
+          description:
+            error instanceof Error ? error.message : "Unknown error occurred",
+        });
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [capTableData]
+  );
 
   const canDownload = React.useMemo(
     () => validationSummary.isValid && rounds.length > 0,
@@ -1110,6 +1128,11 @@ export default function Home() {
         open={jsonImportDialogOpen}
         onOpenChange={setJsonImportDialogOpen}
         onImport={handleImportJson}
+      />
+      <CurrencyDialog
+        open={currencyDialogOpen}
+        onOpenChange={setCurrencyDialogOpen}
+        onConfirm={handleDownloadExcelWithCurrency}
       />
     </div>
   );

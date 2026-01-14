@@ -42,6 +42,7 @@ export interface TargetPercentageInstrument {
   holder_name: string;
   class_name: string;
   target_percentage: number;
+  target_is_top_up?: boolean;
   pro_rata_rights?: "standard" | "super";
   pro_rata_percentage?: number;
   dilution_method?: DilutionMethod;
@@ -66,7 +67,7 @@ export interface ConvertibleInstrument {
   payment_date: string;
   expected_conversion_date: string;
   interest_type: InterestType;
-  discount_rate: number;
+  discount_rate?: number;
   valuation_cap?: number;
   valuation_cap_type?: "default" | "pre_conversion" | "post_conversion_own" | "post_conversion_total";
   pro_rata_rights?: "standard" | "super";

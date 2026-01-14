@@ -48,16 +48,20 @@ class ExcelGenerator:
     specialized sheet generators that handle individual sheet types.
     """
 
-    def __init__(self, data: Dict[str, Any], output_path: str):
+    def __init__(self, data: Dict[str, Any], output_path: str, currency: str = "EUR"):
         """
         Initialize Excel generator.
 
         Args:
             data: Validated cap table JSON data
             output_path: Path for output Excel file
+            currency: Currency format (USD or EUR), defaults to EUR
         """
         self.data = data
         self.output_path = output_path
+        self.currency = currency
+        
+        print("Currency: ", self.currency)
         self.workbook = None
         self.sheets = {}
         self.formats = {}
@@ -85,8 +89,9 @@ class ExcelGenerator:
         self.workbook.formats[0].set_font_size(10)
         self.workbook.formats[0].set_bg_color('#869A78')
 
-        # Create formats
-        self.formats = ExcelFormatters.create_formats(self.workbook)
+        # Create formats with currency
+        self.formats = ExcelFormatters.create_formats(
+            self.workbook, currency=self.currency)
 
         # STEP 1: Create "Cap Table" worksheet first (empty) so it appears first in Excel
         # XLSXWriter sorts sheets by creation order, so we create this first
@@ -128,7 +133,8 @@ class ExcelGenerator:
         )
         # Pass round ranges from rounds sheet and the existing worksheet
         progression_gen.round_ranges = rounds_gen.get_round_ranges()
-        self.sheets['Cap Table'] = progression_gen.generate(existing_sheet=cap_table_sheet)
+        self.sheets['Cap Table'] = progression_gen.generate(
+            existing_sheet=cap_table_sheet)
 
         # Close and save
         self.workbook.close()

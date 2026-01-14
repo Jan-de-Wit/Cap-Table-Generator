@@ -14,6 +14,7 @@ class CapTableRequest(BaseModel):
     schema_version: str = Field(..., description="Schema version")
     holders: List[Dict[str, Any]] = Field(..., description="List of holders")
     rounds: List[Dict[str, Any]] = Field(..., description="List of rounds")
+    currency: Optional[str] = Field(default="USD", description="Currency format (USD or EUR)")
     
     class Config:
         json_schema_extra = {
@@ -29,7 +30,8 @@ class CapTableRequest(BaseModel):
                         "valuation": 1000000,
                         "instruments": []
                     }
-                ]
+                ],
+                "currency": "USD"
             }
         }
 

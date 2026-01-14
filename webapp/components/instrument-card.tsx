@@ -71,8 +71,9 @@ export function InstrumentCard({
       calculationType === "target_percentage" &&
       "target_percentage" in instrument
     ) {
+      const isTopUp = (instrument as any).target_is_top_up || false;
       details.push({
-        label: "Target",
+        label: isTopUp ? "Top-up" : "Target",
         value: `${decimalToPercentage(instrument.target_percentage).toFixed(2)}%`,
         icon: <Percent className="h-3.5 w-3.5" />
       });

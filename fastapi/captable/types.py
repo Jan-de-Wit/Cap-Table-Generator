@@ -36,6 +36,7 @@ class InstrumentDict(TypedDict):
     class_name: str
     initial_quantity: NotRequired[int]
     target_percentage: NotRequired[float]
+    target_is_top_up: NotRequired[bool]
     investment_amount: NotRequired[float]
     interest_rate: NotRequired[float]
     discount_rate: NotRequired[float]
@@ -123,6 +124,7 @@ ProRataTypeName = Union[
 ValuationBasisName = Union[
     str  # Will be one of the VALUATION_BASIS_* constants
 ]
+
 
 
 

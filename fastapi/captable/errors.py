@@ -229,3 +229,4 @@ def aggregate_errors(errors: List[CapTableError]) -> Dict[str, Any]:
 
 
 
+

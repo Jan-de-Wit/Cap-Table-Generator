@@ -597,6 +597,7 @@ class RoundsSheetGenerator(BaseSheetGenerator):
 
             elif calc_type == 'target_percentage':
                 target_pct = instrument.get('target_percentage', 0)
+                target_is_top_up = instrument.get('target_is_top_up', False)
                 sheet.write(row, table_start_col + col_map['target_percentage'],
                             target_pct, self.formats.get('table_percent'))
 
@@ -611,9 +612,16 @@ class RoundsSheetGenerator(BaseSheetGenerator):
                 holder_name = instrument.get('holder_name', '')
                 holder_current_shares_ref = self._get_holder_current_shares_ref(
                     round_idx, holder_name, all_rounds)
-                shares_formula = valuation.create_shares_from_percentage_formula(
-                    f"{target_pct_col}{row + 1}", pre_round_shares_ref, holder_current_shares_ref
-                )
+                
+                # Use top-up formula if flag is set, otherwise use standard formula
+                if target_is_top_up:
+                    shares_formula = valuation.create_shares_from_topup_percentage_formula(
+                        f"{target_pct_col}{row + 1}", pre_round_shares_ref, holder_current_shares_ref
+                    )
+                else:
+                    shares_formula = valuation.create_shares_from_percentage_formula(
+                        f"{target_pct_col}{row + 1}", pre_round_shares_ref, holder_current_shares_ref
+                    )
                 # Wrap in ROUND to ensure whole shares (replace only the first '=' at the start)
                 if shares_formula.startswith('='):
                     shares_formula = '=ROUND(' + shares_formula[1:] + ', 0)'

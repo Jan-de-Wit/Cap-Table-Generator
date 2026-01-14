@@ -163,8 +163,7 @@ Audience: founders, counsel, analysts.
         "interest_rate",
         "payment_date",
         "expected_conversion_date",
-        "interest_type",
-        "discount_rate"
+        "interest_type"
       ],
       "properties": {
         "holder_name": {

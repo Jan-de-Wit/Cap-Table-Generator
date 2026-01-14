@@ -199,6 +199,62 @@ def create_shares_from_percentage_formula(percentage_ownership_ref: str,
     return f"=IFERROR(MAX(0, {new_shares}), 0)"
 
 
+def create_shares_from_topup_percentage_formula(topup_percentage_ref: str,
+                                                pre_round_shares_ref: str,
+                                                holder_current_shares_ref: str = "0") -> str:
+    """
+    Calculate shares issued from a top-up percentage (percentage points added to current ownership).
+
+    TOP-UP PERCENTAGE CALCULATION:
+    - Adds a percentage on top of current ownership
+    - Current ownership: c = CurrentShares / PreRoundShares
+    - Target ownership: c + t (where t is the top-up percentage)
+    - Formula: New Shares = (t × PreRoundShares) / (1 - (CurrentShares / PreRoundShares) - t)
+    - Where: (CurrentShares + NewShares) / (PreRoundShares + NewShares) = c + t
+
+    Mathematical derivation:
+        Let c = C / P (current ownership)
+        Let t = top-up percentage
+        Target: (C + N) / (P + N) = c + t
+        C + N = (c + t) × (P + N)
+        C + N = c×P + t×P + (c + t)×N
+        C + N = C + t×P + (c + t)×N  (since c×P = C)
+        N = t×P + (c + t)×N
+        N - (c + t)×N = t×P
+        N × (1 - c - t) = t×P
+        N = (t×P) / (1 - c - t)
+        N = (t×P) / (1 - (C/P) - t)
+
+    Excel Formula:
+        =IFERROR(MAX(0, (TopUp% × PreRoundShares) / (1 - (HolderCurrentShares / PreRoundShares) - TopUp%)), 0)
+
+    Example:
+        Pre-round shares: 10M
+        Holder current shares: 0.5M (5% ownership)
+        Top-up: 5% (add 5 percentage points)
+        Target ownership: 5% + 5% = 10%
+        New shares: (0.05 × 10M) / (1 - (0.5M / 10M) - 0.05) = 0.5M / (1 - 0.05 - 0.05) = 0.5M / 0.90 = 0.556M
+        After round: (0.5M + 0.556M) / (10M + 0.556M) = 1.056M / 10.556M = 10% ✓
+
+    Args:
+        topup_percentage_ref: Reference to top-up percentage (as decimal, e.g., 0.05 for 5 percentage points)
+        pre_round_shares_ref: Reference to shares outstanding before round
+        holder_current_shares_ref: Reference to holder's current shares before this round (default: "0")
+
+    Returns:
+        Excel formula string
+    """
+    # Formula: N = (t × P) / (1 - (C/P) - t)
+    # Calculate current ownership: C / P
+    current_ownership = f"({holder_current_shares_ref} / {pre_round_shares_ref})"
+    # Numerator: t × P
+    numerator = f"({topup_percentage_ref} * {pre_round_shares_ref})"
+    # Denominator: 1 - (C/P) - t
+    denominator = f"(1 - {current_ownership} - {topup_percentage_ref})"
+    new_shares = f"({numerator} / {denominator})"
+    return f"=IFERROR(MAX(0, {new_shares}), 0)"
+
+
 def create_convertible_shares_formula(conversion_amount_ref: str,
                                       discount_rate_ref: str, round_pps_ref: str = None,
                                       valuation_cap_ref: str = None, total_shares_ref: str = None,

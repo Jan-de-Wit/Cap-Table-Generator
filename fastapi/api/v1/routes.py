@@ -4,6 +4,19 @@ API v1 Routes
 Version 1 API endpoints.
 """
 
+from captable.reporting import ValidationReportGenerator
+from captable.monitoring import PerformanceTracker
+from captable.constants import (
+    CALCULATION_TYPES,
+    CURRENT_SCHEMA_VERSION,
+    CALC_TYPE_FIXED_SHARES,
+    CALC_TYPE_TARGET_PERCENTAGE,
+    CALC_TYPE_VALUATION_BASED,
+    CALC_TYPE_CONVERTIBLE,
+    CALC_TYPE_SAFE,
+)
+from captable.errors import CapTableError, ExcelGenerationError
+from captable.services import CapTableService, ValidationService, ExportService
 import tempfile
 import os
 from pathlib import Path
@@ -47,19 +60,6 @@ if captable_path.exists():
         sys.path.insert(0, str(fastapi_path))
 
 # Now import
-from captable.services import CapTableService, ValidationService, ExportService
-from captable.errors import CapTableError, ExcelGenerationError
-from captable.constants import (
-    CALCULATION_TYPES,
-    CURRENT_SCHEMA_VERSION,
-    CALC_TYPE_FIXED_SHARES,
-    CALC_TYPE_TARGET_PERCENTAGE,
-    CALC_TYPE_VALUATION_BASED,
-    CALC_TYPE_CONVERTIBLE,
-    CALC_TYPE_SAFE,
-)
-from captable.monitoring import PerformanceTracker
-from captable.reporting import ValidationReportGenerator
 
 router = APIRouter(prefix="/api/v1", tags=["v1"])
 
@@ -76,7 +76,8 @@ def cleanup_file(file_path: str):
         if os.path.exists(file_path):
             os.unlink(file_path)
     except Exception as e:
-        print(f"Warning: Failed to cleanup file {file_path}: {e}", file=__import__("sys").stderr)
+        print(f"Warning: Failed to cleanup file {file_path}: {e}", file=__import__(
+            "sys").stderr)
 
 
 @router.post("/generate-excel", response_model=CapTableResponse)
@@ -86,19 +87,30 @@ async def generate_excel(
 ):
     """
     Generate Excel file from cap table JSON data.
-    
+
     Args:
         request: Cap table data in JSON format
-        
+
     Returns:
         Excel file as binary response
     """
     try:
         with performance_tracker.track("excel_generation"):
             data = request.model_dump()
-            
+
+            # Extract currency (default to USD if not provided)
+            currency = data.pop("currency", "N/A")
+            if currency not in ["USD", "EUR"]:
+                currency = "EUR"  # Default to EUR for invalid values
+
+                print(f"WARNING: Invalid currency value {currency}, defaulting to EUR", file=__import__(
+                    "sys").stderr)
+
+
             # Validate the data
-            validation_report = validation_service.validate(data, include_suggestions=True)
+            validation_report = validation_service.validate(
+                data, include_suggestions=True)
+
             if not validation_report.is_valid:
                 error_details = [
                     ValidationErrorDetail(
@@ -118,19 +130,20 @@ async def generate_excel(
                         "summary": validation_report.get_summary()
                     }
                 )
-            
+
             # Create temporary file for Excel output
             excel_path = None
             try:
                 with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp_file:
                     excel_path = tmp_file.name
-                
+
                 # Generate Excel file using service
-                result_path = cap_table_service.generate_excel(data, excel_path)
-                
+                result_path = cap_table_service.generate_excel(
+                    data, excel_path, currency=currency)
+
                 # Schedule cleanup after response is sent
                 background_tasks.add_task(cleanup_file, excel_path)
-                
+
                 # Return the Excel file
                 return FileResponse(
                     result_path,
@@ -148,7 +161,7 @@ async def generate_excel(
                     except:
                         pass
                 raise
-    
+
     except HTTPException:
         raise
     except CapTableError as e:
@@ -166,7 +179,7 @@ async def generate_excel(
         traceback_str = traceback.format_exc()
         print(f"ERROR: {error_msg}", file=__import__("sys").stderr)
         print(traceback_str, file=__import__("sys").stderr)
-        
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=ErrorResponse(
@@ -180,18 +193,19 @@ async def generate_excel(
 async def validate_cap_table_endpoint(request: ValidationRequest):
     """
     Validate cap table JSON data without generating Excel.
-    
+
     Args:
         request: Cap table data in JSON format
-        
+
     Returns:
         Validation result with errors if any
     """
     try:
         with performance_tracker.track("validation"):
             data = request.model_dump()
-            validation_report = validation_service.validate(data, include_suggestions=True)
-            
+            validation_report = validation_service.validate(
+                data, include_suggestions=True)
+
             error_details = [
                 ValidationErrorDetail(
                     error_code=error.error_code,
@@ -201,7 +215,7 @@ async def validate_cap_table_endpoint(request: ValidationRequest):
                 )
                 for error in validation_report.errors
             ]
-            
+
             return ValidationResponse(
                 is_valid=validation_report.is_valid,
                 validation_errors=[str(e) for e in validation_report.errors],
@@ -214,7 +228,7 @@ async def validate_cap_table_endpoint(request: ValidationRequest):
         traceback_str = traceback.format_exc()
         print(f"ERROR: {error_msg}", file=__import__("sys").stderr)
         print(traceback_str, file=__import__("sys").stderr)
-        
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=ErrorResponse(
@@ -228,7 +242,7 @@ async def validate_cap_table_endpoint(request: ValidationRequest):
 async def get_schema():
     """
     Get current schema information.
-    
+
     Returns:
         Schema version and supported versions
     """
@@ -242,7 +256,7 @@ async def get_schema():
 async def get_calculation_types():
     """
     Get list of supported calculation types.
-    
+
     Returns:
         List of calculation types with descriptions
     """
@@ -260,24 +274,26 @@ async def get_calculation_types():
             "required_fields": ["investment_amount", "valuation"]
         },
         CALC_TYPE_CONVERTIBLE: {
-            "description": "Convertible note with interest and discount",
-            "required_fields": ["investment_amount", "interest_rate", "discount_rate"]
+            "description": "Convertible note with interest and optional discount",
+            "required_fields": ["investment_amount", "interest_rate"]
         },
         CALC_TYPE_SAFE: {
             "description": "SAFE (Simple Agreement for Future Equity)",
-            "required_fields": ["investment_amount", "discount_rate"]
+            "required_fields": ["investment_amount"]
         },
     }
-    
+
     types = [
         CalculationTypeInfo(
             name=calc_type,
-            description=calculation_type_info.get(calc_type, {}).get("description", ""),
-            required_fields=calculation_type_info.get(calc_type, {}).get("required_fields", [])
+            description=calculation_type_info.get(
+                calc_type, {}).get("description", ""),
+            required_fields=calculation_type_info.get(
+                calc_type, {}).get("required_fields", [])
         )
         for calc_type in CALCULATION_TYPES
     ]
-    
+
     return CalculationTypesResponse(calculation_types=types)
 
 
@@ -285,10 +301,10 @@ async def get_calculation_types():
 async def calculate_shares(request: CalculateSharesRequest):
     """
     Calculate shares for a specific instrument.
-    
+
     Args:
         request: Calculation request with instrument and round data
-        
+
     Returns:
         Calculated shares and formula
     """
@@ -298,7 +314,7 @@ async def calculate_shares(request: CalculateSharesRequest):
         calc_type = request.calculation_type
         instrument = request.instrument_data
         round_data = request.round_data
-        
+
         if calc_type == CALC_TYPE_FIXED_SHARES:
             shares = instrument.get("initial_quantity", 0)
             formula = f"={shares}"
@@ -314,7 +330,7 @@ async def calculate_shares(request: CalculateSharesRequest):
             shares = 0
             formula = "=0"
             explanation = "Calculation not yet implemented for this type"
-        
+
         return CalculateSharesResponse(
             shares=shares,
             formula=formula,
@@ -331,32 +347,33 @@ async def calculate_shares(request: CalculateSharesRequest):
 async def get_templates():
     """
     Get example cap table templates.
-    
+
     Returns:
         List of available templates
     """
     # Load templates from examples directory
     examples_dir = Path(__file__).parent.parent.parent.parent / "examples"
     templates = []
-    
+
     if examples_dir.exists():
         for json_file in examples_dir.glob("*.json"):
             try:
                 import json
                 with open(json_file, 'r') as f:
                     data = json.load(f)
-                
+
                 templates.append(
                     TemplateInfo(
                         name=json_file.stem.replace("_", " ").title(),
                         description=f"Example cap table from {json_file.name}",
-                        schema_version=data.get("schema_version", CURRENT_SCHEMA_VERSION),
+                        schema_version=data.get(
+                            "schema_version", CURRENT_SCHEMA_VERSION),
                         data=data
                     )
                 )
             except Exception:
                 continue
-    
+
     return TemplateResponse(templates=templates)
 
 
@@ -364,22 +381,22 @@ async def get_templates():
 async def compare_cap_tables(request: CompareRequest):
     """
     Compare two cap tables and identify differences.
-    
+
     Args:
         request: Two cap tables to compare
-        
+
     Returns:
         Comparison result with differences
     """
     try:
         import json
-        
+
         # Simple comparison - convert to JSON strings and compare
         data1_str = json.dumps(request.cap_table_1, sort_keys=True)
         data2_str = json.dumps(request.cap_table_2, sort_keys=True)
-        
+
         are_identical = data1_str == data2_str
-        
+
         differences = []
         if not are_identical:
             # Simplified difference detection
@@ -392,7 +409,7 @@ async def compare_cap_tables(request: CompareRequest):
                     value_2="Cap Table 2"
                 )
             )
-        
+
         return CompareResponse(
             are_identical=are_identical,
             differences=differences,
@@ -411,4 +428,3 @@ async def compare_cap_tables(request: CompareRequest):
 async def health_check():
     """Health check endpoint."""
     return {"status": "ok", "version": "1.0.0"}
-

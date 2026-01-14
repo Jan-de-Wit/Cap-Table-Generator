@@ -12,18 +12,18 @@ from ..types import CapTableData
 
 class CapTableService:
     """Service for cap table business logic."""
-    
+
     def __init__(self):
         """Initialize cap table service."""
         pass
-    
+
     def validate_cap_table(self, data: CapTableData) -> tuple[bool, list[str]]:
         """
         Validate cap table data.
-        
+
         Args:
             data: Cap table data dictionary
-            
+
         Returns:
             Tuple of (is_valid, list of error messages)
         """
@@ -31,42 +31,46 @@ class CapTableService:
         is_valid = generator.validate()
         errors = generator.get_validation_errors() if not is_valid else []
         return is_valid, errors
-    
+
     def generate_excel(
         self,
         data: CapTableData,
         output_path: str,
-        force: bool = False
+        force: bool = False,
+        currency: str = "EUR"
     ) -> str:
         """
         Generate Excel file from cap table data.
-        
+
         Args:
             data: Cap table data dictionary
             output_path: Path for output Excel file
             force: If True, generate even with validation errors
-            
+            currency: Currency format (USD or EUR), defaults to EUR
+
         Returns:
             Path to generated Excel file
-            
+
         Raises:
             ExcelGenerationError: If generation fails
         """
         try:
             generator = CapTableGenerator(json_data=data)
-            
+
             if not force:
                 if not generator.validate():
                     errors = generator.get_validation_errors()
-                    error_msg = "Cap table data is invalid:\n" + "\n".join(errors)
+                    error_msg = "Cap table data is invalid:\n" + \
+                        "\n".join(errors)
                     raise ExcelGenerationError(
                         error_msg,
                         details={"validation_errors": errors}
                     )
-            
-            result_path = generator.generate_excel(output_path, force=force)
+
+            result_path = generator.generate_excel(
+                output_path, force=force, currency=currency)
             return result_path
-        
+
         except CapTableError:
             raise
         except Exception as e:
@@ -74,7 +78,7 @@ class CapTableService:
                 f"Failed to generate Excel: {str(e)}",
                 details={"original_error": str(e)}
             ) from e
-    
+
     def export_json(
         self,
         data: CapTableData,
@@ -83,19 +87,15 @@ class CapTableService:
     ) -> str:
         """
         Export cap table data to JSON file.
-        
+
         Args:
             data: Cap table data dictionary
             output_path: Path for output JSON file
             indent: JSON indentation level
-            
+
         Returns:
             Path to exported JSON file
         """
         generator = CapTableGenerator(json_data=data)
         generator.export_json(output_path, indent=indent)
         return output_path
-
-
-
-

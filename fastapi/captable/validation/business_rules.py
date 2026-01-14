@@ -260,9 +260,10 @@ class BusinessRulesValidator:
                         )
 
                 elif calc_type == "convertible":
-                    # ConvertibleInstrument requires: investment_amount, interest_rate, payment_date, expected_conversion_date, interest_type, discount_rate
+                    # ConvertibleInstrument requires: investment_amount, interest_rate, payment_date, expected_conversion_date, interest_type
+                    # discount_rate is optional (can be 0% or omitted)
                     required_fields = ["investment_amount", "interest_rate", "payment_date",
-                                       "expected_conversion_date", "interest_type", "discount_rate"]
+                                       "expected_conversion_date", "interest_type"]
                     # Support backward compatibility with old field names
                     if "payment_date" not in instrument and "interest_start_date" in instrument:
                         # Old format - allow but prefer new
@@ -297,9 +298,10 @@ class BusinessRulesValidator:
                         )
 
                 elif calc_type == "safe":
-                    # SafeInstrument requires: investment_amount, expected_conversion_date, discount_rate
+                    # SafeInstrument requires: investment_amount, expected_conversion_date
+                    # discount_rate is optional (can be 0% or omitted)
                     required_fields = ["investment_amount",
-                                       "expected_conversion_date", "discount_rate"]
+                                       "expected_conversion_date"]
                     missing_fields = [
                         f for f in required_fields if f not in instrument]
 

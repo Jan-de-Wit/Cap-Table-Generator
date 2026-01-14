@@ -125,9 +125,12 @@ export function RoundInstrumentsSection({
         : "—";
     }
     if (field === "target_percentage") {
-      return "target_percentage" in instrument
-        ? `${decimalToPercentage(instrument.target_percentage).toFixed(2)}%`
-        : "—";
+      if ("target_percentage" in instrument) {
+        const isTopUp = (instrument as any).target_is_top_up || false;
+        const value = `${decimalToPercentage(instrument.target_percentage).toFixed(2)}%`;
+        return isTopUp ? `${value} (top-up)` : value;
+      }
+      return "—";
     }
     if (field === "investment_amount") {
       return "investment_amount" in instrument

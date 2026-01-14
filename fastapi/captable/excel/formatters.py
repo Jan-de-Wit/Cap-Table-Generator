@@ -18,12 +18,13 @@ class ExcelFormatters:
     """
 
     @staticmethod
-    def create_formats(workbook: xlsxwriter.Workbook) -> Dict[str, xlsxwriter.worksheet.Format]:
+    def create_formats(workbook: xlsxwriter.Workbook, currency: str = "USD") -> Dict[str, xlsxwriter.worksheet.Format]:
         """
         Create all standard cell formats for the workbook.
 
         Args:
             workbook: xlsxwriter Workbook instance
+            currency: Currency format (USD or EUR), defaults to USD
 
         Returns:
             Dictionary mapping format names to Format objects
@@ -36,7 +37,7 @@ class ExcelFormatters:
             - round_name: 11pt PT Sans Bold for round names
             - round_header: Century Gothic 14pt Bold with blue background for merged round headers
             - round_header_plain: Century Gothic 14pt Bold for plain round names (no background)
-            - currency: Currency format with $ and commas, shows "-" when empty
+            - currency: Currency format with $ or € and commas, shows "-" when empty
             - percent: Percentage format, shows "-" when empty
             - number: Integer with thousands separator, shows "-" when empty
             - decimal: Decimal number with commas
@@ -53,6 +54,13 @@ class ExcelFormatters:
             - table_date: Left-aligned date format for table cells
             - table_percent: Left-aligned percent format for table cells
         """
+        # Determine currency format code
+        # Accounting format: currency symbol at left edge, number at right edge
+        # The _ at start adds space to push currency to left, * repeats space to fill gap
+        if currency == "EUR":
+            currency_format = '_([$€-2]* #,##0.00_);_([$€-2]* (#,##0.00);_([$€-2]* "-"??_);_(@_)'
+        else:  # Default to USD
+            currency_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
         return {
             'text': workbook.add_format({
                 'font_name': 'PT Sans',
@@ -97,9 +105,9 @@ class ExcelFormatters:
                 'font_name': 'PT Sans',
                 'font_size': 11,
                 'font_color': '#000000',
-                'num_format': '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)',
+                'num_format': currency_format,
                 'bg_color': '#FFFFFF',
-                'align': 'right'
+                'align': 'right'  # Right-align ensures number stays at right edge
             }),
             'percent': workbook.add_format({
                 'font_name': 'PT Sans',
@@ -184,11 +192,11 @@ class ExcelFormatters:
                 'font_name': 'PT Sans',
                 'font_size': 11,
                 'font_color': '#000000',
-                'num_format': '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)',
+                'num_format': currency_format,
                 'top': 1,
                 'bottom': 1,
                 'bg_color': '#FFFFFF',
-                'align': 'left'
+                'align': 'right'  # Right-align ensures number stays at right edge
             }),
             'total_text': workbook.add_format({
                 'font_name': 'PT Sans',
@@ -210,9 +218,9 @@ class ExcelFormatters:
                 'font_name': 'PT Sans',
                 'font_size': 11,
                 'font_color': '#000000',
-                'num_format': '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)',
+                'num_format': currency_format,
                 'bg_color': '#FFFFFF',
-                'align': 'left'
+                'align': 'right'  # Right-align ensures number stays at right edge
             }),
             'table_number': workbook.add_format({
                 'font_name': 'PT Sans',

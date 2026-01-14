@@ -26,6 +26,7 @@ import { FieldWithHelp } from "@/components/field-with-help";
 import { Combobox } from "@/components/ui/combobox";
 import { Separator } from "@/components/ui/separator";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Info, CheckIcon, ChevronsUpDown, X } from "lucide-react";
 import {
   Popover,
@@ -359,7 +360,7 @@ export function InstrumentDialog({
                 setFormData({ ...base, initial_quantity: 0 });
                 break;
               case "target_percentage":
-                setFormData({ ...base, target_percentage: 0 });
+                setFormData({ ...base, target_percentage: 0, target_is_top_up: false });
                 break;
               case "valuation_based":
                 setFormData({ ...base, investment_amount: 0 });
@@ -372,7 +373,6 @@ export function InstrumentDialog({
                   payment_date: "",
                   expected_conversion_date: "",
                   interest_type: "simple",
-                  discount_rate: 0,
                 });
                 break;
               case "safe":
@@ -380,7 +380,6 @@ export function InstrumentDialog({
                   ...base,
                   investment_amount: 0,
                   expected_conversion_date: "",
-                  discount_rate: 0,
                 });
                 break;
             }
@@ -581,9 +580,7 @@ export function InstrumentDialog({
             }
           }
           const discountRate = (formData as any).discount_rate;
-          if (discountRate === undefined || discountRate === null) {
-            errors.push("Discount rate is required");
-          } else {
+          if (discountRate !== undefined && discountRate !== null) {
             const percentageError = validatePercentage(
               decimalToPercentage(discountRate),
               "Discount rate"
@@ -605,9 +602,7 @@ export function InstrumentDialog({
             errors.push("Expected conversion date is required");
           }
           const safeDiscountRate = (formData as any).discount_rate;
-          if (safeDiscountRate === undefined || safeDiscountRate === null) {
-            errors.push("Discount rate is required");
-          } else {
+          if (safeDiscountRate !== undefined && safeDiscountRate !== null) {
             const percentageError = validatePercentage(
               decimalToPercentage(safeDiscountRate),
               "Discount rate"
@@ -1404,71 +1399,92 @@ export function InstrumentDialog({
                           )}
 
                           {calculationType === "target_percentage" && (
-                            <FieldWithHelp
-                              label="Target Percentage"
-                              helpText="Target ownership percentage (0-100%)"
-                              required
-                              error={
-                                touchedFields.has("target_percentage") &&
-                                (formData as any).target_percentage !==
-                                  undefined
-                                  ? validatePercentage(
-                                      decimalToPercentage(
-                                        (formData as any).target_percentage
-                                      ),
-                                      "Target percentage"
-                                    )
-                                  : undefined
-                              }
-                              htmlFor="target-percentage"
-                            >
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  id="target-percentage"
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  max="100"
-                                  value={
-                                    (formData as any).target_percentage
-                                      ? decimalToPercentage(
+                            <>
+                              <FieldWithHelp
+                                label="Target Percentage"
+                                helpText={
+                                  (formData as any).target_is_top_up
+                                    ? "Percentage points to add on top of current ownership (0-100%)"
+                                    : "Target ownership percentage (0-100%)"
+                                }
+                                required
+                                error={
+                                  touchedFields.has("target_percentage") &&
+                                  (formData as any).target_percentage !==
+                                    undefined
+                                    ? validatePercentage(
+                                        decimalToPercentage(
                                           (formData as any).target_percentage
-                                        )
-                                      : ""
-                                  }
-                                  onChange={(e) => {
-                                    const percentage = e.target.value
-                                      ? parseFloat(e.target.value)
-                                      : 0;
-                                    updateField(
-                                      "target_percentage",
-                                      percentageToDecimal(percentage)
-                                    );
+                                        ),
+                                        "Target percentage"
+                                      )
+                                    : undefined
+                                }
+                                htmlFor="target-percentage"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    id="target-percentage"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    value={
+                                      (formData as any).target_percentage
+                                        ? decimalToPercentage(
+                                            (formData as any).target_percentage
+                                          )
+                                        : ""
+                                    }
+                                    onChange={(e) => {
+                                      const percentage = e.target.value
+                                        ? parseFloat(e.target.value)
+                                        : 0;
+                                      updateField(
+                                        "target_percentage",
+                                        percentageToDecimal(percentage)
+                                      );
+                                    }}
+                                    onBlur={() =>
+                                      setTouchedFields(
+                                        (prev) =>
+                                          new Set([...prev, "target_percentage"])
+                                      )
+                                    }
+                                    className={
+                                      touchedFields.has("target_percentage") &&
+                                      (formData as any).target_percentage !==
+                                        undefined &&
+                                      validatePercentage(
+                                        decimalToPercentage(
+                                          (formData as any).target_percentage
+                                        ),
+                                        "Target percentage"
+                                      )
+                                        ? "border-destructive ring-destructive/20"
+                                        : ""
+                                    }
+                                    placeholder="e.g., 20 for 20%"
+                                  />
+                                  <span className="text-muted-foreground">%</span>
+                                </div>
+                              </FieldWithHelp>
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id="target-is-top-up"
+                                  checked={(formData as any).target_is_top_up || false}
+                                  onCheckedChange={(checked) => {
+                                    updateField("target_is_top_up", checked === true);
                                   }}
-                                  onBlur={() =>
-                                    setTouchedFields(
-                                      (prev) =>
-                                        new Set([...prev, "target_percentage"])
-                                    )
-                                  }
-                                  className={
-                                    touchedFields.has("target_percentage") &&
-                                    (formData as any).target_percentage !==
-                                      undefined &&
-                                    validatePercentage(
-                                      decimalToPercentage(
-                                        (formData as any).target_percentage
-                                      ),
-                                      "Target percentage"
-                                    )
-                                      ? "border-destructive ring-destructive/20"
-                                      : ""
-                                  }
-                                  placeholder="e.g., 20 for 20%"
                                 />
-                                <span className="text-muted-foreground">%</span>
+                                <label
+                                  htmlFor="target-is-top-up"
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                >
+                                  Top-up mode (add percentage points instead of total to percentage)
+                                </label>
                               </div>
-                            </FieldWithHelp>
+                            </>
                           )}
 
                           {calculationType === "valuation_based" && (
@@ -1739,8 +1755,7 @@ export function InstrumentDialog({
                           </FieldWithHelp>
                           <FieldWithHelp
                             label="Discount Rate"
-                            helpText="Discount percentage applied at conversion (0-100%)"
-                            required
+                            helpText="Discount percentage applied at conversion (0-100%, optional)"
                             error={
                               touchedFields.has("discount_rate") &&
                               (formData as any).discount_rate !== undefined
@@ -1762,20 +1777,25 @@ export function InstrumentDialog({
                                 min="0"
                                 max="100"
                                 value={
-                                  (formData as any).discount_rate
+                                  (formData as any).discount_rate !== undefined
                                     ? decimalToPercentage(
                                         (formData as any).discount_rate
                                       )
                                     : ""
                                 }
                                 onChange={(e) => {
-                                  const percentage = e.target.value
-                                    ? parseFloat(e.target.value)
-                                    : 0;
-                                  updateField(
-                                    "discount_rate",
-                                    percentageToDecimal(percentage)
-                                  );
+                                  const value = e.target.value.trim();
+                                  if (value === "") {
+                                    updateField("discount_rate", undefined);
+                                  } else {
+                                    const percentage = parseFloat(value);
+                                    if (!isNaN(percentage)) {
+                                      updateField(
+                                        "discount_rate",
+                                        percentageToDecimal(percentage)
+                                      );
+                                    }
+                                  }
                                 }}
                                 onBlur={() =>
                                   setTouchedFields(
@@ -2015,8 +2035,18 @@ export function InstrumentDialog({
                           </FieldWithHelp>
                           <FieldWithHelp
                             label="Discount Rate"
-                            helpText="Discount percentage applied at conversion (0-100%)"
-                            required
+                            helpText="Discount percentage applied at conversion (0-100%, optional)"
+                            error={
+                              touchedFields.has("discount_rate") &&
+                              (formData as any).discount_rate !== undefined
+                                ? validatePercentage(
+                                    decimalToPercentage(
+                                      (formData as any).discount_rate
+                                    ),
+                                    "Discount rate"
+                                  )
+                                : undefined
+                            }
                             htmlFor="safe-discount-rate"
                           >
                             <div className="flex items-center gap-2">
@@ -2027,20 +2057,25 @@ export function InstrumentDialog({
                                 min="0"
                                 max="100"
                                 value={
-                                  (formData as any).discount_rate
+                                  (formData as any).discount_rate !== undefined
                                     ? decimalToPercentage(
                                         (formData as any).discount_rate
                                       )
                                     : ""
                                 }
                                 onChange={(e) => {
-                                  const percentage = e.target.value
-                                    ? parseFloat(e.target.value)
-                                    : 0;
-                                  updateField(
-                                    "discount_rate",
-                                    percentageToDecimal(percentage)
-                                  );
+                                  const value = e.target.value.trim();
+                                  if (value === "") {
+                                    updateField("discount_rate", undefined);
+                                  } else {
+                                    const percentage = parseFloat(value);
+                                    if (!isNaN(percentage)) {
+                                      updateField(
+                                        "discount_rate",
+                                        percentageToDecimal(percentage)
+                                      );
+                                    }
+                                  }
                                 }}
                                 onBlur={() =>
                                   setTouchedFields(
